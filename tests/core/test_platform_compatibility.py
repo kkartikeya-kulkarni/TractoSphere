@@ -108,7 +108,13 @@ def test_argv_unicode_space_directory_and_no_overwrite(tmp_path):
     log = folder / "tool log.txt"
     argument = "literal $HOME; & filename β"
     r = run_command(
-        [sys.executable, "-c", "import sys, time; print(sys.argv[1]); time.sleep(0.25)", argument],
+        [
+            sys.executable,
+            "-c",
+            "import sys, time; sys.stdout.buffer.write(sys.argv[1].encode('utf-8')); "
+            "sys.stdout.buffer.flush(); time.sleep(0.25)",
+            argument,
+        ],
         cwd=folder,
         log=log,
         environment=os.environ,

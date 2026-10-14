@@ -97,8 +97,8 @@ def validate_epi_reference(dwi: Path, reference: Path, dwi_metadata: dict, metad
     # IntendedFor. Named external datasets require a DatasetLinks resolver;
     # neither basename matching nor another subject's path is sufficient.
     accepted_targets = {
-        str(dwi.relative_to(target)),
-        "bids::" + str(dwi.relative_to(target.parent)),
+        dwi.relative_to(target).as_posix(),
+        "bids::" + dwi.relative_to(target.parent).as_posix(),
     }
     if not isinstance(intended, list) or not any(
         isinstance(item, str) and item in accepted_targets for item in intended

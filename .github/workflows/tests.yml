@@ -3,30 +3,32 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform subset for focused verification'
+        type: choice
+        default: all
+        options:
+          - all
+          - windows
+          - macos-arm64
 permissions:
   contents: read
 concurrency:
-  group: platform-tests-${{ github.ref }}
+  group: platform-tests-${{ github.ref }}-${{ github.event_name }}-${{ inputs.platform || 'all' }}
   cancel-in-progress: true
 jobs:
   verify:
     # Private repository remains private; do not consume paid private CI minutes.
     if: github.event.repository.private == false
     timeout-minutes: 25
+    env:
+      # UTF-8 reporting/child streams; does not change Windows file-encoding defaults.
+      PYTHONIOENCODING: utf-8
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-15
-            python: '3.12'
-          - os: macos-15-intel
-            python: '3.12'
-          - os: ubuntu-24.04
-            python: '3.12'
-          - os: ubuntu-24.04
-            python: '3.13'
-          - os: windows-2022
-            python: '3.12'
+        include: ${{ fromJSON(inputs.platform == 'windows' && '[{"os":"windows-2022","python":"3.12"}]' || inputs.platform == 'macos-arm64' && '[{"os":"macos-15","python":"3.12"}]' || '[{"os":"macos-15","python":"3.12"},{"os":"macos-15-intel","python":"3.12"},{"os":"ubuntu-24.04","python":"3.12"},{"os":"ubuntu-24.04","python":"3.13"},{"os":"windows-2022","python":"3.12"}]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

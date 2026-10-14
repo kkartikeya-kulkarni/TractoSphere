@@ -263,3 +263,27 @@ def test_diagnostic_gate_preserves_nonfinite_and_collapse_failures(tmp_path):
             correction_gate(dataset, folder, {"shells": shells}, lambda: False)
     finally:
         dataset.close()
+
+
+def test_bids_reference_paths_stay_posix_with_windows_relative_paths(tmp_path, monkeypatch):
+    """BIDS URI separators stay '/', regardless of host filesystem separators."""
+    from pathlib import PureWindowsPath
+
+    dataset, _, _, ref = fixture(tmp_path)
+    original = Path.relative_to
+
+    def windows_relative(self, *args, **kwargs):
+        return PureWindowsPath(original(self, *args, **kwargs).as_posix())
+
+    metadata = json.loads(dataset.paths.dwi.with_suffix(".json").read_text())
+    reference = json.loads(ref.with_suffix(".json").read_text())
+    try:
+        monkeypatch.setattr(Path, "relative_to", windows_relative)
+        assert validate_epi_reference(dataset.paths.dwi, ref, metadata, reference)[
+            "intended_for_verified"
+        ]
+        reference["IntendedFor"] = reference["IntendedFor"].replace("sub-test", "sub-other")
+        with pytest.raises(ValueError, match="does not identify"):
+            validate_epi_reference(dataset.paths.dwi, ref, metadata, reference)
+    finally:
+        dataset.close()
