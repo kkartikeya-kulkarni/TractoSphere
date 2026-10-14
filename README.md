@@ -5,7 +5,7 @@
 An open-source diffusion MRI research workstation for preprocessing, quality
 control, visualization, tractography, and analysis.
 
-**PUBLIC ALPHA · RESEARCH USE ONLY · NOT FOR CLINICAL USE · SCIENTIFIC VALIDATION ONGOING**
+**PUBLIC ALPHA**
 
 TractoSphere brings a linked MRI and tractography workspace together with
 metadata-aware preprocessing and saved QC. The alpha supports visualization and
