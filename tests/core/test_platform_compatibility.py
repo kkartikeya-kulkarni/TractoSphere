@@ -202,3 +202,31 @@ def test_windows_non_native_launcher_not_executed(tmp_path, monkeypatch):
     )
     row = next(r for r in report["tools"] if r["name"] == "mrconvert")
     assert row["state"] == "unverified" and "Not a native" in row["detail"]
+
+
+def test_windows_gzip_policy_preserves_unicode_image_values(tmp_path, monkeypatch):
+    """Safe backend selection keeps all image values/geometry and writer behavior."""
+    import nibabel.openers as openers
+
+    from dmri_studio.core.image_io import configure_safe_image_io
+
+    modules = [openers]
+    try:
+        from nibabel import _compression
+    except ImportError:
+        pass
+    else:
+        modules.append(_compression)
+    for module in modules:
+        if hasattr(module, "HAVE_INDEXED_GZIP"):
+            monkeypatch.setattr(module, "HAVE_INDEXED_GZIP", True)
+    assert configure_safe_image_io("Linux") is False
+    assert configure_safe_image_io("Windows") is True
+    assert all(not m.HAVE_INDEXED_GZIP for m in modules if hasattr(m, "HAVE_INDEXED_GZIP"))
+    path = tmp_path / "image β.nii.gz"
+    data = np.arange(120, dtype=np.float32).reshape(4, 5, 6)
+    affine = np.diag([-2, 3, 4, 1])
+    nib.save(nib.Nifti1Image(data, affine), path)
+    image = nib.load(path)
+    assert np.array_equal(np.asarray(image.dataobj), data)
+    assert np.array_equal(image.affine, affine)

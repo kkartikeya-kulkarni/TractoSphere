@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep BIDS calibration URI comparisons in portable slash form on Windows.
+- Use NiBabel's standard gzip reader on Windows after isolating a native
+  indexed_gzip Unicode-filename crash; preserve optional acceleration elsewhere.
+
 - Preserve approved SVG/font/icon bytes during Windows Git checkout; exact-hash
   release auditing remains enabled and rejects modified assets.
 - Verify linked-view expansion through workspace/layout geometry and persisted

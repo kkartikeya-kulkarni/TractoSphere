@@ -101,3 +101,11 @@ Sources: [Qt](https://doc.qt.io/qt-6/supported-platforms.html),
 [WSL commands](https://learn.microsoft.com/windows/wsl/reference),
 [WSL interoperability](https://learn.microsoft.com/en-us/windows/dev-environment/wsl-interop),
 [GitHub runner architecture and pricing scope](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+
+## Windows gzip safety
+
+CI reproduced a native indexed_gzip 1.10.3 process exit for a Unicode NIfTI
+filename. TractoSphere selects NiBabel's standard gzip backend process-locally
+on Windows before core image reads. Source arrays and installed packages are
+unchanged; compressed random reads can be slower. macOS/Linux keep acceleration.
+This fix is on main after v0.1.0-alpha; the published alpha artifacts are unchanged.

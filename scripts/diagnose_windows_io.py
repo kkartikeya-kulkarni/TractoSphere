@@ -21,8 +21,8 @@ with tempfile.TemporaryDirectory() as directory:
     nib.save(nib.Nifti1Image(np.ones((4, 5, 6), np.float32), np.eye(4)), path)
     print("checkpoint: load; indexed_gzip=", compression.HAVE_INDEXED_GZIP, flush=True)
     if DISABLE:
-        # Diagnostic comparison only, scoped to this disposable child process.
-        compression.HAVE_INDEXED_GZIP = False
+        # Run the actual application initialization in this isolated child.
+        import dmri_studio.core
     image = nib.load(path)
     print("checkpoint: materialize", flush=True)
     assert np.asarray(image.dataobj).sum() == 120
@@ -30,7 +30,9 @@ with tempfile.TemporaryDirectory() as directory:
 """)
 
 for name, disable in [("ascii.nii.gz", False), ("MRI β.nii.gz", False), ("MRI β.nii.gz", True)]:
-    print(f"Diagnostic: {name!r}, disable_indexed_gzip={disable}", flush=True)
+    print(f"Diagnostic: {name!r}, use_application_policy={disable}", flush=True)
     code = CODE.replace("NAME", repr(name)).replace("DISABLE", repr(disable))
     child = subprocess.run([sys.executable, "-u", "-c", code], timeout=30)
     print(f"Diagnostic return code: {child.returncode}", flush=True)
+    if disable or name == "ascii.nii.gz":
+        assert child.returncode == 0, "Application-safe image I/O failed"
