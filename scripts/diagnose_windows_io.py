@@ -12,16 +12,17 @@ import textwrap
 CODE = textwrap.dedent("""
 import faulthandler, pathlib, tempfile
 import nibabel as nib
+import nibabel._compression as compression
 import numpy as np
 faulthandler.enable()
 with tempfile.TemporaryDirectory() as directory:
     path = pathlib.Path(directory) / NAME
     print("checkpoint: save", str(path), flush=True)
     nib.save(nib.Nifti1Image(np.ones((4, 5, 6), np.float32), np.eye(4)), path)
-    print("checkpoint: load; indexed_gzip=", nib.openers.HAVE_INDEXED_GZIP, flush=True)
+    print("checkpoint: load; indexed_gzip=", compression.HAVE_INDEXED_GZIP, flush=True)
     if DISABLE:
         # Diagnostic comparison only, scoped to this disposable child process.
-        nib.openers.HAVE_INDEXED_GZIP = False
+        compression.HAVE_INDEXED_GZIP = False
     image = nib.load(path)
     print("checkpoint: materialize", flush=True)
     assert np.asarray(image.dataobj).sum() == 120
