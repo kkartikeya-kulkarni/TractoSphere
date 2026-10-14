@@ -1,6 +1,9 @@
 # Quick start
 
-1. Install the GUI extra and run `dmri-studio gui`.
+1. Follow the [installation guide](installation.md). Mac users can use the
+   release helper without Git. Open the app using the launch command for your
+   installation and choose **Continue with viewer only** if scientific tools
+   are not configured. MRtrix3, FSL and ANTs are not needed for steps 2–6.
 2. Use **Image viewer** or **Tractography** to open an anatomical NIfTI without
    creating a preprocessing project. The four-view workspace links the crosshair
    and preserves coded geometry. Open a 4D image to navigate volumes.
@@ -14,7 +17,9 @@
    group as a new derivative. This does not generate tractography.
 6. Save a workspace to preserve source references, ROI derivatives and display/
    camera state. Keep its source files and assets directory accessible.
-7. For preprocessing, use **Data & imports**, select DWI/bval/bvec/JSON and inspect
+7. For preprocessing, first install the needed scientific tools and
+   [select/test/save their actual folders](installation.md#which-folders-to-select).
+   Then use **Data & imports**, select DWI/bval/bvec/JSON and inspect
    validation. Record processing history only with evidence. In **Preprocessing**,
    select eligible operations, configure inputs and create a command preview.
    Approve the reviewed plan to run in a NEW local output directory.

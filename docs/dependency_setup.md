@@ -5,6 +5,15 @@ Python GUI dependencies alone. MRtrix3, FSL and ANTs are optional **local
 command-line installations**, not bundled tools, imported libraries, containers
 or remote APIs. TractoSphere never installs, upgrades or downgrades them.
 
+## Start here if you are installing for the first time
+
+Use the [step-by-step installation guide](installation.md), including the
+[folder selection table for all three packages](installation.md#which-folders-to-select).
+It lists the exact example `bin` paths, expected executable names, Finder folder
+selection, direct version checks, FSL's installation records and
+[macOS security popups](installation.md#macos-security-popups).
+The rest of this page documents how the existing checker works.
+
 ## First launch
 
 After entering the studio, the setup dialog inventories installed scientific

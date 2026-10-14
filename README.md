@@ -16,36 +16,41 @@ generation and connectome analysis are future capabilities.
 
 ## Try the alpha
 
-Python **3.12 or newer** is required. macOS Apple Silicon is the locally verified
-platform. Ubuntu 24.04 ARM64 also has bounded VM/X11 software-rendering validation.
-Intel macOS, Linux x86-64 and Windows remain experimental and have no native
-runtime verification yet. Windows preprocessing/WSL bridging is unsupported.
+**Mac users: start with the [step-by-step installation guide](docs/installation.md#mac-install-and-open-the-application).**
+It covers Python, the three exact release downloads, the installation helper,
+first launch and the command to reopen the app. The helper route does not need
+Git or a repository checkout. This alpha is a Python application, not a
+standalone .app/.dmg.
 
-```sh
-git clone https://github.com/kkartikeya-kulkarni/TractoSphere.git
-cd TractoSphere
-git checkout v0.1.0-alpha
-python3.12 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install '.[gui]'
-dmri-studio gui
-```
+macOS Apple Silicon with Python 3.12 is the locally verified platform. The pinned
+Qt GUI libraries list macOS 14.4+ as their supported range. Intel macOS, Linux
+x86-64 and Windows remain experimental; Ubuntu 24.04 ARM64 has bounded VM/X11
+software-rendering validation. See [platform evidence](docs/platforms.md).
 
-On Windows activate with `.venv\Scripts\Activate.ps1`. See the
-[installation guide](docs/installation.md) for wheel installation, external
-scientific tools, troubleshooting and the macOS installation helper.
-No AI account, API key, cloud service or MRI download is required to launch.
-FSL, MRtrix3 and ANTs are installed separately for the operations that use them.
-The first-run setup checker reports exact tool paths, versions and per-operation
-requirements. Choose **Continue with viewer only** to begin without scientific
-software. In Preferences → **Software Dependencies**, use **Install / Setup** for guided,
-platform-specific official downloads, licensing/storage guidance and installation
-testing. Completed compatible installations can be verified and configured without
-global PATH edits. Downloads open only with explicit consent; installation remains
-manual (FSL may require Terminal/IT help). No unattended installers are run.
-Recheck through Preferences or run `dmri-studio doctor`. No external
-tool is silently installed or changed. Missing acquisition metadata stays missing.
+**Install the application first; add scientific tools when you need preprocessing.**
+Choose **Continue with viewer only** to open images, existing tracts, atlases,
+ROIs and saved QC without MRtrix3, FSL or ANTs. No AI account, API key, cloud
+service or MRI download is required to launch.
+
+For preprocessing, use the guide's
+[exact folder examples for MRtrix3, FSL and ANTs](docs/installation.md#which-folders-to-select)
+and [package installation steps](docs/installation.md#install-the-scientific-tools-on-a-mac).
+Each tool needs its actual installation root or `bin` folder, followed by
+**Test Installation** and saving the verified paths. A downloaded archive or
+an empty folder is not an installed tool. macOS security prompts, unknown versions
+and wrong paths have [separate troubleshooting steps](docs/installation.md#understand-setup-results).
+
+The in-app **Install / Setup** opens official downloads and guidance; installation
+of scientific packages remains manual. A “Missing” tool message does not mean the
+GUI failed to install. Downloads require explicit consent, and no scientific
+tool or system PATH is silently changed.
+
+Developers can use the
+[source installation instructions](docs/installation.md#source-installation-on-macos).
+[Windows and Linux alternatives](docs/installation.md#other-installation-methods)
+are documented separately. Windows preprocessing/WSL bridging is unsupported.
+The [dependency setup guide](docs/dependency_setup.md) describes exact versions,
+inventory details and operation requirements. Missing acquisition metadata stays missing.
 
 ## What works immediately after installing the GUI
 
