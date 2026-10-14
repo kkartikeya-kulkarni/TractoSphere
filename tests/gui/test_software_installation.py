@@ -10,6 +10,7 @@ import pytest
 from PySide6.QtCore import QPoint, QSettings, Qt
 from PySide6.QtWidgets import QFileDialog, QScrollArea
 
+from dmri_studio.core import software_setup
 from dmri_studio.core.dependencies import inspect_dependencies
 from dmri_studio.core.software_setup import installation_guide
 from dmri_studio.gui import dependency_setup, software_installation
@@ -32,12 +33,15 @@ def wizard(window, qtbot, monkeypatch):
     # These controls test the guided macOS workflow on every host. Native
     # Windows remains unsupported; this is a synthetic workflow, not an
     # installation claim. Windows cannot execute a POSIX shebang fixture.
+    host = dict(system="Darwin", architecture="arm64", macos="26.3", distribution={})
+    # Keep guide, scanner and final compatibility validation on the same
+    # simulated host. Do not patch family_state to return 'ready': its real
+    # version/completeness/permission checks must still execute.
+    monkeypatch.setattr(software_setup, "host_platform", lambda: host)
     monkeypatch.setattr(
         software_installation,
         "installation_guide",
-        lambda family: installation_guide(
-            family, host=dict(system="Darwin", architecture="arm64", macos="26.3", distribution={})
-        ),
+        lambda family: installation_guide(family, host=host),
     )
     if os.name == "nt":
         from dmri_studio.core import dependencies
