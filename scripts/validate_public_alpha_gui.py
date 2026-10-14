@@ -10,6 +10,7 @@ import hashlib
 import json
 import sys
 import time
+from importlib.metadata import version
 from pathlib import Path
 
 import nibabel as nib
@@ -88,7 +89,7 @@ def main():
         assert capture_widget(window).save(str(out / f"{name}.png"))
 
     try:
-        assert __version__ == "0.1.0a0"
+        assert __version__ == version("dmri-studio")
         assert not hasattr(window, "assistant")
         assert "Public Alpha" in window.windowTitle()
         viewer.load_image(sources[1])

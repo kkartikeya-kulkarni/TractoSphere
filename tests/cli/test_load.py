@@ -20,6 +20,7 @@ import nibabel as nib
 import numpy as np
 import pytest
 
+from dmri_studio import __version__
 from dmri_studio.cli.main import main
 from dmri_studio.core.dataset import DatasetPaths
 from dmri_studio.core.loading import DatasetLoader
@@ -297,7 +298,7 @@ def test_unexpected_exception_logs_diagnostic(
 def test_usage_version_and_gui_help(capsys: pytest.CaptureFixture[str]) -> None:
     """Only implemented commands are advertised; ordinary usage exits are stable."""
     assert main(["--version"]) == 0
-    assert "0.1.0" in capsys.readouterr().out
+    assert __version__ in capsys.readouterr().out
     assert main(["load"]) == 2
     assert "required" in capsys.readouterr().err
     assert main(["gui", "--help"]) == 0

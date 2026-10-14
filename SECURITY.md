@@ -2,7 +2,7 @@
 
 ## Supported version
 
-v0.1.0-alpha receives best-effort security fixes during active development.
+v0.1.1-alpha receives best-effort security fixes during active development.
 It is not approved for clinical use or handling identifiable clinical data without
 an independently appropriate institutional environment and safeguards.
 

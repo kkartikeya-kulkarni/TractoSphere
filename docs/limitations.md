@@ -46,10 +46,11 @@ PUBLIC ALPHA · RESEARCH USE ONLY · NOT FOR CLINICAL USE · SCIENTIFIC VALIDATI
   and platform acceptance remain pending; successful installation is not scientific QC.
 
 - Cross-platform evidence is bounded: macOS ARM64 is locally verified; Ubuntu
-  ARM64 has VM/X11 software-rendering evidence; Intel Mac, Linux x86-64 and Windows
-  have no completed native runtime validation. CI is prepared but private jobs are
-  deliberately gated off. Native Wayland, independent clean Mac and physical Linux
-  GPU tests remain pending. See [platform scope](platforms.md).
+  ARM64 has VM/X11 software-rendering evidence. Hosted CI passes on macOS ARM64,
+  macOS Intel, Ubuntu x86-64 (Python 3.12/3.13) and Windows Server 2022. Windows CI
+  uses Mesa software rendering; physical Windows 10/11, native Wayland,
+  independent clean Mac and physical Linux GPU testing remain pending.
+  See [platform scope](platforms.md).
 - Workspace/export publication requires hard-link-capable local storage; FAT/exFAT
   or restricted network filesystems may reject it. There is no overwrite fallback.
 - Windows generic subprocess cancellation covers the direct executable only, not

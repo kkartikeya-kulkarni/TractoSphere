@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## v0.1.1-alpha — 2026-10-14
+
+Python package version: 0.1.1a0. Updated downloads include the Windows fixes and
+improved installation instructions. The original v0.1.0-alpha artifacts are retained.
+
+### Fixed
 
 - Keep BIDS calibration URI comparisons in portable slash form on Windows.
 - Use NiBabel's standard gzip reader on Windows after isolating a native
@@ -11,6 +16,11 @@
 - Verify linked-view expansion through workspace/layout geometry and persisted
   window sizes within native desktop bounds, including virtual CI displays.
 - Add Windows checkout, SVG tampering and disguised-executable regression checks.
+- Preserve original ZIP member names when auditing unsafe archive paths on Windows.
+- Make source-freshness and simulated-platform tests deterministic across platforms.
+- Exercise real Qt/VTK rendering on Windows hosted CI with checksum-pinned Mesa
+  software OpenGL; Mesa is CI-only and is not bundled with the application.
+- Clarify Mac installation and exact scientific-tool directory selection.
 
 ## v0.1.0-alpha — 2026-10-14
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dmri-studio"
-version = "0.1.0a0"
+version = "0.1.1a0"
 description = "TractoSphere: an open-source diffusion MRI research workstation"
 readme = "README.md"
 requires-python = ">=3.12"

@@ -2,15 +2,15 @@
 
 PUBLIC ALPHA · RESEARCH USE ONLY · SCIENTIFIC VALIDATION ONGOING
 
-## Actual verification scope (Phase 3, 2026-10-14)
+## Actual verification scope (updated for v0.1.1-alpha, 2026-10-14)
 
 | Platform | Installation and GUI evidence | Scientific tools | Alpha support |
 | --- | --- | --- | --- |
 | macOS Apple Silicon | Source and noneditable wheel, Python 3.12, native Qt/VTK on Apple M5 / 16 GB / macOS 26.3; real T1, 65-volume DWI, TCK/TRK, atlas ROIs, edits, workspace, dark/light | Existing local adapters retained; exact MRtrix 3.0.5 / EDDY 2401.2 / N4 2.6.5 gates | Primary locally verified platform; independent clean Mac still pending |
-| macOS Intel | Matching Python 3.12 dependency wheels identified; Intel macOS 15 CI prepared, not executed | Official universal MRtrix and matching Intel ANTs guidance | Experimental; no Intel machine tested |
+| macOS Intel | Matching Python 3.12 dependency wheels identified; Intel macOS 15 hosted CI passed | Official universal MRtrix and matching Intel ANTs guidance | Hosted CI tested; independent physical Intel Mac pending |
 | Ubuntu 24.04 ARM64 | Clean VM source and wheel installs; full tests; X11/Xvfb + Mesa software rendering; real MRI/TCK/TRK/atlas/filtering and native Qt screenshots | Missing-tool and simulated-tool tests; generic local subprocess execution/cancellation tested; no full scientific pipeline executed on Linux | Experimental, with bounded VM evidence; not physical-GPU certification |
-| Ubuntu/Linux x86-64 | Python 3.12/3.13 Ubuntu 24.04 CI prepared, not executed | Existing strict adapter gates and distribution-specific guidance retained | Experimental; no x86-64 Linux runtime tested |
-| Windows 10/11 x86-64 | Python 3.12 wheel availability and simulated platform contracts; Windows Server 2022 CI prepared, not executed | Native .exe detection improved; FSL/WSL and all Windows scientific adapters remain unavailable | Experimental viewer only; no Windows runtime/GPU verification |
+| Ubuntu/Linux x86-64 | Python 3.12/3.13 Ubuntu 24.04 hosted CI passed with Xvfb/Mesa | Existing strict adapter gates and distribution-specific guidance retained | Hosted CI tested; physical Linux GPU pending |
+| Windows 10/11 x86-64 | Python 3.12 wheel availability and simulated platform contracts; Windows Server 2022 hosted CI passed using Mesa software OpenGL | Native .exe detection improved; FSL/WSL and all Windows scientific adapters remain unavailable | Experimental viewer only; hosted software rendering tested; physical Windows 10/11 GPU pending |
 | Windows-to-WSL | No execution, path translation, environment, cancellation or output bridge | A WSL/Linux executable is never reported as a usable native Windows FSL tool | Unsupported |
 | Other OS/architecture | No application validation | Official guides accessible, no readiness claim | Unsupported/unverified |
 
@@ -23,8 +23,8 @@ upstream binary availability do not establish application or scientific validity
 
 Use a native Python architecture; do not mix Intel and ARM Python packages. The
 application wheel is platform-independent, but Qt/VTK/NumPy/SciPy wheels are not.
-Python 3.12 was actually exercised. The Python 3.13 CI target is prepared, not a
-completed verification of every Python version allowed by package metadata.
+Python 3.12 was actually exercised. Python 3.13 passed Ubuntu hosted CI; this is not verification of every
+Python version allowed by package metadata.
 
 [Qt 6.12's upstream support table](https://doc.qt.io/qt-6/supported-platforms.html)
 lists macOS 14.4+, Windows 10 1809+/11 and Ubuntu 24.04 ARM64/x86-64. These are
@@ -88,9 +88,13 @@ setup/filesystem tests, Qt behavior tests and actual VTK-pixel smoke tests. It
 includes macOS ARM, macOS Intel, Ubuntu x86-64 (Python 3.12/3.13) and Windows x64.
 Fixtures are small generated geometry, explicitly not biological validation data.
 
-Jobs are gated to public repositories to avoid paid private CI usage. The workflow
-has been locally linted, but **no GitHub runner results are claimed in this phase**.
-The repository remains private. Xvfb/CI screenshots are not physical-GPU tests.
+Jobs are gated to public repositories to avoid paid private CI usage. The public
+repository's [four non-Windows jobs passed](https://github.com/kkartikeya-kulkarni/TractoSphere/actions/runs/38638990797)
+at commit 10b8080. The [complete Windows job passed](https://github.com/kkartikeya-kulkarni/TractoSphere/actions/runs/38645371566)
+at e980a1f after additional Windows fixes: 661 core tests and 103 GUI tests passed,
+with 23 and 1 existing optional/platform skips respectively; the rendering smoke
+also passed. These are results across revisions, not one all-platform green run.
+Xvfb/CI screenshots are not physical-GPU tests. Scientific validity is separate.
 
 See [Phase 3 validation](cross_platform_validation_phase3.md) for results and
 [dependency setup](dependency_setup.md) for guided installation boundaries.
@@ -108,7 +112,7 @@ CI reproduced a native indexed_gzip 1.10.3 process exit for a Unicode NIfTI
 filename. TractoSphere selects NiBabel's standard gzip backend process-locally
 on Windows before core image reads. Source arrays and installed packages are
 unchanged; compressed random reads can be slower. macOS/Linux keep acceleration.
-This fix is on main after v0.1.0-alpha; the published alpha artifacts are unchanged.
+This fix is included in v0.1.1-alpha. The v0.1.0-alpha artifacts remain unchanged.
 
 Windows hosted CI needs real OpenGL rendering support. Its Hyper-V display did
 not provide OpenGL 3.2, and VTK's OSMesa fallback lacked its DLL. CI now verifies
