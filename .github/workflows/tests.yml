@@ -58,6 +58,11 @@ jobs:
         run: python scripts/diagnose_windows_io.py
       - name: Core, geometry, tractography, atlas, QC, setup and filesystem tests
         run: python -m pytest tests/core tests/cli tests/unit tests/test_atlas.py tests/test_scene.py tests/test_scene_operations.py --junitxml=core-tests.xml
+      - name: Isolated Windows graphics diagnostics
+        if: runner.os == 'Windows'
+        run: |
+          Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion
+          python scripts/diagnose_windows_rendering.py
       - name: Native macOS/Windows Qt behavior tests
         if: runner.os != 'Linux'
         run: python -m pytest tests/gui --junitxml=gui-tests.xml
