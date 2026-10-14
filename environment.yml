@@ -1,0 +1,13 @@
+# Run from the repository root: conda env create -f environment.yml
+# Existing environments: conda env update -f environment.yml
+# Package metadata owns runtime and test dependencies; constraints pin tested versions.
+name: dmri-studio
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - -c requirements-dev.lock.txt
+      - -e .[gui-dev]

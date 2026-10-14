@@ -1,0 +1,430 @@
+{
+  "schema": "tractosphere.release-assets/1",
+  "assets": {
+    "src/dmri_studio/gui/assets/fonts/Inter-Regular.otf": {
+      "sha256": "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799",
+      "license": "SIL-OFL-1.1",
+      "source": "https://github.com/rsms/inter/releases/tag/v4.1"
+    },
+    "src/dmri_studio/gui/assets/fonts/JetBrainsMono-Regular.ttf": {
+      "sha256": "a0bf60ef0f83c5ed4d7a75d45838548b1f6873372dfac88f71804491898d138f",
+      "license": "SIL-OFL-1.1",
+      "source": "https://github.com/JetBrains/JetBrainsMono/releases/tag/v2.304"
+    },
+    "src/dmri_studio/gui/assets/fonts/Inter-Medium.otf": {
+      "sha256": "6c222ed2c3660524dd0c14fb745e00fee65c5361ab28f60fba6730bf4e648763",
+      "license": "SIL-OFL-1.1",
+      "source": "https://github.com/rsms/inter/releases/tag/v4.1"
+    },
+    "src/dmri_studio/gui/assets/fonts/Inter-SemiBold.otf": {
+      "sha256": "0a4d30778fa2dc239368d90fd854b88b27e7ede737450da72686a90eca66f02c",
+      "license": "SIL-OFL-1.1",
+      "source": "https://github.com/rsms/inter/releases/tag/v4.1"
+    },
+    "src/dmri_studio/gui/assets/fonts/JetBrainsMono-Medium.ttf": {
+      "sha256": "31c92d01a8a08528b718a43addf0ad3df0af2ca4b7b3290a452f70f358e14d3d",
+      "license": "SIL-OFL-1.1",
+      "source": "https://github.com/JetBrains/JetBrainsMono/releases/tag/v2.304"
+    },
+    "docs/screenshots/viewer-dark.png": {
+      "sha256": "c218dd563577f039213a814a4050c6dcba4de62b7a2ef723942a4c72dd653cfb",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/viewer-light.png": {
+      "sha256": "814989126d373bae13b9e3348150e585ee563397a3145c1131dd5297b7fac64b",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/guided-mrtrix3-guide-dark.png": {
+      "sha256": "fb09837c56e1d08ed5f968aabfd2b852682a79f62a562a978918af44f49d64cd",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/viewer-only-setup.png": {
+      "sha256": "4e3d26b88bba2fe3b0d5d1f7bcfc3c773f0af79ce2c621c5176963cc70fbcd85",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/atlas-dark.png": {
+      "sha256": "5f7bfc86505aa33458042dffbb650496deab9e20113d53fddad09e5ab710d3b0",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/diffusion-dark.png": {
+      "sha256": "2a4e544665c77387980a1f1a9cc65f405115e6f673646876d4f2bacb3882a9f8",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/guided-ants-guide-light.png": {
+      "sha256": "94062c939803278a084a3de4712e5010c10d258f4199768581a524507a268db0",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/guided-mrtrix3-guide-light.png": {
+      "sha256": "5495e53b2a7cd6a0d9ea2d90a5d9d79c8c5eb54b251e8d6d20edd40b0c143677",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/phase3-macos-setup.png": {
+      "sha256": "1099e70503ee29dda4bc75239475c060f8fddbbf71c1cfc3269244609d83ed4b",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/phase3-macos-atlas.png": {
+      "sha256": "5f7bfc86505aa33458042dffbb650496deab9e20113d53fddad09e5ab710d3b0",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/guided-software-dependencies-dark.png": {
+      "sha256": "be94d2ed85f633d024df00d25a17c2d173870f8245e779de42bacf5a3d894ee0",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/dependency-setup.png": {
+      "sha256": "23643e6ecae83e472608d7869e9b2d39b032afa4fe5f2abdfb369c44a562f24a",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/guided-fsl-guide-light.png": {
+      "sha256": "a32aadaa955a4e196011c931acfecb6e40b4ca717f3b323aa2f98f4ca0c28606",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/guided-fsl-guide-dark.png": {
+      "sha256": "d66c1ab56245fa7ef194af7b4b71712697a649480b7370c55b74caf3a321e71f",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/phase3-linux-atlas.png": {
+      "sha256": "80eba58e5bb09399ed046bb14641e9c01717de81071595ae944a09778945f544",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/dependency-setup-light.png": {
+      "sha256": "06bf9c7289e412976fa12d47f4db949c4395791c03f4296022f26687da609ac2",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "docs/screenshots/guided-ants-guide-dark.png": {
+      "sha256": "cc5ebda09c3d4d952d1bd6bde4d56d865bda7cd68632588b1ea2b045d376d2c0",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere GUI captures; procedural welcome/logo images contain no MRI"
+    },
+    "src/dmri_studio/gui/assets/icons/triangle-alert.svg": {
+      "sha256": "4866f38b8560d410f21e3226413e0b77997b6dfbb6931fadfe0a0d5aef9ffeb4",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/search.svg": {
+      "sha256": "9322d964b61cf729b3a81210568d5a97eaf4a1f3239f25a056fda3013bf35611",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/panel-right-close.svg": {
+      "sha256": "48b9f4f84d55f99d6e4b7dc9e31937f687bc6aca223c003d7f3bd8bab6526c0b",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/boxes.svg": {
+      "sha256": "7e301f6c38337389f5a96675d14cb9d8ef8a613329e99c3dfcf7c635bdd1faae",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/chevron-down.svg": {
+      "sha256": "66ea878e72ed3488bb3b464c39dfdccee8d1f78e560dccea40e5e12da0e87e87",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/database.svg": {
+      "sha256": "471eb14bc8d144896a82dfc4aa9daf350f769f0896f4bef33e50aabdbb51130d",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/brain.svg": {
+      "sha256": "8c07e052620014d2beb9b646f2056a1c4655ff635087c4197b63cc0df9c17440",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/files.svg": {
+      "sha256": "5bb407dcae94a429672af886b11abcba16ccdffc2ddd6106b1c33c5745c2b1b1",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/terminal.svg": {
+      "sha256": "1ec2382658b6fe0642253ba75d3bbd8f48d03c9aa79c9cdb0dbbc269e112b8a1",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/maximize.svg": {
+      "sha256": "1f790856b0de805ab62e871609f1990b89d227d472022e57a11fde015aad4826",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/circle-help.svg": {
+      "sha256": "975db087da041530dbf59ba1e61a7b99c3519fad43dae6375e42ccc74ba63924",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/sliders-vertical.svg": {
+      "sha256": "9f4d1a0807510057f2c0fe6ffe50f232a0d5f2d25a05f3ceea16db20dcc4a51d",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/folder-open.svg": {
+      "sha256": "ee57452b40e71df310214091dd9da1941a397c83197b8ff8d7ae66dd4242578b",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/x.svg": {
+      "sha256": "4a9cdab38fbb96162e7dace28e33f4ca0e49d8963a6162abc3d4691b7d675117",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/log-in.svg": {
+      "sha256": "abb5d168da58fb38603d59182892974c0f5b365baa691280dc5cbe470bec51fb",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/chevron-right.svg": {
+      "sha256": "2758143d7b2434e4aa7307dfd34405c87909ff4052f21b5f3f40d45224b4f19b",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/sliders-horizontal.svg": {
+      "sha256": "4a6b5404724a439227964670bf9eb71bcebd98384178441e50093f2620169b1a",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/arrow-right.svg": {
+      "sha256": "288397fdb73bb4f783cf9eabb726ff47357df1d4e3f1201dd748090579f108b9",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/log-out.svg": {
+      "sha256": "ef5acaea068568b087096ca3da84f41982e7518860de199305dc28f0928ff75a",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/file-input.svg": {
+      "sha256": "5e5d04d39164d376646e702a4d4b53fa8b003aed8f6952d30f3f21f0690fc903",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/minimize.svg": {
+      "sha256": "7daa304bc3dccac1f100304e66a41139662cc6c0ba3eba67480d97466a9ce02b",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/settings.svg": {
+      "sha256": "3c7bee2696ce0c2d48d34e813f4fcda31f0ad21ab9309aee3751cde4280ad737",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/download.svg": {
+      "sha256": "21ee20839a201a74e612aafe7eaaf56f6ddc095c74aa5fcbb252c51f74a7535c",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/book-open.svg": {
+      "sha256": "a5eb669f66989fdbc003b1689ebc93769b3b9d680f840573f2a3ac268756f894",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/layers.svg": {
+      "sha256": "ce16d0a955e3581cda17f6b2fd5c5bc2034b405f9cecc31c8ebb8495b4afc1bb",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/bot.svg": {
+      "sha256": "e46fe72fc5b33d7a17b0112df85da9ded851860312e8353f4fe23d87a4ce77f5",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/file-chart-column.svg": {
+      "sha256": "d270281c75ed5ac63d32ca32269a45c4b4ba373ffe4be0268513e16a1d255d9f",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/circle-check.svg": {
+      "sha256": "3e519680ab8e2a8ad8f56a340c10d61957d872237aaa868cf324b0900a74f384",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/plus.svg": {
+      "sha256": "7f6af73bf1ff6c4bca3f18351c8d1bdec6749c0c2530c4de5da85d520c21df17",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/control-chevron-light.svg": {
+      "sha256": "ebc96153c7bf466819672fcf95b5c3fbdfb3461607573ca3150f2060a5667656",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/rotate-ccw.svg": {
+      "sha256": "622685386ab4017eabfde01cd74550a20b1924df233b353f73b6b155371f2afd",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/info.svg": {
+      "sha256": "bc977a64eb96f3e9c1041ffd09a3fceb70e3e65c02b571f76064062ed31f3cb9",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/chart-no-axes-combined.svg": {
+      "sha256": "c78cd9f846108d5edbaf3a16d9df1763a8dde97bd1d4b55f359b78daa01f3c4b",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/folder-plus.svg": {
+      "sha256": "76d62eb7796ce6c7e303c437464923de2d1ae19a5c8d010f8b36dfc1d6180890",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/copy.svg": {
+      "sha256": "ea80e566c7a12628a447cb53179b19aea4f60b9143e2becd0d0f20bf260e5718",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/image.svg": {
+      "sha256": "619c9db58c879dce6250376ba67d9c9102ca6dbb3b1efb9294c9f180e22273a5",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/scan.svg": {
+      "sha256": "c77f0e634b2451a14a262a59b61d75bbcea3994b16eeba1f5753e86b33282a4d",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/square.svg": {
+      "sha256": "bd979354f0ab184b95cecf03eedefe40c2dc65830ac6d7e60017b2b25a354acb",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/play.svg": {
+      "sha256": "e646902a5a8ba055ce573c6f51d10bb6eb9d230e7d6e84a9e6c81f599778ffc1",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/workflow.svg": {
+      "sha256": "ae99ea8f56a2835a2cca35b2fbb57643ab73443610970dba23e24bd9df75cfec",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/panel-left-close.svg": {
+      "sha256": "8f5b1fc9255e60f212379e8e315087a2f0a595a639ad2fb25c255dc3295c4e7d",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/network.svg": {
+      "sha256": "626be730feea1e5ea7539fbf78b4a3fcb927ce5d7dc43364f2216908672ac792",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/sun.svg": {
+      "sha256": "a3955c8b0425fcc5c9ba12d2bdd77fe53b2cd5dd05e7742a56f342e996fb2ef8",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/control-chevron-dark.svg": {
+      "sha256": "a5f022c346302e228e82903b25ed22ff1beac4e95e24ca44a99d604b5716ab9f",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/circle-x.svg": {
+      "sha256": "bcd8788901e6f29e1b231a81ba5e707d083d06cb4848a28f29407fab4f8e0b64",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/panel-left-open.svg": {
+      "sha256": "4529f625891390e8c6f106b9603984bc9ec5b03e35a13af7e7a6d50df965183b",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/eye.svg": {
+      "sha256": "5bf90197dd7629cad64a2e48d1186a71559deb6121207d10e3dc5b19ebaffdcf",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/external-link.svg": {
+      "sha256": "3891241b8c3bfc3a8a930078f26ffc5a7e9763da6d0162ace2050b28d4c1d1fe",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/list-checks.svg": {
+      "sha256": "01516400eab1492cf7abe94a0a58d3809f8d3c59f24116a74658f49bbaf740e4",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/route.svg": {
+      "sha256": "fc169fd38a9963b016ad6d60fd72baa2b0ea8e0cec085bbc53287297c3d8121a",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/upload.svg": {
+      "sha256": "04b9443355c959b3477b7856ee40dffa79438e5bfdb4e9dbf5159341ace26408",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/pause.svg": {
+      "sha256": "0f4280e6dcc1047551bbc6ef8a9f1a34959de13c7f077d9667d12ab90c8fbca7",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/grid-2x2.svg": {
+      "sha256": "dc1896d3b22e88e0ba45a77bc8e947b7a01d0c9fb5ff77d07d24a5589816bb84",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/shield-check.svg": {
+      "sha256": "8d4fcdbde5bba4abb1a2f6fe53e37ceb6343a1d5449a9d88f6f97c1971d26c4e",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/history.svg": {
+      "sha256": "a98ff758157910b9fc9d42d5d5dc80c2f4e037afa5f8ea4dee5f5649f03d438d",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/monitor.svg": {
+      "sha256": "d1a443233345724859de8e4fb48968ba91e885e12ddbd710701548bd91b39428",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/clipboard-check.svg": {
+      "sha256": "e2bac86a6b24caa0d7d0dcc2719ec6b7870ec5eef2d21afae498d8cb5eefda96",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/icons/moon.svg": {
+      "sha256": "47503477c9c6848eeaff01c324093e1a04a7d264220f580662d92f229eaa428e",
+      "license": "ISC / upstream Feather MIT portions",
+      "source": "https://github.com/lucide-icons/lucide/tree/0.468.0; control chevrons change stroke color only"
+    },
+    "src/dmri_studio/gui/assets/branding/tractosphere.svg": {
+      "sha256": "786c8596ae039716045ccf715545e672ef97e651df7bda6433d34d1362b2c670",
+      "license": "MIT",
+      "source": "Project-authored vector brain logo and raster/icon conversions; no MRI data"
+    },
+    "src/dmri_studio/gui/assets/branding/tractosphere-app.svg": {
+      "sha256": "e525eeb256a738316f58356b73c8477df1d769490263703fe6278a51168c9f58",
+      "license": "MIT",
+      "source": "Project-authored vector brain logo and raster/icon conversions; no MRI data"
+    },
+    "src/dmri_studio/gui/assets/branding/tractosphere-app.ico": {
+      "sha256": "ec6ad0cfd1534bb25790f28469c5452ed06165359b3716c0caca7256e0e8d5f2",
+      "license": "MIT",
+      "source": "Project-authored vector brain logo and raster/icon conversions; no MRI data"
+    },
+    "src/dmri_studio/gui/assets/branding/tractosphere-app.png": {
+      "sha256": "88eb5e5b0870362378aa6d9daba8b04b973fa974c89a0a851450d61b7e2668d1",
+      "license": "MIT",
+      "source": "Project-authored vector brain logo and raster/icon conversions; no MRI data"
+    },
+    "src/dmri_studio/gui/assets/branding/tractosphere-app.icns": {
+      "sha256": "332d0b6480e16f326470f9804797ab4bb9745fb37c8b34393a7c3047c273ef61",
+      "license": "MIT",
+      "source": "Project-authored vector brain logo and raster/icon conversions; no MRI data"
+    }
+  }
+}

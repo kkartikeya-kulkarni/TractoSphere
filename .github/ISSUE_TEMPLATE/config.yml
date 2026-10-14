@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Researcher discussion
+    url: https://github.com/kkartikeya-kulkarni/TractoSphere/discussions
+    about: Usage questions and research discussion; do not share restricted data.
+  - name: Private security report
+    url: https://github.com/kkartikeya-kulkarni/TractoSphere/security/advisories/new
+    about: Report vulnerabilities privately; never post credentials in public issues.

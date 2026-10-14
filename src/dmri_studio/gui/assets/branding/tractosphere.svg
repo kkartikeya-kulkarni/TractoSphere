@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>TractoSphere brain and diffusion pathways</title>
+<g fill="none" stroke-linecap="round" stroke-linejoin="round">
+<path d="M30 10C24 5 17 9 16 15C8 15 6 22 9 27C3 34 7 43 13 45C13 53 21 57 28 53L32 49L36 53C43 57 51 53 51 45C57 43 61 34 55 27C58 22 56 15 48 15C47 9 40 5 34 10L32 14Z" fill="#192B36" stroke="#C5DBDF" stroke-width="2.6"/>
+<path d="M32 14V48M17 16C15 22 19 25 23 24M10 29C16 26 22 29 22 34M14 45C18 39 24 40 27 44M47 16C49 22 45 25 41 24M54 29C48 26 42 29 42 34M50 45C46 39 40 40 37 44" stroke="#7A9CA7" stroke-width="1.7"/>
+<path d="M17 38C21 25 28 24 32 30C36 24 43 25 47 38" stroke="#7BCBD4" stroke-width="2.5"/>
+<path d="M23 48C29 40 26 24 24 18M41 48C35 40 38 24 40 18" stroke="#B7A5DD" stroke-width="2.3"/>
+<path d="M15 34C24 39 40 39 49 34" stroke="#D1B77C" stroke-width="2"/>
+</g></svg>

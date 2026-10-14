@@ -1,0 +1,11 @@
+include release-assets.json LICENSE THIRD_PARTY_NOTICES.md README.md CHANGELOG.md CONTRIBUTING.md CITATION.cff SECURITY.md AGENTS.md environment.yml requirements-dev.lock.txt
+recursive-include docs *.md *.png *.json
+recursive-include scripts *.py *.command
+recursive-include tests *.py
+recursive-include src/dmri_studio/gui/assets *
+global-exclude __pycache__ *.py[cod] .DS_Store
+prune .venv
+prune data
+prune outputs
+prune research-private
+prune release-private

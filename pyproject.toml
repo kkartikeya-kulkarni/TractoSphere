@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dmri-studio"
+version = "0.1.0a0"
+description = "TractoSphere: an open-source diffusion MRI research workstation"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+classifiers = ["Development Status :: 3 - Alpha", "Intended Audience :: Science/Research", "Topic :: Scientific/Engineering :: Medical Science Apps."]
+dependencies = ["numpy>=2.1,<3", "nibabel>=5.3,<6", "psutil>=7.2,<8"]
+
+[project.optional-dependencies]
+gui = ["PySide6==6.12.0", "indexed_gzip>=1.10,<2", "vtk>=9.4,<10", "scipy>=1.14,<2", "matplotlib>=3.9,<4"]
+gui-dev = ["dmri-studio[gui,dev]", "pytest-qt==4.5.0"]
+dev = ["pytest>=8,<10", "pytest-cov>=6,<8", "ruff>=0.11,<1"]
+
+[project.urls]
+Homepage = "https://github.com/kkartikeya-kulkarni/TractoSphere"
+Issues = "https://github.com/kkartikeya-kulkarni/TractoSphere/issues"
+
+[project.scripts]
+dmri-studio = "dmri_studio.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+source = ["dmri_studio"]
+branch = true
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.setuptools.package-data]
+"dmri_studio.gui" = ["assets/*.qss", "assets/*.md", "assets/fonts/*", "assets/icons/*", "assets/branding/*"]
+

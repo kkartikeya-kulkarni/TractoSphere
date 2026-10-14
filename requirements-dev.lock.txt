@@ -1,0 +1,26 @@
+# Tested Python dependencies for Step B on native macOS ARM64 / Python 3.12.15.
+# Use as pip constraints with the editable dev installation; no local build URLs.
+coverage==7.16.2
+iniconfig==2.3.1
+nibabel==5.4.2
+numpy==2.5.3
+packaging==26.3
+pluggy==1.6.0
+Pygments==2.21.0
+pytest-cov==7.1.0
+pytest==9.1.1
+ruff==0.16.10
+setuptools==84.0.0
+typing_extensions==4.16.0
+wheel==0.48.0
+PySide6==6.12.0
+PySide6_Addons==6.12.0
+PySide6_Essentials==6.12.0
+PySide6_Pdf==6.12.0.140
+PySide6_WebEngine==6.12.0.140
+shiboken6==6.12.0
+pytest-qt==4.5.0
+vtk==9.7.1
+scipy==1.18.1
+matplotlib==3.11.2
+indexed_gzip==1.10.3

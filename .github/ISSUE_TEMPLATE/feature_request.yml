@@ -1,0 +1,39 @@
+name: "Feature request"
+description: "Suggest a research workflow improvement"
+body:
+  - type: markdown
+    attributes:
+      value: "Public alpha, research use only. Do not upload identifiable patient data, restricted MRI datasets, private study records or credentials. Share a public/synthetic reproducer."
+  - type: input
+    id: version
+    attributes:
+      label: TractoSphere version
+      placeholder: v0.1.0-alpha
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, CPU/architecture, RAM, Python/Qt/VTK and relevant scientific-tool versions.
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details and evidence
+      description: "Research use case, expected behavior and the current limitation"
+    validations:
+      required: true
+  - type: textarea
+    id: reproducer
+    attributes:
+      label: Reproducer or permitted public data reference
+      description: Include image/tract space, acquisition metadata and operation/parameters where relevant. Do not upload private data.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data safety
+      options:
+        - label: I have removed credentials, personal identifiers and restricted/private research data from this report.
+          required: true

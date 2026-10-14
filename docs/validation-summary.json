@@ -1,0 +1,37 @@
+{
+  "version": "0.1.0a0",
+  "checks": [
+    "startup without AI",
+    "native 65-volume MRI navigation",
+    "linked position",
+    "real TCK and TRK indexing/rendering",
+    "named atlas tree",
+    "multiple actual surfaces",
+    "morphology and undo",
+    "volumetric include/exclude filtering",
+    "dark/light native screenshots"
+  ],
+  "unchanged": {
+    "sub-1006__T1w.nii.gz": true,
+    "sub-1006__dwi.nii.gz": true,
+    "sub-1006__AF_L.tck": true,
+    "sub-1006__PYT_L.trk": true,
+    "sub-1006__mask_wm.nii.gz": true,
+    "sub-1006__mask_gm.nii.gz": true,
+    "sub-1006__mask_csf.nii.gz": true
+  },
+  "source_sha256": {
+    "sub-1006__T1w.nii.gz": "4f6104c305bde125b4b465c554ad1b73770e1db0a44d8bda227145248d9e22b1",
+    "sub-1006__dwi.nii.gz": "0f80ee799bd359018a775691d1eb38a4721981987530d61908581347c81ae2b4",
+    "sub-1006__AF_L.tck": "1537b50e8c625ff97c0f3639b8f44cd3b57a148a99260c29deed3bce5dbd9e2e",
+    "sub-1006__PYT_L.trk": "0c41c6bcba8a4c56e5f9faba52cc8280427463a8eb15a686c9a16c4b825f27f9",
+    "sub-1006__mask_wm.nii.gz": "89f4394d6596fa4c53e29d7618e90121968dc3233832c25eb0235ad8faa63524",
+    "sub-1006__mask_gm.nii.gz": "0e0823fbb1109856a194b469d08b8e8afee8487c8f63b45c3ef4418d867f0039",
+    "sub-1006__mask_csf.nii.gz": "d941b08cc4bfd60f853a1646b17a44e412a5c7b21910f6a6a5d3fe37f2ac5417"
+  },
+  "tract_counts": {
+    "sub-1006__AF_L.tck": 18375,
+    "sub-1006__PYT_L.trk": 65734
+  },
+  "scientific_acceptance": "not inferred from software smoke tests"
+}
