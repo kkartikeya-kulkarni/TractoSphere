@@ -192,9 +192,12 @@ class Audit:
                         with archive.open(info) as stream:
                             child = stream.read(MAX_MEMBER + 1)
                         self.member(
-                            info.filename,
+                            # ZipInfo.filename normalizes backslashes on Windows.
+                            # Inspect the original archive spelling so malformed
+                            # paths cannot become apparently safe approved assets.
+                            info.orig_filename,
                             child,
-                            location=location + "!" + info.filename,
+                            location=location + "!" + info.orig_filename,
                             depth=depth + 1,
                         )
                 return

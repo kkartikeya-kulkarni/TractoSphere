@@ -62,7 +62,7 @@ def fixture(root):
                 "EchoTime": 0.09,
                 "RepetitionTime": 4,
                 "FlipAngle": 90,
-                "IntendedFor": [str(Path(p).relative_to(raw / "sub-01")) for p in paths],
+                "IntendedFor": [Path(p).relative_to(raw / "sub-01").as_posix() for p in paths],
             }
         )
     )
@@ -75,7 +75,7 @@ def test_two_runs_one_subject_and_shared_calibration(tmp_path):
     assert rows[0]["identity"]["sub"] == rows[1]["identity"]["sub"] == "01"
     assert rows[0]["identity"]["run"] != rows[1]["identity"]["run"]
     assert rows[0]["references"][0]["path"] == rows[1]["references"][0]["path"]
-    assert rows[0]["acquisition"]["field_sources"]["EchoTime"].endswith("/dwi.json")
+    assert Path(rows[0]["acquisition"]["field_sources"]["EchoTime"]) == tmp_path / "raw/dwi.json"
     project = new_project("Separate runs")
     for r in rows:
         project = add_acquisition(

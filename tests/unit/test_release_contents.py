@@ -41,7 +41,11 @@ def test_renamed_compressed_nifti_rejected():
 def test_archive_paths_rejected(name):
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w") as archive:
-        archive.writestr(name, "example")
+        entry = zipfile.ZipInfo(name)
+        # ZipInfo normalizes the host separator on Windows at construction.
+        # Write an actual malformed archive, not its normalized safe equivalent.
+        entry.filename = name
+        archive.writestr(entry, "example")
     audit = MODULE.Audit({})
     audit.member("bundle.zip", stream.getvalue())
     assert "unsafe_archive_path" in codes(audit)
@@ -182,3 +186,24 @@ def test_executable_disguised_as_svg_is_rejected(magic):
     audit.member("icon.svg", magic + b"\x00" * 20)
     assert "bundled_executable" in codes(audit)
     assert "unapproved_binary_asset" in codes(audit)
+
+
+def test_zip_original_path_checked_after_windows_normalization(monkeypatch):
+    """Emulate ZipInfo's Windows normalization on every test platform."""
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w") as archive:
+        entry = zipfile.ZipInfo("a\\b")
+        entry.filename = entry.orig_filename
+        archive.writestr(entry, "example")
+    original = zipfile.ZipFile.infolist
+
+    def normalized(self):
+        entries = original(self)
+        for entry in entries:
+            entry.filename = entry.filename.replace("\\", "/")
+        return entries
+
+    monkeypatch.setattr(zipfile.ZipFile, "infolist", normalized)
+    audit = MODULE.Audit({})
+    audit.member("bundle.zip", stream.getvalue())
+    assert "unsafe_archive_path" in codes(audit)
