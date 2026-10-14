@@ -112,3 +112,73 @@ def test_named_sdist_is_inspected_as_tar():
     audit.member("dmri_studio-0.1.0a0.tar.gz", stream.getvalue())
     assert not audit.findings
     assert audit.files == 2
+
+
+def test_svg_line_ending_change_is_rejected():
+    """Do not normalize XML to hide a changed approved asset."""
+    data = b'<svg>\n<path d="M0 0"/>\n</svg>\n'
+    approved = {
+        "icon.svg": {
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "license": "MIT",
+            "source": "synthetic fixture",
+        }
+    }
+    audit = MODULE.Audit(approved)
+    for name in ("icon.svg", "dmri_studio-0.1.0a0/icon.svg"):
+        audit.member(name, data)
+    assert not audit.findings
+    audit.member("icon.svg", data.replace(b"\n", b"\r\n"))
+    assert codes(audit) == {"unapproved_binary_asset"}
+
+
+def test_windows_checkout_preserves_approved_svg_bytes(tmp_path):
+    """Exercise real Git CRLF checkout rules without requiring a Windows host."""
+    import subprocess
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", str(repo)], check=True, capture_output=True)
+    attributes = Path(__file__).resolve().parents[2] / ".gitattributes"
+    (repo / ".gitattributes").write_bytes(attributes.read_bytes())
+    data = b'<svg>\n<path d="M0 0"/>\n</svg>\n'
+    (repo / "icon.svg").write_bytes(data)
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True, capture_output=True)
+    checkout = tmp_path / "windows-checkout"
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "-c",
+            "core.autocrlf=true",
+            "checkout-index",
+            "--all",
+            "--force",
+            "--prefix=" + checkout.as_posix() + "/",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    actual = (checkout / "icon.svg").read_bytes()
+    assert actual == data
+    audit = MODULE.Audit(
+        {
+            "icon.svg": {
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "license": "MIT",
+                "source": "synthetic fixture",
+            }
+        }
+    )
+    audit.member("icon.svg", actual)
+    assert not audit.findings
+
+
+@pytest.mark.parametrize("magic", [b"\x7fELF", b"MZ", b"\xcf\xfa\xed\xfe"])
+def test_executable_disguised_as_svg_is_rejected(magic):
+    """Asset handling never bypasses the independent executable-content gate."""
+    audit = MODULE.Audit({})
+    audit.member("icon.svg", magic + b"\x00" * 20)
+    assert "bundled_executable" in codes(audit)
+    assert "unapproved_binary_asset" in codes(audit)

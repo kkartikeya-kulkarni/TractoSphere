@@ -1,0 +1,8 @@
+# Asset approvals are exact byte hashes. In particular, SVG is XML text but
+# must never undergo Windows core.autocrlf conversion in source or packages.
+*.svg -text
+*.png -text
+*.ico -text
+*.icns -text
+*.otf -text
+*.ttf -text

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Preserve approved SVG/font/icon bytes during Windows Git checkout; exact-hash
+  release auditing remains enabled and rejects modified assets.
+- Verify linked-view expansion through workspace/layout geometry and persisted
+  window sizes within native desktop bounds, including virtual CI displays.
+- Add Windows checkout, SVG tampering and disguised-executable regression checks.
+
 ## v0.1.0-alpha — 2026-10-14
 
 First public-alpha candidate under the TractoSphere product name. Python package

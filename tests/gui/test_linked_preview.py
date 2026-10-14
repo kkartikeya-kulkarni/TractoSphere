@@ -127,7 +127,15 @@ def test_keyboard_expand_collapse_and_escape(
     qtbot.wait(30)
     assert preview.expanded == orientation
     assert window.workspace.currentWidget() is window.expanded_host
-    assert view.canvas.height() > 300
+    # A 1024px virtual desktop can legitimately allocate exactly the 300px
+    # size hint. Verify the expansion contract in layout coordinates instead:
+    # the same live canvas fills the columns and receives stretch, even when
+    # the scroll host must retain its minimum height on a small display.
+    assert preview.parentWidget() is window.expanded_content
+    qtbot.waitUntil(lambda: view.width() == preview.columns.contentsRect().width())
+    assert view.canvas.width() == view.contentsRect().width()
+    assert view.canvas.height() >= view.canvas.minimumHeight()
+    assert view.layout().stretch(view.layout().indexOf(view.canvas)) == 1
     assert not preview.sphere_side.isVisible()
     assert sum(v.isVisible() for v in preview.views.values()) == 1
     before = preview.position[view.geometry.axis]
