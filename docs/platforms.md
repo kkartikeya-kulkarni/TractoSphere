@@ -109,3 +109,11 @@ filename. TractoSphere selects NiBabel's standard gzip backend process-locally
 on Windows before core image reads. Source arrays and installed packages are
 unchanged; compressed random reads can be slower. macOS/Linux keep acceleration.
 This fix is on main after v0.1.0-alpha; the published alpha artifacts are unchanged.
+
+Windows hosted CI needs real OpenGL rendering support. Its Hyper-V display did
+not provide OpenGL 3.2, and VTK's OSMesa fallback lacked its DLL. CI now verifies
+a pinned Mesa archive against its publisher SHA-256 and deploys only its WGL
+loader/driver into the disposable runner's Python directory. No system driver
+or user workstation is modified, and no Mesa binaries are shipped in the app.
+These are software-rendered tests, not physical-GPU or Windows 10/11 validation.
+Reference: https://docs.vtk.org/en/v9.5.1/release_details/9.4/support-runtime-opengl-window-selection.html

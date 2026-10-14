@@ -58,6 +58,26 @@ jobs:
         run: python scripts/diagnose_windows_io.py
       - name: Core, geometry, tractography, atlas, QC, setup and filesystem tests
         run: python -m pytest tests/core tests/cli tests/unit tests/test_atlas.py tests/test_scene.py tests/test_scene_operations.py --junitxml=core-tests.xml
+      - name: Windows CI software OpenGL (pinned Mesa, ephemeral runner only)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'mesa-26.2.4-msvc.7z'
+          $mesa = Join-Path $env:RUNNER_TEMP 'mesa-26.2.4-msvc'
+          Invoke-WebRequest 'https://github.com/pal1000/mesa-dist-win/releases/download/26.2.4/mesa3d-26.2.4-release-msvc.7z' -OutFile $archive
+          $expected = '351fc8c8b695878ffb3eaa044b3ead08672a48b1a045e3c3e3975811df0f6695'
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected) { throw 'Mesa archive checksum mismatch' }
+          & 7z x $archive "-o$mesa" -y
+          if ($LASTEXITCODE -ne 0) { throw 'Mesa extraction failed' }
+          # Per-application WGL deployment, never system32 or the source tree.
+          # VTK recommends this distribution when the hosted Hyper-V driver
+          # cannot provide OpenGL 3.2. No Mesa binaries enter release packages.
+          foreach ($name in @('opengl32.dll', 'libgallium_wgl.dll')) {
+            $destination = Join-Path $env:pythonLocation $name
+            if (Test-Path $destination) { throw "Refusing to overwrite $destination" }
+            Copy-Item (Join-Path $mesa "x64/$name") $destination -ErrorAction Stop
+          }
+          'GALLIUM_DRIVER=llvmpipe' | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Isolated Windows graphics diagnostics
         if: runner.os == 'Windows'
         run: |
