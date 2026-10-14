@@ -23,6 +23,8 @@ PUBLIC ALPHA · RESEARCH USE ONLY · NOT FOR CLINICAL USE
 - [Understand setup results and fix common errors](#understand-setup-results)
 - [Source installation, Windows, Linux and manual wheel installation](#other-installation-methods)
 
+<a id="macos-helper"></a>
+
 ## Mac: install and open the application
 
 The release helper is the shorter installation route: you do not need to clone
@@ -147,6 +149,8 @@ For the helper's default installation, run:
 This works without activating an environment or adding anything to your shell
 PATH. If you installed into another folder, use the helper's printed command.
 
+<a id="guided-scientific-software-installation"></a>
+
 ## Which folders to select
 
 In **Preferences → Software Dependencies**, each field needs an existing
@@ -225,6 +229,8 @@ the expected files are present. Some FSL setups expose launchers under
 TractoSphere resolves supported FSL launchers back to the installed component
 records rather than trusting a suite version label.
 
+<a id="external-preprocessing-tools"></a>
+
 ## Install the scientific tools on a Mac
 
 The application helper does not download these packages. **Install / Setup** in
@@ -261,34 +267,55 @@ guide does not claim checksum authentication for it.
 
 ### FSL
 
-1. Follow the [official FSL macOS installation guide](https://fsl.fmrib.ox.ac.uk/fsl/docs/install/macos.html).
-   Its installer performs a separate installation and may change shell settings.
-   Check its licensing and storage requirements first.
-2. Record the installation directory. For an installation into **fsl** in your
-   home folder, the root is `~/fsl` and the TractoSphere selection is `~/fsl/bin`.
-   If the installer uses a different location, use that location's `bin` folder.
-3. Wait for **FSL successfully installed**, then close and reopen Terminal.
+**Check this before downloading:** TOPUP/EDDY in this alpha requires
+`eddy_cpu` component **2401.2**, plus the installed FSL component ownership/build
+records. A default/latest FSL installation can contain another version.
+A correct path and a completed FSL installation do not, by themselves, establish
+that the alpha will accept every operation.
+
+If FSL is already installed, skip the download steps and locate its existing
+installation with `printenv FSLDIR` or `command -v topup` as described above.
+Keep a working research installation intact.
+
+For a new, separate FSL installation:
+
+1. Open the [official FSL macOS installation guide](https://fsl.fmrib.ox.ac.uk/fsl/docs/install/macos.html).
+   Review its licensing and storage requirements. The external installer can
+   change shell configuration; it is separate from TractoSphere.
+2. On that page, use the **download the getfsl.sh script** link. Save it as
+   `getfsl.sh` in **Downloads**. Use the official FSL link, not a third-party copy.
+3. Open Terminal and run the downloaded installer:
+
+```sh
+sh "$HOME/Downloads/getfsl.sh"
+```
+
+4. Record the installation directory printed by the installer. A normal
+   installation into the **fsl** folder in your home directory has:
+   - Installation root: `~/fsl`
+   - Folder to select in TractoSphere: **`~/fsl/bin`**
+   If another location was used, select that installation's `bin` folder.
+5. Wait for **FSL successfully installed**, then close and reopen Terminal.
    A downloaded installer script alone is not an FSL installation.
-4. For the `~/fsl` example, check that the files and installed package records
-   exist:
+6. For the `~/fsl` example, confirm that the files and package records exist:
 
 ```sh
 ls "$HOME/fsl/bin/topup" "$HOME/fsl/bin/eddy_cpu" "$HOME/fsl/bin/flirt"
 ls -d "$HOME/fsl/conda-meta"
 ```
 
-5. In TractoSphere, [select, test and save](#select-test-and-save-each-location)
-   `~/fsl/bin`. The scanner inspects installed component ownership/build records;
-   do not launch TOPUP or EDDY without data just to obtain a version.
+7. In TractoSphere, select **`~/fsl/bin`** in the **FSL** field, click
+   **Test Installation**, and save the location when its checks pass.
+   The scanner reads installed component records; do not launch TOPUP or EDDY
+   without data just to obtain a version.
+8. Read the per-operation results. If EDDY is detected with a version other than
+   **2401.2**, or required component records are absent, its operation remains
+   unavailable even though the path is correct.
 
-**Compatibility limit:** this alpha requires `eddy_cpu` component **2401.2**
-and the required ownership/build records. The current default FSL installer may
-supply a different version. Installing the latest FSL is not a guarantee that
-this alpha's TOPUP/EDDY adapter will accept it. This guide does not prescribe an
-unverified downgrade or claim a fully automated compatible FSL installation.
-Keep a working research setup intact; use a separate compatible installation
-with upstream/IT help, or leave the affected processing operation pending.
-FSL's overall “6.x” version alone cannot establish readiness.
+This guide does not prescribe an unverified downgrade or claim a fully automated
+compatible FSL installation. Use a separate compatible installation with upstream/
+IT help if needed, or leave the affected operation pending. FSL's overall “6.x”
+version alone cannot establish readiness.
 
 ### ANTs 2.6.5
 
@@ -356,6 +383,8 @@ For ANTs or other blocked libraries, follow the same origin-review and upstream/
 Apple guidance for that package. Do not assume approving `mrconvert` also
 approves every shared library.
 
+<a id="troubleshooting"></a>
+
 ## Understand setup results
 
 | What you see | What it means | What to do next |
@@ -408,6 +437,8 @@ and remove identifying information before posting logs or screenshots publicly.
 See the [dependency setup guide](dependency_setup.md) for inventory options.
 
 ## Other installation methods
+
+<a id="source-installation"></a>
 
 ### Source installation on macOS
 
@@ -464,6 +495,8 @@ cd "$HOME/TractoSphere"
 source .venv/bin/activate
 dmri-studio gui
 ```
+
+<a id="wheel-installation"></a>
 
 ### Manual wheel installation
 
