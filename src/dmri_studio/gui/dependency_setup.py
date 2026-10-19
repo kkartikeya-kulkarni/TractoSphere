@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
 from dmri_studio.core.dependencies import INSTALL_LINKS, inspect_dependencies
 from dmri_studio.core.software_setup import family_state, verify_archive
 
-from .components import button, label
+from .components import Disclosure, button, label
 from .settings import Settings
 from .workers import ViewerTaskWorker
 
@@ -192,8 +192,9 @@ class DependencyWidget(QWidget):
         super().__init__()
         self.controller, self.can_apply = controller, can_apply
         root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
-        root.addWidget(label("Software Dependencies", "section"))
+        root.setContentsMargins(24, 24, 24, 24)
+        root.setSpacing(16)
+        root.addWidget(label("Software Dependencies", "title"))
         root.addWidget(
             label(
                 "Viewer, atlas, ROI/tract editing and saved QC work without MRtrix3, FSL or ANTs. "
@@ -201,48 +202,55 @@ class DependencyWidget(QWidget):
                 "caption",
             )
         )
-        self.fields = {}
-        self.guides = {}
+        self.fields, self.guides, self.family_labels, self.family_details = {}, {}, {}, {}
         for family, url in INSTALL_LINKS.items():
-            row = QHBoxLayout()
-            row.addWidget(label(family, "control"))
-            field = QLineEdit(controller.inputs.get(family, ""))
-            field.setPlaceholderText("Auto-detect, or select existing root/bin folder")
-            field.setAccessibleName(f"{family} setup location")
-            row.addWidget(field, 1)
-            row.addWidget(
-                button("Locate Existing Installation", lambda _, f=family: self.browse(f))
-            )
-            root.addLayout(row)
+            section = QWidget()
+            family_layout = QVBoxLayout(section)
+            family_layout.setContentsMargins(0, 8, 0, 8)
+            family_layout.setSpacing(8)
+            heading = QHBoxLayout()
+            heading.addWidget(label(family, "section"))
+            state = label("Not checked", "caption")
+            state.setAccessibleName(f"{family} installation state")
+            heading.addWidget(state, 1)
+            self.family_labels[family] = state
+            family_layout.addLayout(heading)
             actions = QHBoxLayout()
-            actions.addWidget(button("Install / Setup", lambda _, f=family: self.open_guide(f)))
+            actions.addWidget(button("Locate Installation…", lambda _, f=family: self.browse(f)))
+            actions.addWidget(button("Install / Setup…", lambda _, f=family: self.open_guide(f)))
             actions.addWidget(
                 button("Test Installation", lambda _, f=family: self.open_guide(f, test=True))
             )
-            actions.addWidget(button("Scan Again", self.scan))
-            state = label("Not checked", "caption")
-            state.setAccessibleName(f"{family} installation state")
-            actions.addWidget(state, 1)
-            if not hasattr(self, "family_labels"):
-                self.family_labels = {}
-            self.family_labels[family] = state
-            root.addLayout(actions)
+            actions.addStretch()
+            family_layout.addLayout(actions)
+            detail = QWidget()
+            detail_layout = QVBoxLayout(detail)
+            detail_layout.setContentsMargins(0, 4, 0, 4)
+            field = QLineEdit(controller.inputs.get(family, ""))
+            field.setPlaceholderText("Auto-detect, or select existing root/bin folder")
+            field.setAccessibleName(f"{family} setup location")
+            field.textChanged.connect(self.refresh_actions)
+            detail_layout.addWidget(label("Application-specific installation path", "caption"))
+            detail_layout.addWidget(field)
             link = label(
                 f'<a href="{url}">Official {family} installation instructions</a>', "caption"
             )
             link.setTextFormat(Qt.TextFormat.RichText)
             link.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
             link.setOpenExternalLinks(True)
-            link.setToolTip("Opens your browser only when clicked; does not install anything")
-            root.addWidget(link)
+            link.setToolTip("Opens the official guide; no automatic installation")
+            detail_layout.addWidget(link)
+            disclosure = Disclosure("Installation details", detail)
+            self.family_details[family] = disclosure
+            family_layout.addWidget(disclosure)
             self.fields[family] = field
-            field.textChanged.connect(self.refresh_actions)
+            root.addWidget(section)
         self.common = QCheckBox("Also inspect common installation folders")
         self.common.setChecked(controller.common)
-        root.addWidget(self.common)
+
         self.common.toggled.connect(self.refresh_actions)
         actions = QHBoxLayout()
-        self.check = button("Check installed tools", self.scan, primary=True)
+        self.check = button("Scan Again", self.scan, primary=True)
         self.save = button("Use checked tool locations", self.apply)
         self.export = button("Export setup report", self.export_report)
         actions.addWidget(self.check)
@@ -262,14 +270,21 @@ class DependencyWidget(QWidget):
             "Select/hover any row to inspect exact version evidence and limitations."
         )
         self.tree.currentItemChanged.connect(self.detail)
-        root.addWidget(self.tree)
+
         self.details = QPlainTextEdit()
         self.details.setReadOnly(True)
         self.details.setMaximumHeight(115)
         self.details.setPlaceholderText("Tool version evidence and adapter guidance appear here.")
-        root.addWidget(self.details)
+
         self.features = label("", "caption")
-        root.addWidget(self.features)
+        advanced = QWidget()
+        advanced_layout = QVBoxLayout(advanced)
+        advanced_layout.setContentsMargins(0, 4, 0, 4)
+        for widget in (self.common, self.tree, self.details, self.features):
+            advanced_layout.addWidget(widget)
+        self.advanced = Disclosure("Component versions, paths and diagnostics", advanced)
+        root.addWidget(self.advanced)
+        root.addStretch()
         controller.progress.connect(self.status.setText)
         controller.updated.connect(self.populate)
         controller.busy_changed.connect(self.busy)
@@ -311,6 +326,10 @@ class DependencyWidget(QWidget):
         if not hasattr(self, "check"):
             return
         self.busy(self.controller.thread is not None)
+        if self.controller.report:
+            for family, field in self.fields.items():
+                if field.text().strip() != self.controller.inputs.get(family, ""):
+                    self.family_labels[family].setText("Location changed · Scan Again to verify")
 
     def choices_current(self):
         """Bind the inventory to the folder/search choices actually inspected."""
@@ -335,7 +354,21 @@ class DependencyWidget(QWidget):
         from .software_installation import STATE_LABELS
 
         for family, widget in self.family_labels.items():
-            widget.setText(STATE_LABELS[family_state(report, family)["state"]])
+            state = STATE_LABELS[family_state(report, family)["state"]]
+            versions = (
+                sorted(
+                    {
+                        str(r["version"])
+                        for r in report["tools"]
+                        if r["family"] == family and r.get("version")
+                    }
+                )
+                if report
+                else []
+            )
+            if report and family == "FSL":
+                versions = sorted({str(v) for v in report["fsl_suite_versions"].values() if v})
+            widget.setText((" · ".join(versions) + " · " if versions else "") + state)
         if report is None:
             if self.controller.error:
                 self.status.setText("Setup check failed: " + self.controller.error)
@@ -447,7 +480,7 @@ class DependencyDialog(QDialog):
 
     def __init__(self, window):
         super().__init__(window)
-        self.setWindowTitle("TractoSphere · first-run software setup")
+        self.setWindowTitle("Software Dependencies")
         self.resize(1000, 750)
         layout = QVBoxLayout(self)
         scroll = QScrollArea()
@@ -459,7 +492,7 @@ class DependencyDialog(QDialog):
         layout.addWidget(scroll)
         row = QHBoxLayout()
         row.addWidget(button("Continue with viewer only", self.accept, primary=True))
-        row.addWidget(button("Continue to studio", self.accept))
+
         layout.addLayout(row)
         self.finished.connect(lambda _: window.settings.set("dependencies/acknowledged", True))
         if window.dependencies.report is None:

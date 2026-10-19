@@ -14,6 +14,7 @@ from vtkmodules.vtkCommonCore import vtkPoints
 from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkImageData, vtkPlane, vtkPolyData
 from vtkmodules.vtkCommonMath import vtkMatrix4x4
 from vtkmodules.vtkFiltersCore import vtkFlyingEdges3D, vtkTubeFilter
+from vtkmodules.vtkFiltersHybrid import vtkPolyDataSilhouette
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
 from vtkmodules.vtkIOImage import vtkPNGWriter
 from vtkmodules.vtkRenderingCore import (
@@ -66,6 +67,7 @@ class SceneRenderer(QVTKRenderWindowInteractor):
     """Accelerated line/tube/surface rendering with ordinary trackball interaction."""
 
     def __init__(self, parent=None):
+        self._finalized = False
         self.frame = None
         self.capturing = False
         super().__init__(parent)
@@ -74,8 +76,8 @@ class SceneRenderer(QVTKRenderWindowInteractor):
         self.renderer = vtk.vtkRenderer()
         self.renderer.SetBackground(0.035, 0.045, 0.06)
         self.renderer.SetUseDepthPeeling(True)
-        self.renderer.SetMaximumNumberOfPeels(8)
-        self.renderer.SetOcclusionRatio(0.1)
+        self.renderer.SetMaximumNumberOfPeels(32)
+        self.renderer.SetOcclusionRatio(0.02)
         self.GetRenderWindow().SetAlphaBitPlanes(1)
         self.GetRenderWindow().SetMultiSamples(0)
         self.GetRenderWindow().AddRenderer(self.renderer)
@@ -156,7 +158,9 @@ class SceneRenderer(QVTKRenderWindowInteractor):
             return
         super().mouseReleaseEvent(event)
 
-    def mesh(self, key, vertices, triangles, color=(0.72, 0.78, 0.85), opacity=0.4):
+    def mesh(
+        self, key, vertices, triangles, color=(0.72, 0.78, 0.85), opacity=0.4, point_colors=None
+    ):
         self.remove(key)
         poly = vtk.vtkPolyData()
         points = vtk.vtkPoints()
@@ -168,21 +172,52 @@ class SceneRenderer(QVTKRenderWindowInteractor):
             numpy_to_vtkIdTypeArray(triangles.ravel().astype(np.int64), deep=True),
         )
         poly.SetPolys(cells)
+        if point_colors is not None:
+            colors = numpy_to_vtk(point_colors, deep=True)
+            colors.SetName("World RAS directions")
+            poly.GetPointData().SetScalars(colors)
         from vtkmodules.vtkFiltersCore import vtkPolyDataNormals
 
         normals = vtkPolyDataNormals()
         normals.SetInputData(poly)
         normals.ConsistencyOn()
+        if point_colors is not None:
+            normals.SplittingOff()
         normals.Update()
         mapper = vtk.vtkPolyDataMapper()
         mapper.SetInputData(normals.GetOutput())
-        mapper.ScalarVisibilityOff()
+        if point_colors is None:
+            mapper.ScalarVisibilityOff()
+        else:
+            mapper.SetColorModeToDirectScalars()
+            mapper.ScalarVisibilityOn()
         actor = vtk.vtkActor()
         actor.SetMapper(mapper)
         actor.GetProperty().SetColor(*color)
         actor.GetProperty().SetOpacity(opacity)
         self.renderer.AddActor(actor)
         self.actors[key] = actor
+        self.draw()
+
+    def fod_mesh(self, mesh, opacity):
+        """Render one sampled radial FOD with immutable world-direction RGB."""
+        self.mesh(
+            ("fod", 0), mesh.vertices[0], mesh.faces, opacity=opacity, point_colors=mesh.colors
+        )
+        if not hasattr(self, "fod_axes"):
+            from vtkmodules.vtkInteractionWidgets import vtkOrientationMarkerWidget
+            from vtkmodules.vtkRenderingAnnotation import vtkAxesActor
+
+            axes = vtkAxesActor()
+            axes.SetXAxisLabelText("R")
+            axes.SetYAxisLabelText("A")
+            axes.SetZAxisLabelText("S")
+            self.fod_axes = vtkOrientationMarkerWidget()
+            self.fod_axes.SetOrientationMarker(axes)
+            self.fod_axes.SetInteractor(self.GetRenderWindow().GetInteractor())
+            self.fod_axes.SetViewport(0.0, 0.0, 0.2, 0.2)
+            self.fod_axes.SetEnabled(True)
+            self.fod_axes.InteractiveOff()
         self.draw()
 
     def volume_render(self, data, reference, low, high, opacity=0.15):
@@ -225,6 +260,8 @@ class SceneRenderer(QVTKRenderWindowInteractor):
         return super().paintEngine()
 
     def paintEvent(self, event):
+        if self._finalized:
+            return
         if sys.platform != "darwin":
             return super().paintEvent(event)
         painter = QPainter(self)
@@ -239,7 +276,7 @@ class SceneRenderer(QVTKRenderWindowInteractor):
             QTimer.singleShot(0, self.draw)
 
     def capture_frame(self, *_):
-        if self.capturing:
+        if self.capturing or self._finalized:
             return
         self.capturing = True
         try:
@@ -290,7 +327,31 @@ class SceneRenderer(QVTKRenderWindowInteractor):
             self.pick_callback(group, index)
 
     def draw(self):
-        self.GetRenderWindow().Render()
+        if not self._finalized:
+            self.GetRenderWindow().Render()
+
+    def Finalize(self):
+        """Idempotent native cleanup on the GUI thread before owner destruction."""
+        if self._finalized:
+            return
+        self._finalized = True
+        self._Timer.stop()
+        if hasattr(self, "fod_axes"):
+            self.fod_axes.SetEnabled(False)
+            self.fod_axes.SetInteractor(None)
+        # Includes QVTK's inherited CursorChanged callback as well as our frame
+        # capture: neither may retain a Python widget after native destruction.
+        self.GetRenderWindow().RemoveAllObservers()
+        self._Iren.SetInteractorStyle(None)
+        self._Iren.RemoveAllObservers()
+        self._Iren.Disable()
+        self.pick_callback = self.position_callback = self.gesture_callback = None
+        self.renderer.RemoveAllViewProps()
+        self.actors.clear()
+        self.mapper_ids.clear()
+        self.planes.clear()
+        super().Finalize()
+        self.frame = None
 
     def remove(self, key):
         if key in self.actors:
@@ -346,6 +407,35 @@ class SceneRenderer(QVTKRenderWindowInteractor):
         self.actors[key] = actor
         self.draw()
 
+    def roi_polydata(self, key, poly, color, opacity, mode="Surface"):
+        """Attach a physical-space display mesh; outline follows the active camera."""
+        self.remove(key)
+        mapper = vtk.vtkPolyDataMapper()
+        if mode == "Boundary only":
+            silhouette = vtkPolyDataSilhouette()
+            silhouette.SetInputData(poly)
+            silhouette.SetCamera(self.renderer.GetActiveCamera())
+            silhouette.SetEnableFeatureAngle(False)
+            mapper.SetInputConnection(silhouette.GetOutputPort())
+        else:
+            mapper.SetInputData(poly)
+        mapper.ScalarVisibilityOff()
+        actor = vtk.vtkActor()
+        actor.SetMapper(mapper)
+        prop = actor.GetProperty()
+        prop.SetColor(*color)
+        prop.SetOpacity(opacity)
+        prop.SetInterpolationToPhong()
+        prop.SetSpecular(0.12)
+        prop.SetSpecularPower(18)
+        prop.SetAmbient(0.15)
+        if mode == "Wireframe":
+            prop.SetRepresentationToWireframe()
+        prop.SetLineWidth(1.3)
+        self.renderer.AddActor(actor)
+        self.actors[key] = actor
+        self.draw()
+
     def tracts(
         self,
         key,
@@ -392,6 +482,18 @@ class SceneRenderer(QVTKRenderWindowInteractor):
             if coloring == "Length":
                 value = min(np.linalg.norm(np.diff(line, axis=0), axis=1).sum() / 200, 1)
                 color[:] = (value, 1 - value, 0.5)
+            if coloring == "SIFT2 weight":
+                if group.weights is None or group.cuts:
+                    color[:] = group.color
+                else:
+                    from dmri_studio.core.viewer_display import colors as scalar_colors
+
+                    # Factors belong to original source IDs, never to the local
+                    # display subset index. Full-vector min/max is the legend.
+                    low = group.weight_record["statistics"]["minimum"]
+                    high = group.weight_record["statistics"]["maximum"]
+                    value = (group.weights[group.source_ids[i]] - low) / max(high - low, 1e-30)
+                    color[:] = scalar_colors(np.asarray([value]), "viridis")[0] / 255.0
             if highlight and i in group.selected:
                 color[:] = (1, 0.85, 0.1)
             rgb.append(color)

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QGridLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -18,6 +19,8 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSplitter,
     QTabWidget,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -38,6 +41,7 @@ from .comparison import ComparisonWindow
 from .components import button, label
 from .execution import ProcessingWorker
 from .theme import Theme
+from .workstation import EmptyState
 
 
 class QCPage(QWidget):
@@ -59,7 +63,7 @@ class QCPage(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(20, 20, 20, 20)
         root.setSpacing(12)
-        root.addWidget(label("Preprocessing quality control", "title"))
+        root.addWidget(label("Quality Control", "title"))
         root.addWidget(
             label(
                 "Review saved evidence from each operation. Opening QC does not rerun processing or accept results.",
@@ -67,14 +71,21 @@ class QCPage(QWidget):
             )
         )
         top = QHBoxLayout()
-        self.open_button = button("Open QC catalog", self.browse)
+        self.open_button = button("Open Report…", self.browse)
         top.addWidget(self.open_button)
         self.identity = label("No QC catalog loaded", "control")
         top.addWidget(self.identity, 1)
         root.addLayout(top)
         self.status = label("Choose the catalog produced for a processing attempt.", "caption")
         root.addWidget(self.status)
+        self.empty = EmptyState(
+            "No QC report open",
+            "Open a saved QC report to review processing evidence.",
+            [("Open Report…", self.browse)],
+        )
+        root.addWidget(self.empty, 1)
         split = QSplitter()
+        self.content = split
         self.stages = QListWidget()
         self.stages.setWordWrap(True)
         self.stages.setAccessibleName("Processing steps and independent QC status")
@@ -102,8 +113,13 @@ class QCPage(QWidget):
         layout.addWidget(self.artifacts)
         actions = QHBoxLayout()
         self.open_report = button("Open report", self.view_report)
+        self.open_report.setToolTip("Select a report artifact to open its verified HTML.")
         self.export = button("Export report", self.save_report)
+        self.export.setToolTip("Select a report artifact to export its unchanged bytes.")
         self.compare = button("Compare images", self.open_comparison)
+        self.compare.setToolTip(
+            "Requires a saved matched-image comparison artifact with verified gradients and volume mapping."
+        )
         for widget in (self.open_report, self.export, self.compare):
             actions.addWidget(widget)
         layout.addLayout(actions)
@@ -129,10 +145,17 @@ class QCPage(QWidget):
         evidence = QWidget()
         evidence_layout = QVBoxLayout(evidence)
         evidence_layout.setContentsMargins(0, 8, 0, 0)
-        for widget in (self.figure_zoom, self.figure_scroll, self.text):
+        for widget in (self.figure_zoom, self.figure_scroll):
             layout.removeWidget(widget)
             evidence_layout.addWidget(widget, 0 if widget is self.figure_zoom else 1)
-        tabs.addTab(evidence, "Evidence && measurements")
+        tabs.addTab(evidence, "Figures")
+        self.measurements = QTreeWidget()
+        self.measurements.setHeaderLabels(["Recorded measurement", "Value"])
+        self.measurements.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.measurements.setAccessibleName("Producer measurements; no recalculation")
+        tabs.addTab(self.measurements, "Measurements")
+        layout.removeWidget(self.text)
+        tabs.addTab(self.text, "Source details")
         review_page = QWidget()
         review_layout = QVBoxLayout(review_page)
         review_layout.addWidget(label("Scientific review", "section"))
@@ -197,9 +220,19 @@ class QCPage(QWidget):
 
     def browse(self) -> None:
         """Choose a producer catalog rather than guess statuses from a folder name."""
-        path, _ = QFileDialog.getOpenFileName(self, "Open saved QC catalog", "", "JSON (*.json)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Open saved QC report or catalog", "", "QC evidence (*.json *.html *.htm)"
+        )
         if path:
-            self.load(Path(path))
+            if Path(path).suffix.lower() in {".html", ".htm"}:
+                opened = QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(path).resolve())))
+                self.status.setText(
+                    "Opened saved HTML in your browser; no catalog statuses were inferred."
+                    if opened
+                    else "The browser could not open this report. Choose another browser or open the file directly."
+                )
+            else:
+                self.load(Path(path))
 
     def load(self, path: Path) -> None:
         """Verify catalog/evidence hashes in a worker, retaining prior evidence on error."""
@@ -264,6 +297,7 @@ class QCPage(QWidget):
             self.status.setText("Evidence hashes verified. Scientific review remains required.")
         elif self.kind == "artifact":
             if isinstance(result, QImage):
+                self.review_tabs.setCurrentIndex(0)
                 self.original_figure = result
                 self.scale_figure()
                 self.figure_zoom.show()
@@ -272,7 +306,7 @@ class QCPage(QWidget):
                 QTimer.singleShot(0, self.scale_figure)
             else:
                 self.figure_zoom.hide()
-                self.text.setPlainText(result)
+                self.present_measurements(result)
                 self.text.show()
                 self.figure_scroll.hide()
             self.status.setText("Showing existing evidence; no analysis was rerun.")
@@ -353,7 +387,7 @@ class QCPage(QWidget):
                 "error.fg"
                 if value in {"failed", "rejected"}
                 else "warning.fg"
-                if value in {"pending", "required", "needs_review"}
+                if value in {"pending", "required", "needs_review", "completed_with_findings"}
                 else "success.fg"
                 if value in {"passed", "accepted"}
                 else "text.secondary"
@@ -394,6 +428,7 @@ class QCPage(QWidget):
             )
             self.figure_scroll.hide()
             self.text.show()
+            self.review_tabs.setCurrentWidget(self.text)
             return
         catalog = self.catalog
 
@@ -410,11 +445,60 @@ class QCPage(QWidget):
 
         self.start("artifact", read)
 
+    def present_measurements(self, text):
+        """Format recorded JSON values without changing their values or QC meaning."""
+        self.text.setPlainText(text)
+        self.measurements.clear()
+        try:
+            record = json.loads(text)
+        except (ValueError, TypeError):
+            self.review_tabs.setCurrentWidget(self.text)
+            return
+
+        remaining = [2000]
+
+        def append(parent, key, value):
+            if remaining[0] <= 0:
+                return
+            remaining[0] -= 1
+            compound = isinstance(value, (dict, list))
+            item = QTreeWidgetItem(
+                parent, [str(key), "" if compound else json.dumps(value, ensure_ascii=False)]
+            )
+            item.setToolTip(0, str(key))
+            item.setToolTip(1, item.text(1))
+            if compound:
+                entries = value.items() if isinstance(value, dict) else enumerate(value)
+                for child, content in entries:
+                    append(item, child, content)
+
+        if isinstance(record, dict):
+            for key, value in record.items():
+                append(self.measurements, key, value)
+        else:
+            append(self.measurements, "Recorded value", record)
+        if remaining[0] == 0:
+            QTreeWidgetItem(
+                self.measurements,
+                [
+                    "Display limited to 2,000 entries",
+                    "Complete unchanged values are in Source details",
+                ],
+            )
+        self.measurements.expandToDepth(0)
+        self.review_tabs.setCurrentWidget(self.measurements)
+
     def update_actions(self) -> None:
         """Enable only implemented actions supported by the selected evidence."""
         idle = self.thread is None
+        self.empty.setVisible(self.catalog is None)
+        self.content.setVisible(self.catalog is not None)
+        self.identity.setVisible(self.catalog is not None)
         entry = self.selected()
         report = bool(entry and entry["kind"] == "report")
+        self.open_button.setVisible(self.catalog is not None)
+        for action in self.empty.actions:
+            action.setEnabled(idle)
         self.open_button.setEnabled(idle)
         self.stages.setEnabled(idle)
         self.artifacts.setEnabled(idle)

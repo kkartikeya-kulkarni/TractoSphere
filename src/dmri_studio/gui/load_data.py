@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QBoxLayout,
     QComboBox,
     QFileDialog,
+    QFormLayout,
     QGridLayout,
     QHBoxLayout,
     QInputDialog,
@@ -69,6 +70,11 @@ class LoadDataPage(QWidget):
     cancel_requested = Signal()
     unload_requested = Signal()
     notification = Signal(str, str)
+    open_image_requested = Signal()
+    open_tracts_requested = Signal()
+    open_project_requested = Signal()
+    open_results_requested = Signal()
+    open_scientific_requested = Signal()
 
     def __init__(self, theme: Theme, settings: Settings) -> None:
         """Start empty; no previously used image is opened automatically."""
@@ -77,6 +83,7 @@ class LoadDataPage(QWidget):
         self.dataset: DwiDataset | None = None
         self.busy = False
         self.state = "empty"
+        self.import_intent = "unknown"
         self.root = QVBoxLayout(self)
         self.root.setContentsMargins(*([PAGE_INSET] * 4))
         self.root.setSpacing(GAP)
@@ -91,14 +98,64 @@ class LoadDataPage(QWidget):
         heading.addWidget(self.another)
         heading.addWidget(self.unload)
         self.root.addLayout(heading)
+        self.goals = QWidget()
+        goals = QVBoxLayout(self.goals)
+        goals.setContentsMargins(0, 16, 0, 16)
+        goals.setSpacing(12)
+        goals.addWidget(label("What would you like to open?", "section"))
+        for title, description, callback in [
+            (
+                "Open image…",
+                "Inspect anatomical or diffusion NIfTI images.",
+                self.open_image_requested.emit,
+            ),
+            (
+                "Import raw DWI",
+                "Review matching diffusion gradients and acquisition metadata.",
+                lambda: self.choose_intent("raw"),
+            ),
+            (
+                "Import preprocessed DWI",
+                "Keep external processing history unknown until evidence is reviewed.",
+                lambda: self.choose_intent("preprocessed"),
+            ),
+            (
+                "Open project…",
+                "Resume subjects, acquisitions and recorded processing attempts.",
+                self.open_project_requested.emit,
+            ),
+            (
+                "Open tractography…",
+                "Inspect existing TCK/TRK with a compatible anatomical reference.",
+                self.open_tracts_requested.emit,
+            ),
+            (
+                "Import scientific inputs…",
+                "Inspect MIF, tensors, FODs, masks or 5TT independently; plan future algorithms.",
+                self.open_scientific_requested.emit,
+            ),
+            (
+                "Import existing results…",
+                "Inspect an existing engine manifest without restarting processing.",
+                self.open_results_requested.emit,
+            ),
+        ]:
+            row = QHBoxLayout()
+            control = button(title, callback, quiet=True)
+            control.setMinimumWidth(220)
+            control.setProperty("leftAligned", True)
+            row.addWidget(control)
+            row.addWidget(label(description, "caption"), 1)
+            goals.addLayout(row)
+        self.root.addWidget(self.goals)
         self.stepper = label(
             "01  Select files     /     02  Validate inputs     /     03  Explore dataset",
             "caption",
         )
         self.root.addWidget(self.stepper)
         self.banner = Card(theme)
-        self.banner.body.setContentsMargins(16, 12, 16, 12)
-        self.banner_title = label("", "section")
+        self.banner.body.setContentsMargins(8, 6, 8, 6)
+        self.banner_title = label("", "caption")
         self.banner_detail = label("", "caption")
         banner_row = QHBoxLayout()
         banner_row.addWidget(self.banner_title, 1)
@@ -109,6 +166,9 @@ class LoadDataPage(QWidget):
         self.root.addWidget(self.banner)
         self.banner.hide()
         self.form = Card(theme, "Input files")
+        self.intent_label = label("Diffusion inputs · processing history unknown", "control")
+        self.form.body.addWidget(self.intent_label)
+        self.form.body.addWidget(button("Choose another import type", self.show_goals, quiet=True))
         self.drop_zone = DropZone(theme, self.browse_folder)
         self.drop_zone.dropped.connect(self.drop_paths)
         self.form.body.addWidget(self.drop_zone)
@@ -118,6 +178,9 @@ class LoadDataPage(QWidget):
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(8)
+        path_fields = QWidget()
+        path_form = QFormLayout(path_fields)
+        path_form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         rows = [
             ("dwi", "DWI image — required", "4D NIfTI · .nii or .nii.gz"),
             ("bval", "b-values — required", "Whitespace text · one value per volume · s/mm²"),
@@ -145,12 +208,20 @@ class LoadDataPage(QWidget):
             theme.bind(error, "bg.surface", "error.fg")
             error.hide()
             self.errors[role] = error
-            grid.addWidget(field_label, row * 3, 0, 1, 2)
-            grid.addWidget(field, row * 3 + 1, 0)
-            grid.addWidget(browse, row * 3 + 1, 1)
-            grid.addWidget(error, row * 3 + 2, 0, 1, 2)
+            file_name = label("No file selected", "control")
+            file_name.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            field.textChanged.connect(
+                lambda text, target=file_name: self.show_file_name(target, text)
+            )
+            grid.addWidget(field_label, row * 2, 0)
+            grid.addWidget(browse, row * 2, 1, 2, 1)
+            grid.addWidget(file_name, row * 2 + 1, 0)
+            path_form.addRow(title, field)
+            path_form.addRow(error)
         grid.setColumnStretch(0, 1)
         self.form.body.addLayout(grid)
+        self.path_disclosure = Disclosure("Full paths and manual entry", path_fields)
+        self.form.body.addWidget(self.path_disclosure)
         self.layout_choice = QComboBox()
         self.layout_choice.addItem("Auto — FSL rows", "auto")
         self.layout_choice.addItem("3 rows (x, y, z)", "3xN")
@@ -215,7 +286,31 @@ class LoadDataPage(QWidget):
         self.root.addStretch()
         self.another.hide()
         self.unload.hide()
+        self.form.hide()
+        self.empty.hide()
+        self.stepper.hide()
         self.update_enabled()
+
+    def show_file_name(self, target, text):
+        """Readable identity with the complete editable path available on disclosure."""
+        target.setText(Path(text.strip().strip("\"'")).name if text else "No file selected")
+        target.setToolTip(text)
+
+    def choose_intent(self, intent):
+        """A user-declared entry point never asserts completed corrections."""
+        self.import_intent = intent
+        self.intent_label.setText(
+            "Externally preprocessed DWI · history requires evidence"
+            if intent == "preprocessed"
+            else "Raw DWI · review acquisition metadata and history"
+        )
+        self.show_form()
+
+    def show_goals(self):
+        """Retain candidate paths and the active dataset while changing import type."""
+        if not self.busy:
+            self.form.hide()
+            self.goals.show()
 
     def resizeEvent(self, event: object) -> None:
         """Reflow metadata cards below the approved content-width breakpoint."""
@@ -262,6 +357,8 @@ class LoadDataPage(QWidget):
             message = "Choose a .nii or .nii.gz diffusion image."
         self.errors[role].setText(message)
         self.errors[role].setVisible(bool(message))
+        if message:
+            self.path_disclosure.toggle.setChecked(True)
         self.update_enabled()
 
     def browse(self, role: str) -> None:
@@ -372,6 +469,9 @@ class LoadDataPage(QWidget):
     def show_form(self) -> None:
         """Open candidate inputs while keeping the active dataset visible."""
         self.form.show()
+        self.goals.hide()
+        self.stepper.show()
+        self.empty.hide()
         self.fields["dwi"].setFocus()
         if self.dataset is not None and not self.busy:
             self.show_banner(
@@ -429,15 +529,12 @@ class LoadDataPage(QWidget):
         if busy:
             self.state = "loading"
             self.form.show()
+            self.goals.hide()
             self.stepper.setText("✓ Select files     →     ② Validate · running     →     ③ Loaded")
             self.stage.setText("Starting loader…")
-            self.show_banner(
-                "Loading dataset",
-                f"{self.dataset.paths.dwi.name} is still active."
-                if self.dataset
-                else "Checking metadata and bounded voxel samples.",
-                "running",
-            )
+            self.banner.hide()
+            self.stage_message = "Checking input metadata and bounded voxel samples"
+            self.update_elapsed()
         self.update_enabled()
 
     def set_progress(self, progress: object) -> None:
@@ -499,8 +596,10 @@ class LoadDataPage(QWidget):
         loaded = dataset is not None
         for widget in (self.preview, self.details, self.another, self.unload):
             widget.setVisible(loaded)
-        self.empty.setVisible(not loaded)
-        self.form.setVisible(not loaded)
+        self.empty.hide()
+        self.form.hide()
+        self.goals.setVisible(not loaded)
+        self.stepper.setVisible(loaded)
         self.subtitle.setVisible(not loaded)
         if dataset is None:
             self.state = "empty"
@@ -523,6 +622,11 @@ class LoadDataPage(QWidget):
             + dataset.validation.coverage_message(),
             "warning" if warnings else "success",
         )
+        if not warnings:
+            self.banner.hide()
+        else:
+            self.theme.bind(self.banner, "bg.surface", "text.primary")
+            self.banner_title.setText("Input checks · review required")
         card = Card(self.theme, "Dataset summary")
         card.body.addWidget(label(dataset.paths.dwi.name, "section"))
         source = label(str(dataset.paths.dwi.parent), "caption")

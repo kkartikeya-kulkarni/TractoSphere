@@ -5,7 +5,6 @@ are never used as participant evidence. The actual MRtrix/ANTs N4 wrapper is run
 """
 
 import json
-import os
 import shutil
 from pathlib import Path
 
@@ -20,7 +19,7 @@ from dmri_studio.core.loading import DatasetLoader
 from dmri_studio.core.qc import load_catalog
 from dmri_studio.core.workflow import HistoryClaim, ProcessingHistory, assess_operations
 
-ANTS = Path(os.environ.get("TRACTOSPHERE_ANTS_BIN", ".missing-optional-ants"))
+ANTS = Path(__file__).resolve().parents[3] / "workflow-research/lemon-resolution-001/tools-env/bin"
 
 
 def make_fixture(root):

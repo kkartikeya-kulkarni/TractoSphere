@@ -4,9 +4,10 @@ The fixed stylesheet is installed once; switching themes updates palettes and
 icons in place. All measurements are logical pixels except the font point sizes.
 """
 
+import sys
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, QObject, QSize, Signal
+from PySide6.QtCore import QByteArray, QObject, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QIcon, QPainter, QPalette, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
@@ -27,34 +28,30 @@ CARD_PADDING = 16
 GAP = 16
 CONTROL = 32
 COMPACT = 28
-SIDEBAR = 184
+SIDEBAR = 204
 RAIL = 52
-MOTION = 160
+MOTION = 0
 ICON_SIZE = QSize(18, 18)
 
 
 def font(style: str = "body") -> QFont:
-    """Return an actual bundled weight with a portable system fallback."""
-    size, weight = {
-        "title": (19, 600),
-        "section": (11, 600),
-        "body": (10, 400),
-        "control": (10, 500),
-        "caption": (9, 400),
-        "metric": (21, 600),
-        "mono": (9.75, 400),
-    }[style]
-    families = QFontDatabase.families()
-    family = "JetBrains Mono" if style == "mono" else "Inter"
-    result = (
-        QFont(family)
-        if family in families
-        else QFontDatabase.systemFont(
-            QFontDatabase.SystemFont.FixedFont
-            if style == "mono"
-            else QFontDatabase.SystemFont.GeneralFont
-        )
+    """Return a readable platform system font; never bundle Apple font files."""
+    system = QFontDatabase.systemFont(
+        QFontDatabase.SystemFont.FixedFont
+        if style == "mono"
+        else QFontDatabase.SystemFont.GeneralFont
     )
+    base = max(12.0, QFontDatabase.systemFont(QFontDatabase.SystemFont.GeneralFont).pointSizeF())
+    size, weight = {
+        "title": (base + 8, 600),
+        "section": (base, 500),
+        "body": (base, 400),
+        "control": (base, 400),
+        "caption": (max(11, base - 2), 400),
+        "metric": (base + 8, 500),
+        "mono": (max(11, base - 2), 400),
+    }[style]
+    result = QFont(system)
     result.setPointSizeF(size)
     result.setWeight(QFont.Weight(weight))
     return result
@@ -66,24 +63,51 @@ class Theme(QObject):
     changed = Signal()
 
     def __init__(self, app: QApplication, name: str = "dark") -> None:
-        """Load offline font assets and install the structural stylesheet once."""
+        """Resolve the native palette and install the structural stylesheet once."""
         super().__init__(app)
         self.app = app
-        self.reduced_motion = False
+        previous = getattr(app, "tractosphere_theme", None)
+        if previous is not None:
+            # A test/application can replace the presentation controller. Old
+            # platform listeners must not recolor windows that have been closed.
+            app.styleHints().colorSchemeChanged.disconnect(previous.system_appearance_changed)
+            app.paletteChanged.disconnect(previous.native_palette_changed)
+        self.reduced_motion = True
+        self.native_accent = QColor(app.palette().color(QPalette.ColorRole.Accent))
+        self.preference = name
+        self._applying = False
         app.tractosphere_theme = self
-        self.name = name if name in ("dark", "light") else "dark"
+        self.name = self.resolve(name)
         self.surfaces: list[tuple[QWidget, str, str]] = []
         self.icons: list[tuple[QWidget, str, str]] = []
-        for path in sorted((ASSETS / "fonts").glob("*")):
-            if path.suffix in (".otf", ".ttf"):
-                QFontDatabase.addApplicationFont(str(path))
-        app.setStyle("Fusion")
+        # Keep native macOS widgets; Windows/Linux retain the portable Qt style.
+        if sys.platform != "darwin":
+            app.setStyle("Fusion")
         app.setFont(font())
         app.setStyleSheet((ASSETS / "shell.qss").read_text())
-        self.apply(self.name)
+        self.apply(name)
+        app.styleHints().colorSchemeChanged.connect(self.system_appearance_changed)
+        app.paletteChanged.connect(self.native_palette_changed)
+
+    def resolve(self, preference):
+        """Resolve system appearance without inventing a per-platform theme."""
+        if preference in {"light", "dark"}:
+            return preference
+        return "dark" if self.app.styleHints().colorScheme() == Qt.ColorScheme.Dark else "light"
+
+    def system_appearance_changed(self, *_):
+        if self.preference == "system" and not self._applying:
+            self.apply("system")
+
+    def native_palette_changed(self, palette):
+        if not self._applying:
+            self.native_accent = QColor(palette.color(QPalette.ColorRole.Accent))
+            self.apply(self.preference)
 
     def color(self, token: str) -> QColor:
         """Resolve one named token for the active theme."""
+        if token in {"accent.primary", "focus.ring"} and self.native_accent.isValid():
+            return QColor(self.native_accent)
         return QColor(COLORS[token][self.name == "light"])
 
     def palette(self, background: str = "bg.canvas", foreground: str = "text.primary") -> QPalette:
@@ -134,6 +158,54 @@ class Theme(QObject):
 
     def icon(self, name: str, token: str = "text.secondary") -> QIcon:
         """Render the bundled SVG at Retina resolution with explicit stroke tint."""
+        # Qt resolves SF Symbols from the OS. No Apple symbol assets are stored.
+        symbols = {
+            "file-input": "square.and.arrow.down",
+            "folder-open": "folder",
+            "database": "square.stack.3d.up",
+            "scan": "photo",
+            "clipboard-check": "checklist",
+            "sliders-horizontal": "slider.horizontal.3",
+            "brain": "waveform.path",
+            "route": "point.3.connected.trianglepath.dotted",
+            "network": "point.3.filled.connected.trianglepath.dotted",
+            "list-checks": "checkmark.seal",
+            "files": "clock.arrow.circlepath",
+            "settings": "gearshape",
+            "panel-left-close": "sidebar.left",
+            "panel-left-open": "sidebar.left",
+            "search": "magnifyingglass",
+            "sun": "sun.max",
+            "moon": "moon",
+            "terminal": "terminal",
+            "chevron-right": "chevron.right",
+            "chevron-down": "chevron.down",
+            "rotate-ccw": "arrow.counterclockwise",
+            "maximize": "arrow.up.left.and.arrow.down.right",
+            "minimize": "arrow.down.right.and.arrow.up.left",
+            "layers": "square.3.layers.3d",
+            "plus": "plus",
+            "x": "xmark",
+            "copy": "doc.on.doc",
+            "download": "square.and.arrow.down",
+            "upload": "square.and.arrow.up",
+            "play": "play",
+            "square": "stop",
+            "info": "info.circle",
+            "shield-check": "checkmark.shield",
+            "arrow-right": "arrow.right",
+            "file-chart-column": "doc.text",
+            "book-open": "book",
+        }
+        native = QIcon.fromTheme(symbols.get(name, name)) if sys.platform == "darwin" else QIcon()
+        if not native.isNull():
+            pixmap = native.pixmap(QSize(36, 36))
+            painter = QPainter(pixmap)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+            painter.fillRect(pixmap.rect(), self.color(token))
+            painter.end()
+            pixmap.setDevicePixelRatio(2)
+            return QIcon(pixmap)
         data = (
             (ASSETS / "icons" / f"{name}.svg")
             .read_text()
@@ -152,7 +224,8 @@ class Theme(QObject):
         self.icons = [(w, n, t) for w, n, t in self.icons if w is not widget]
         self.icons.append((widget, name, token))
         widget.setIcon(self.icon(name, token))
-        widget.setIconSize(ICON_SIZE)
+        if hasattr(widget, "setIconSize"):
+            widget.setIconSize(ICON_SIZE)
 
     def style_widget(self, widget: QWidget, background: str, foreground: str, bound: bool) -> None:
         """Refresh explicit local brushes where Qt caches stylesheet palette roles.
@@ -175,7 +248,7 @@ class Theme(QObject):
             )
         if isinstance(widget, QAbstractItemView):
             rules.append(
-                f"{selector}::item:selected {{ background-color: {color('accent.subtle')}; color: {color('accent.text')}; border-left: 2px solid {color('accent.primary')}; }}"
+                f"{selector}::item:selected {{ background-color: {color('accent.subtle')}; color: {color('accent.text')}; }}"
             )
         if isinstance(widget, QComboBox):
             arrow = (ASSETS / "icons" / f"control-chevron-{self.name}.svg").as_posix()
@@ -209,7 +282,9 @@ class Theme(QObject):
 
     def apply(self, name: str) -> None:
         """Switch colors immediately while retaining all application state."""
-        self.name = name
+        self.preference = name
+        self.name = self.resolve(name)
+        self._applying = True
         self.app.setPalette(self.palette())
         # Deleted transient disclosures may still be in the palette registry.
         from shiboken6 import isValid
@@ -232,4 +307,5 @@ class Theme(QObject):
             widget.update()
         for widget, icon, token in self.icons:
             widget.setIcon(self.icon(icon, token))
+        self._applying = False
         self.changed.emit()

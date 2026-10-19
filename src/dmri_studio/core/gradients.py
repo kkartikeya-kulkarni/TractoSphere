@@ -136,7 +136,7 @@ class GradientTable:
     bvals: NDArray[np.float64]
     bvecs: NDArray[np.float64]
     source_layout: Literal["3xN", "Nx3"] = "Nx3"
-    convention: Literal["fsl_image_axes"] = "fsl_image_axes"
+    convention: Literal["fsl_image_axes", "mrtrix_world_ras"] = "fsl_image_axes"
     _parse_checks: tuple[CheckResult, ...] = field(default=(), repr=False)
     _ambiguous: bool = field(default=False, repr=False)
     _bval_source: str | None = field(default=None, repr=False)
@@ -152,8 +152,10 @@ class GradientTable:
             raise ValueError("Internal bvecs must have shape (N, 3).")
         if self.source_layout not in ("3xN", "Nx3"):
             raise ValueError("source_layout must be '3xN' or 'Nx3'.")
-        if self.convention != "fsl_image_axes":
-            raise ValueError("Only the supplied FSL image-axis convention is supported.")
+        if self.convention not in {"fsl_image_axes", "mrtrix_world_ras"}:
+            raise ValueError(
+                "Supported frames are supplied FSL image axes or embedded MRtrix world RAS; no automatic conversion."
+            )
         object.__setattr__(self, "bvals", bvals)
         object.__setattr__(self, "bvecs", bvecs)
         object.__setattr__(self, "_parse_checks", tuple(self._parse_checks))
@@ -582,5 +584,55 @@ class GradientTable:
                     "Shell grouping requires nonempty, finite, nonnegative b-values.",
                 )
             )
-        checks.append(CheckResult("G10", "info", _CONVENTION_MESSAGE))
+        checks.append(
+            CheckResult(
+                "G10",
+                "info",
+                _CONVENTION_MESSAGE
+                if self.convention == "fsl_image_axes"
+                else "Embedded MRtrix scanner/world RAS gradients retained in volume order; no FSL conversion, rotation, normalization or b-value rescaling applied. Anatomical correspondence is unverified.",
+            )
+        )
         return tuple(checks)
+
+
+def mrtrix_world_scheme(
+    bvals: ArrayLike,
+    bvecs: ArrayLike,
+    *,
+    convention: str,
+    affine: ArrayLike | None = None,
+) -> NDArray[np.float64]:
+    """Detached expected scheme for an explicitly reviewed MRtrix gradient import.
+
+    Parsing/GradientTable never change source directions. This function mirrors
+    MRtrix's declared unit normalization and FSL storage-handedness mapping for
+    conversion verification only; it is not an empirical anatomical flip or a
+    gradient-correction algorithm. B-values are retained exactly, with scaling
+    disabled in the corresponding command. Embedded world-RAS inputs need no
+    voxel-axis rotation. Source arrays remain unchanged.
+    """
+    values = np.asarray(bvals, dtype=np.float64)
+    vectors = np.asarray(bvecs, dtype=np.float64).copy()
+    if (
+        values.ndim != 1
+        or vectors.shape != (len(values), 3)
+        or not np.isfinite(values).all()
+        or not np.isfinite(vectors).all()
+    ):
+        raise ValueError("Expected finite matching gradient rows before coordinate conversion")
+    norms = np.linalg.norm(vectors, axis=1)
+    if convention == "fsl_image_axes":
+        matrix = np.asarray(affine, dtype=np.float64)
+        if matrix.shape != (4, 4) or not np.isfinite(matrix).all():
+            raise ValueError("FSL import verification requires a finite affine")
+        rotation = matrix[:3, :3] / np.linalg.norm(matrix[:3, :3], axis=0)
+        if np.linalg.det(rotation) > 0:
+            vectors[:, 0] *= -1
+        vectors[norms > 0] /= norms[norms > 0, None]
+        vectors = (rotation @ vectors.T).T
+    elif convention == "mrtrix_world_ras":
+        vectors[norms > 0] /= norms[norms > 0, None]
+    else:
+        raise ValueError("Unsupported gradient coordinate convention")
+    return np.column_stack((vectors, values))

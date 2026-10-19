@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QGridLayout,
     QHBoxLayout,
+    QLineEdit,
     QListWidget,
     QPlainTextEdit,
     QVBoxLayout,
@@ -20,6 +21,7 @@ from dmri_studio.core.runs import inspect_run
 
 from .components import Disclosure, button, label
 from .execution import ProcessingWorker
+from .workstation import EmptyState
 
 
 class ResultsPage(QWidget):
@@ -27,6 +29,7 @@ class ResultsPage(QWidget):
 
     load_requested = Signal(object)
     qc_requested = Signal(object)
+    scientific_requested = Signal()
 
     def __init__(self, settings):
         """Keep evidence hashing outside the UI thread and preserve source attempts."""
@@ -40,7 +43,7 @@ class ResultsPage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
-        layout.addWidget(label("Saved preprocessing runs", "title"))
+        layout.addWidget(label("Runs & Reports", "title"))
         layout.addWidget(
             label(
                 "Reopen outputs, processing history and QC. Opening a run never restarts a correction. Continue from verified outputs in a new attempt.",
@@ -52,12 +55,24 @@ class ResultsPage(QWidget):
         self.refresh = button("Refresh saved status", self.reload)
         actions.addWidget(self.open)
         actions.addWidget(self.refresh)
+        actions.addWidget(button("Open scientific selection…", self.scientific_requested.emit))
         actions.addStretch()
         layout.addLayout(actions)
         self.status = label(
             "Select an engine run manifest. Existing study reports can be opened in QC.", "caption"
         )
         layout.addWidget(self.status)
+        self.empty = EmptyState(
+            "No processing run open",
+            "Open a saved engine manifest to inspect its steps, outputs and QC. This never restarts processing.",
+            [("Open run…", self.browse)],
+        )
+        layout.addWidget(self.empty, 1)
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Find a step or recorded status…")
+        self.search.setAccessibleName("Search saved processing steps")
+        self.search.textChanged.connect(self.filter_steps)
+        layout.addWidget(self.search)
         self.steps = QListWidget()
         self.steps.setAccessibleName("Saved processing step states")
         self.steps.setMinimumHeight(160)
@@ -79,7 +94,8 @@ class ResultsPage(QWidget):
         self.details.setReadOnly(True)
         self.details.setAccessibleName("Saved commands, results and provenance")
         self.details.setMaximumHeight(300)
-        layout.addWidget(Disclosure("Exact commands and provenance", self.details))
+        self.advanced = Disclosure("Exact commands and provenance", self.details)
+        layout.addWidget(self.advanced)
 
         self.update_actions()
 
@@ -156,6 +172,7 @@ class ResultsPage(QWidget):
             else result["record"].get("error", "")
         )
         self.details.setPlainText(json.dumps(result, indent=2))
+        self.filter_steps(self.search.text())
 
     def finished(self):
         """Re-enable actions only when evidence worker ownership has ended."""
@@ -167,7 +184,22 @@ class ResultsPage(QWidget):
     def update_actions(self):
         """No output replacement while processing or metadata inspection is active."""
         idle = self.thread is None
+        self.empty.setVisible(self.snapshot is None)
+        for widget in (
+            self.search,
+            self.steps,
+            self.recovery_summary,
+            self.load_output,
+            self.open_qc,
+            self.recover,
+            self.advanced,
+        ):
+            widget.setVisible(self.snapshot is not None)
         self.products.setVisible(bool(self.snapshot and self.snapshot["products"]))
+        self.open.setVisible(self.snapshot is not None)
+        self.refresh.setVisible(self.path is not None)
+        for action in self.empty.actions:
+            action.setEnabled(idle)
         self.open.setEnabled(idle)
         self.refresh.setEnabled(idle and self.path is not None)
         self.load_output.setEnabled(
@@ -179,6 +211,11 @@ class ResultsPage(QWidget):
             and bool(self.snapshot and self.snapshot.get("recovery"))
         )
         self.open_qc.setEnabled(idle and bool(self.snapshot and self.snapshot["qc_catalog"]))
+
+    def filter_steps(self, text):
+        for index in range(self.steps.count()):
+            item = self.steps.item(index)
+            item.setHidden(text.casefold() not in item.text().casefold())
 
     def choose_output(self):
         """Ask the existing loader to activate a specific verified derivative."""

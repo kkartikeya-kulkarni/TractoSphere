@@ -1,7 +1,8 @@
 """Synthetic desktop fixtures; GUI tests never depend on a real HCP subject.
 
-Run with ``QT_QPA_PLATFORM=offscreen python -m pytest tests/gui`` for headless
-behavior checks. Native screenshots are a separate local acceptance exercise.
+Use the native Cocoa plugin on macOS for VTK tests. Linux CI uses Xvfb;
+offscreen Qt is suitable only for non-VTK checks on macOS. Native screenshots
+remain a separate visual acceptance exercise.
 """
 
 from pathlib import Path
@@ -36,6 +37,9 @@ def window(qapp: object, qtbot: object, tmp_path: Path) -> MainWindow:
     theme = Theme(qapp)
     settings = Settings(QSettings(str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat))
     instance = MainWindow(theme, settings)
+    # Scientific workflow tests begin in their explicitly selected import route.
+    # The redesigned production startup is tested separately as the Start page.
+    instance.focus_load()
     # Own this window's teardown explicitly. pytest-qt's automatic widget
     # deletion does not wait when closeEvent defers closure for an active read.
     # Three serialized planes make that race much easier to encounter natively.
@@ -45,8 +49,20 @@ def window(qapp: object, qtbot: object, tmp_path: Path) -> MainWindow:
     # establish the real keyboard context instead of relying on show timing.
     instance.raise_()
     instance.activateWindow()
+    qtbot.waitExposed(instance, timeout=10000)
     qtbot.wait(30)
-    qtbot.waitUntil(instance.isActiveWindow, timeout=10000)
+
+    def activate_native_window():
+        # Cocoa may deliver the prior welcome/tool window's deactivation after
+        # show(). Request activation only after exposure, and retry the actual
+        # native request while retaining the real active-window assertion.
+        if not instance.isActiveWindow():
+            instance.raise_()
+            instance.activateWindow()
+            instance.windowHandle().requestActivate()
+        return instance.isActiveWindow()
+
+    qtbot.waitUntil(activate_native_window, timeout=10000)
     yield instance
     instance.close()
     qtbot.waitUntil(

@@ -79,7 +79,7 @@ def test_reference_association_and_grid(tmp_path):
         "RepetitionTime": 7,
         "FlipAngle": 90,
     }
-    cal = {**meta, "PhaseEncodingDirection": "j", "IntendedFor": dwi.relative_to(subject).as_posix()}
+    cal = {**meta, "PhaseEncodingDirection": "j", "IntendedFor": str(dwi.relative_to(subject))}
     assert validate_epi_reference(dwi, reference, meta, cal)["intended_for_verified"]
     with pytest.raises(ValueError, match="IntendedFor"):
         validate_epi_reference(

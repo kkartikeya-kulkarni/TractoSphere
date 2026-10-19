@@ -120,7 +120,7 @@ def test_scan_is_responsive_and_close_waits_safely(window, qtbot, monkeypatch):
     assert window.dependencies.report["cancelled"]
 
 
-def test_real_app_entry_routes_first_run(window, qtbot, monkeypatch, qapp):
+def test_real_app_entry_opens_studio_without_setup_modal(window, qtbot, monkeypatch, qapp):
     from dmri_studio.gui import app
 
     monkeypatch.setattr(dependency_setup, "inspect_dependencies", lambda **_: absent())
@@ -131,7 +131,8 @@ def test_real_app_entry_routes_first_run(window, qtbot, monkeypatch, qapp):
     monkeypatch.setattr(qapp, "exec", lambda: 0)
     window.settings.set("show_welcome", False)
     assert app.main() == 0
-    qtbot.waitUntil(lambda: window.dependency_dialog is not None, timeout=10000)
-    assert window.dependency_dialog.isVisible()
-    window.dependency_dialog.accept()
-    settled(window, qtbot)
+    assert window.dependency_dialog is None
+    assert window.isVisible()
+    assert window.dependencies.thread is None
+    window.focus_dependencies()
+    assert window.workspace.currentWidget() is window.dependency_host

@@ -16,11 +16,15 @@ import nibabel as nib
 import numpy as np
 from nibabel.streamlines.trk import decode_value_from_name, get_affine_trackvis_to_rasmm
 
+from .process import check_cancel
+
 
 class IndexedStreamlines(Sequence):
     """Random-access immutable physical-coordinate fibers, with source attributes."""
 
-    def __init__(self, path):
+    def __init__(self, path, *, cancelled=lambda: False):
+        self.cancelled = cancelled
+        check_cancel(cancelled)
         self.path = Path(path).resolve()
         stat = self.path.stat()
         self.signature = (stat.st_size, stat.st_mtime_ns)
@@ -40,12 +44,22 @@ class IndexedStreamlines(Sequence):
         self._cache = OrderedDict()
         self._cache_bytes = 0
         self.raw = np.memmap(self.path, mode="r", dtype=np.uint8)
-        if self.trk:
-            self._index_trk()
-        else:
-            self._index_tck()
-        self.lengths = np.asarray(self.lengths)
-        self.verify_source()
+        try:
+            if self.trk:
+                self._index_trk()
+            else:
+                self._index_tck()
+            self.lengths = np.asarray(self.lengths)
+            self.verify_source()
+        except BaseException:
+            self.close()
+            raise
+
+    def close(self):
+        """Release an inspection-only mapping after all indexed reads finish."""
+        self._cache.clear()
+        self._cache_bytes = 0
+        self.raw._mmap.close()
 
     def verify_source(self):
         stat = self.path.stat()
@@ -55,6 +69,7 @@ class IndexedStreamlines(Sequence):
     def _index_trk(self):
         offset = int(self.header["_offset_data"])
         while offset < len(self.raw):
+            check_cancel(self.cancelled)
             if offset + 4 > len(self.raw):
                 raise ValueError("Truncated TRK point count")
             count = struct.unpack_from(self.header["endianness"] + "i", self.raw, offset)[0]
@@ -94,6 +109,7 @@ class IndexedStreamlines(Sequence):
         previous_point = None
         terminated = False
         for begin in range(0, len(points), 262144):
+            check_cancel(self.cancelled)
             block = points[begin : begin + 262144]
             finite = np.isfinite(block).all(axis=1)
             separators = np.isnan(block).all(axis=1)

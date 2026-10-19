@@ -30,7 +30,7 @@ def _parser() -> argparse.ArgumentParser:
     """Describe the currently implemented CLI; GUI dispatch remains optional and lazily imported."""
     parser = argparse.ArgumentParser(
         prog="dmri-studio",
-        description="Inspect diffusion NIfTI images and matching gradients in place.",
+        description="Inspect and process diffusion MRI with explicit scientific review.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -91,6 +91,15 @@ def _parser() -> argparse.ArgumentParser:
     from .dependencies import add_command as add_dependency_command
 
     add_dependency_command(commands)
+    from .scientific import add_command as add_scientific_command
+
+    add_scientific_command(commands)
+    from .batch import add_command as add_batch_command
+
+    add_batch_command(commands)
+    from .roi_filter import add_command as add_roi_filter_command
+
+    add_roi_filter_command(commands)
     return parser
 
 
@@ -356,6 +365,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Returning rather than leaking SystemExit keeps the adapter scriptable;
         # the console entry point and __main__ turn the result into process status.
         return int(exc.code or 0)
+    if args.command == "roi-filter":
+        from .roi_filter import run
+
+        return run(args)
+    if args.command == "batch":
+        from .batch import run
+
+        return run(args)
+    if args.command == "scientific":
+        from .scientific import run
+
+        return run(args)
     if args.command == "doctor":
         from .dependencies import run
 

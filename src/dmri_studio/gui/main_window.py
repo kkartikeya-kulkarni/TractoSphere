@@ -5,15 +5,13 @@ snapshots; shell preferences stay separate. Safe close drains blocking reads.
 """
 
 import logging
-import sys
 import time
 from dataclasses import replace
 from pathlib import Path
 from threading import Event
 
-from PySide6.QtCore import Qt, QThread, QTimer
+from PySide6.QtCore import QSize, Qt, QThread, QTimer
 from PySide6.QtGui import QAction, QIcon, QKeySequence
-from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -24,6 +22,8 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSplitter,
     QStackedWidget,
+    QStatusBar,
+    QToolBar,
     QVBoxLayout,
     QWidget,
 )
@@ -35,15 +35,18 @@ from dmri_studio.core.validation import ValidationPolicy
 from .components import ElidedLabel, LogDrawer, Toast, button, label
 from .dependency_setup import DependencyController, DependencyDialog
 from .load_data import LoadDataPage
+from .operation_state import OperationState, State
 from .preferences import PreferencesPage
 from .projects import ProjectPage
 from .qc import QCPage
 from .results import ResultsPage
+from .scientific_planning import ScientificPlanningPage
 from .settings import Settings
 from .theme import ASSETS, COMPACT, RAIL, SIDEBAR, Theme
-from .welcome import reduced_motion
+from .validation_page import DataValidationPage
 from .workers import LoadWorker, LogBridge, QtLogHandler
 from .workflow import WorkflowPage
+from .workstation import StartPage
 
 
 class MainWindow(QMainWindow):
@@ -58,7 +61,7 @@ class MainWindow(QMainWindow):
         self.settings = settings or Settings()
         self.dependencies = DependencyController(self.settings, self)
         self.dependency_dialog = None
-        theme.reduced_motion = reduced_motion(self.settings)
+        theme.reduced_motion = True
         self.loader = loader or DatasetLoader()
         self.dataset: DwiDataset | None = None
         self.retired: list[DwiDataset] = []
@@ -66,13 +69,14 @@ class MainWindow(QMainWindow):
         self.project_binding = None
         self.running_project_binding = None
         self.request = 0
+        self.load_state = OperationState(self)
         self.load_thread: QThread | None = None
         self.load_worker: LoadWorker | None = None
         self.cancel_event = Event()
         self.closing = False
         self.sidebar_collapsed = bool(self.settings.get("sidebar_collapsed", False))
         self.drawer_height = int(self.settings.get("drawer_height", 220))
-        self.setWindowTitle("TractoSphere — Diffusion MRI Research Studio — Public Alpha")
+        self.setWindowTitle("TractoSphere — Diffusion MRI Research Studio")
         self.setWindowIcon(QIcon(str(ASSETS / "branding/tractosphere-app.svg")))
         self.setMinimumSize(960, 640)
         self.resize(1280, 840)
@@ -86,7 +90,7 @@ class MainWindow(QMainWindow):
         sidebar = QVBoxLayout(self.sidebar)
         sidebar.setContentsMargins(12, 16, 12, 16)
         sidebar.setSpacing(8)
-        self.wordmark = label("WORKSPACES", "caption")
+        self.wordmark = label("TractoSphere", "section")
         sidebar.addWidget(self.wordmark)
         self.collapse = button("", self.toggle_sidebar, quiet=True)
         self.collapse.setAccessibleName("Toggle sidebar")
@@ -94,22 +98,38 @@ class MainWindow(QMainWindow):
         sidebar.addWidget(self.collapse)
         sidebar.addSpacing(8)
         self.nav_buttons = []
+        self.nav_headers = []
         names = [
             ("Project", "file-input"),
             ("Acquisitions", "database"),
-            ("Viewer", "scan"),
             ("Data Check", "clipboard-check"),
+            ("Viewer", "scan"),
+            ("Tractography", "route"),
             ("Preprocessing", "sliders-horizontal"),
             ("Reconstruction", "brain"),
-            ("Tractography", "route"),
+            ("Registration", "scan"),
+            ("Batch Processing", "list-checks"),
             ("Connectivity", "network"),
             ("QC", "list-checks"),
             ("Results", "files"),
+            ("Software Dependencies", "sliders-horizontal"),
             ("Settings", "settings"),
         ]
         for name, icon in names:
-            if name == "Settings":
-                sidebar.addStretch()
+            group = {
+                "Project": "Data",
+                "Viewer": "View",
+                "Preprocessing": "Process",
+                "QC": "Review",
+                "Software Dependencies": "System",
+            }.get(name)
+            if group:
+                if name == "Software Dependencies":
+                    sidebar.addStretch()
+                heading = label(group, "caption")
+                heading.setContentsMargins(8, 8, 0, 0)
+                sidebar.addWidget(heading)
+                self.nav_headers.append(heading)
             nav = button(
                 name,
                 self.focus_load
@@ -120,12 +140,22 @@ class MainWindow(QMainWindow):
                 if name == "Viewer"
                 else self.focus_scientific_viewer
                 if name == "Tractography"
+                else self.focus_dependencies
+                if name == "Software Dependencies"
                 else self.focus_preferences
                 if name == "Settings"
                 else self.focus_data_check
                 if name == "Data Check"
                 else self.focus_workflow
                 if name == "Preprocessing"
+                else self.focus_registration
+                if name == "Registration"
+                else self.focus_batch
+                if name == "Batch Processing"
+                else self.focus_models
+                if name == "Reconstruction"
+                else self.focus_connectivity
+                if name == "Connectivity"
                 else self.focus_qc
                 if name == "QC"
                 else self.focus_results
@@ -143,10 +173,15 @@ class MainWindow(QMainWindow):
                     "Tractography": "3D viewer · inspect and edit existing tractograms",
                     "Acquisitions": "Review acquisition associations",
                     "Preprocessing": "Configure supported preprocessing operations",
+                    "Reconstruction": "Import independent inputs and plan diffusion models; execution adapters are not implemented",
+                    "Registration": "Register images and review atlases on preprocessed diffusion",
+                    "Batch Processing": "Import studies, review workflows, execute and recover batches",
+                    "Connectivity": "Build and inspect connectomes from existing tracts and registered nodes",
                     "Data Check": "Validate loaded inputs",
                     "QC": "Inspect existing quality-control results",
                     "Results": "View processing outputs and reports",
                     "Settings": "Application preferences",
+                    "Software Dependencies": "Detect, locate and set up scientific software",
                 }.get(name, "Available in a later phase")
             )
             nav.setAccessibleDescription(nav.toolTip())
@@ -160,65 +195,76 @@ class MainWindow(QMainWindow):
                     "Settings",
                     "Tractography",
                     "Viewer",
+                    "Software Dependencies",
+                    "Reconstruction",
+                    "Connectivity",
+                    "Batch Processing",
+                    "Registration",
                 }
             )
             theme.set_icon(nav, icon, "accent.text" if name == "Project" else "text.disabled")
             if name == "Project":
                 nav.setProperty("selected", True)
                 theme.bind(nav, "accent.subtle", "accent.text")
+            nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            nav.setMinimumHeight(30)
             sidebar.addWidget(nav)
             self.nav_buttons.append((nav, name))
-        self.sidebar_note = label("Single-dataset workspace\nImport, inspect and plan.", "caption")
+        self.sidebar_note = label("Research alpha", "caption")
         sidebar.addWidget(self.sidebar_note)
         shell.addWidget(self.sidebar)
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
-        top = QWidget()
-        theme.bind(top, "bg.surface")
-        top.setMinimumHeight(64)
-        top_layout = QHBoxLayout(top)
-        top_layout.setContentsMargins(16, 8, 16, 8)
-        logo = QSvgWidget(str(ASSETS / "branding/tractosphere.svg"))
-        logo.setFixedSize(36, 36)
-        logo.setAccessibleName("TractoSphere logo")
-        top_layout.addWidget(logo)
-        brand = QVBoxLayout()
-        brand.setSpacing(0)
-        brand.addWidget(label("TractoSphere", "section"))
-        brand.addWidget(label("Diffusion MRI Research Studio", "caption"))
-        alpha_notice = label("PUBLIC ALPHA · RESEARCH USE ONLY", "caption")
-        alpha_notice.setWordWrap(False)
-        alpha_notice.setToolTip("NOT FOR CLINICAL USE · SCIENTIFIC VALIDATION ONGOING")
-        brand.addWidget(alpha_notice)
-        top_layout.addLayout(brand)
-        top_layout.addSpacing(24)
-        identity = QVBoxLayout()
-        identity.setSpacing(0)
-        self.project_label = ElidedLabel("Untitled project", "control")
-        identity.addWidget(self.project_label)
-        self.dataset_label = ElidedLabel("No dataset loaded", "caption")
-        identity.addWidget(self.dataset_label)
-        top_layout.addLayout(identity, 1)
-        self.commands_button = button(
-            "⌘K" if sys.platform == "darwin" else "Ctrl+K",
-            self.commands,
-            quiet=True,
+        self.toolbar = QToolBar("Workspace", self)
+        self.toolbar.setMovable(False)
+        self.toolbar.setFloatable(False)
+        self.toolbar.setMinimumHeight(44)
+        self.toolbar.setIconSize(QSize(18, 18))
+        self.toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toolbar.addWidget(self.collapse)
+        self.workspace_title = label("Start", "section")
+        self.workspace_title.setMinimumWidth(125)
+        self.toolbar.addWidget(self.workspace_title)
+        self.toolbar.addSeparator()
+        self.open_image_action = self.toolbar.addAction(
+            theme.icon("folder-open"), "Open Image…", self.open_image
         )
+        self.open_tract_action = self.toolbar.addAction(
+            theme.icon("route"), "Add Tracts…", self.open_tractography
+        )
+        theme.set_icon(self.open_image_action, "folder-open")
+        theme.set_icon(self.open_tract_action, "route")
+        self.plan_tracking_action = self.toolbar.addAction(
+            "Generate / filter tracks…", self.focus_tracking_plan
+        )
+        self.plan_tracking_action.setToolTip(
+            "Generate MRtrix tracks, filter streamlines or create tract-density maps after command review and approval"
+        )
+        self.toolbar.addSeparator()
+        self.inspector_action = self.toolbar.addAction(
+            theme.icon("sliders-horizontal"), "Inspector", self.toggle_inspector
+        )
+        self.inspector_action.setCheckable(True)
+        self.inspector_action.setChecked(True)
+        theme.set_icon(self.inspector_action, "sliders-horizontal")
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.toolbar.addWidget(spacer)
+        self.commands_button = button("Commands", self.commands, quiet=True)
         theme.set_icon(self.commands_button, "search")
-        top_layout.addWidget(self.commands_button)
-        top_layout.addWidget(button("3D Viewer", self.focus_scientific_viewer, quiet=True))
+        self.toolbar.addWidget(self.commands_button)
         self.theme_button = button("", self.toggle_theme, quiet=True)
-        top_layout.addWidget(self.theme_button)
-        logs_button = button("", self.toggle_logs, quiet=True)
-        logs_button.setAccessibleName("Toggle log drawer")
-        logs_button.setToolTip(
-            "Toggle logs · ⌘J" if sys.platform == "darwin" else "Toggle logs · Ctrl+J"
-        )
-        theme.set_icon(logs_button, "terminal")
-        top_layout.addWidget(logs_button)
-        right_layout.addWidget(top)
+        self.toolbar.addWidget(self.theme_button)
+        right_layout.addWidget(self.toolbar)
+        self.project_label = ElidedLabel("No project open", "caption")
+        self.dataset_label = ElidedLabel("No image open", "caption")
+        status = QStatusBar(self)
+        status.setSizeGripEnabled(True)
+        status.addWidget(self.project_label, 1)
+        status.addPermanentWidget(self.dataset_label, 2)
+        self.setStatusBar(status)
         self.splitter = QSplitter(Qt.Orientation.Vertical)
         self.splitter.setChildrenCollapsible(False)
         self.scroll = QScrollArea()
@@ -227,6 +273,11 @@ class MainWindow(QMainWindow):
         self.scroll.setWidget(self.page)
         self.workspace = QStackedWidget()
         self.workspace.addWidget(self.scroll)
+        self.validation_page = DataValidationPage(theme, self.focus_load)
+        self.validation_host = QScrollArea()
+        self.validation_host.setWidgetResizable(True)
+        self.validation_host.setWidget(self.validation_page)
+        self.workspace.addWidget(self.validation_host)
         self.projects = ProjectPage(lambda: (self.dataset, self.workflow.history))
         self.workspace.addWidget(self.projects)
         self.projects.load_requested.connect(self.load_saved_result)
@@ -259,9 +310,64 @@ class MainWindow(QMainWindow):
         self.workspace.addWidget(self.workflow_scroll)
         self.qc = QCPage(theme)
         self.workspace.addWidget(self.qc)
+        self.scientific = ScientificPlanningPage(
+            theme, lambda: self.dataset, lambda: self.workflow.history
+        )
+        self.workspace.addWidget(self.scientific)
+        self.scientific.notification.connect(
+            lambda message, tone: self.toast.show_message(message, tone)
+        )
+        self.scientific.processing_available = lambda: self.workflow.execution.thread is None
+        self.scientific.execution_busy.connect(self.dti_processing_busy)
+        self.scientific.inspect_requested.connect(self.inspect_scientific_input)
+        self.scientific.qc_requested.connect(self.focus_qc)
+        self.scientific.dti.view_requested.connect(self.open_dti_product)
+        self.scientific.csd.view_requested.connect(self.open_scientific_product)
+        self.scientific.tracking.view_requested.connect(self.open_scientific_product)
+        self.scientific.registration.view_requested.connect(self.open_scientific_product)
+        self.scientific.registration.qc_requested.connect(self.open_generated_qc)
+        self.scientific.anatomy.view_requested.connect(self.open_scientific_product)
+        self.scientific.anatomy.qc_requested.connect(self.open_generated_qc)
+        self.scientific.anatomy.run_requested.connect(self.open_saved_run)
+        self.scientific.sift2.view_requested.connect(self.open_scientific_product)
+        self.scientific.sift2.qc_requested.connect(self.open_generated_qc)
+        self.scientific.sift2.run_requested.connect(self.open_saved_run)
+        self.scientific.connectome.view_requested.connect(self.open_scientific_product)
+        self.scientific.connectome.qc_requested.connect(self.open_generated_qc)
+        self.scientific.connectome.run_requested.connect(self.open_saved_run)
+        self.scientific.tracking.qc_requested.connect(self.open_generated_qc)
+        self.scientific.tracking.run_requested.connect(self.open_saved_run)
+        self.scientific.roi_import_requested.connect(self.import_tracking_rois)
+        self.scientific.csd.qc_requested.connect(self.open_generated_qc)
+        self.scientific.csd.run_requested.connect(self.open_saved_run)
+        self.scientific.dti.qc_requested.connect(self.open_generated_qc)
+        self.scientific.dti.run_requested.connect(self.open_saved_run)
+        from .batch import BatchPage
+
+        self.batch = BatchPage(theme, settings=self.settings)
+        self.workspace.addWidget(self.batch)
+        self.batch.product_requested.connect(
+            lambda product: (
+                self.open_dti_product(product)
+                if product["kind"] == "dti_vector"
+                else self.open_scientific_product(product)
+            )
+        )
+        self.batch.busy_changed.connect(self.dti_processing_busy)
+        self.batch.processing_available = lambda: (
+            self.scientific.thread is None and self.workflow.execution.thread is None
+        )
+        self.scientific.processing_available = lambda: (
+            self.workflow.execution.thread is None and self.batch.thread is None
+        )
         self.results = ResultsPage(self.settings)
+        self.results.scientific_requested.connect(self.open_scientific_selection)
         self.workspace.addWidget(self.results)
         self.preferences = PreferencesPage(self)
+        self.dependency_host = QScrollArea()
+        self.dependency_host.setWidgetResizable(True)
+        self.dependency_host.setWidget(self.preferences.dependencies)
+        self.workspace.addWidget(self.dependency_host)
         self.preferences_scroll = QScrollArea()
         self.preferences_scroll.setWidgetResizable(True)
         self.preferences_scroll.setWidget(self.preferences)
@@ -295,6 +401,11 @@ class MainWindow(QMainWindow):
         shell.addWidget(right, 1)
         self.toast = Toast(right, theme)
         self.page.load_requested.connect(self.start_load)
+        self.page.open_image_requested.connect(self.open_image)
+        self.page.open_tracts_requested.connect(self.open_tractography)
+        self.page.open_project_requested.connect(self.browse_project)
+        self.page.open_results_requested.connect(self.browse_run)
+        self.page.open_scientific_requested.connect(self.focus_models)
         self.page.cancel_requested.connect(self.cancel_load)
         self.page.unload_requested.connect(self.unload)
         self.page.notification.connect(self.toast.show_message)
@@ -308,22 +419,12 @@ class MainWindow(QMainWindow):
         self.logger.setLevel(logging.INFO)
         self.logger.addHandler(self.handler)
         self.actions = []
-        for name, shortcut, callback in [
-            ("Choose DWI image", "Ctrl+O", lambda: self.page.browse("dwi")),
-            ("Command list", "Ctrl+K", self.commands),
-            ("Toggle sidebar", "Ctrl+B", self.toggle_sidebar),
-            ("Toggle log drawer", "Ctrl+J", self.toggle_logs),
-        ]:
-            action = QAction(name, self)
-            action.setShortcut(QKeySequence(shortcut))
-            action.triggered.connect(callback)
-            self.addAction(action)
-            self.actions.append(action)
-        menu = self.menuBar().addMenu("File")
-        menu.addAction(self.actions[0])
-        view = self.menuBar().addMenu("View")
-        for action in self.actions[1:]:
-            view.addAction(action)
+        self.setup_menus()
+        self.workspace.currentChanged.connect(self.update_edit_actions)
+        self.update_edit_actions()
+        self.start_page = StartPage(self)
+        self.workspace.addWidget(self.start_page)
+        self.projects.project_changed.connect(self.remember_project)
         self.apply_sidebar()
         self.update_theme_action()
         if geometry := self.settings.get("geometry"):
@@ -342,7 +443,8 @@ class MainWindow(QMainWindow):
         self.close_timer = QTimer(self)
         self.close_timer.setInterval(50)
         self.close_timer.timeout.connect(self.finish_close)
-        self.theme.apply(self.theme.name)
+        self.theme.apply(self.theme.preference)
+        self.focus_start()
 
     def record(self, message: str, level: str = "INFO") -> None:
         """Record actual GUI transaction events separately from core stages."""
@@ -359,6 +461,8 @@ class MainWindow(QMainWindow):
         self.request += 1
         self.cancel_event = Event()
         self.page.remove_failure()
+        self.toast.resolve("dataset-load")
+        self.load_token = self.load_state.begin(State.VALIDATING, "Checking dataset inputs…")
         self.page.set_busy(True)
         self.workflow.execution.setEnabled(False)
         self.theme.apply(self.theme.name)
@@ -389,6 +493,7 @@ class MainWindow(QMainWindow):
     def load_progress(self, request: int, progress: object) -> None:
         """Ignore progress from a superseded transaction."""
         if request == self.request and not self.cancel_event.is_set():
+            self.load_state.update(self.load_token, State.LOADING, progress.message)
             self.page.set_progress(progress)
 
     def cancel_load(self) -> None:
@@ -422,6 +527,10 @@ class MainWindow(QMainWindow):
             self.dataset = result.dataset
             self.page.set_dataset(self.dataset)
             self.workflow.set_dataset(self.dataset)
+            if not self.pending_result and self.page.import_intent == "preprocessed":
+                self.workflow.source.setText(
+                    "User imported externally preprocessed DWI. Operations, parameters and scientific validation remain unknown until supporting records are reviewed."
+                )
             self.project_binding = (
                 self.pending_result.get("project_binding") if self.pending_result else None
             )
@@ -456,17 +565,26 @@ class MainWindow(QMainWindow):
             )
             self.setWindowTitle(f"{self.dataset.paths.dwi.name} — TractoSphere")
             self.release_retired()
-            self.toast.show_message(
-                self.page.banner_title.text(),
-                "warning" if self.page.state == "warning" else "success",
+            self.load_state.update(
+                self.load_token,
+                State.WARNING if self.page.state == "warning" else State.READY,
+                self.dataset.paths.dwi.name
+                + (
+                    " · input warnings require review"
+                    if self.page.state == "warning"
+                    else " · ready"
+                ),
             )
             self.record("Dataset activated. " + result.report.coverage_message())
         else:
             self.page.present_report(result.report, cancelled)
-            if not cancelled:
-                self.toast.show_message(
-                    "Could not load dataset. See candidate validation.", "error"
-                )
+            self.load_state.update(
+                self.load_token,
+                State.CANCELLED if cancelled else State.FAILED,
+                "Loading cancelled"
+                if cancelled
+                else "Could not load dataset; see candidate validation",
+            )
         self.theme.apply(self.theme.name)
         self.scroll.verticalScrollBar().setValue(0)
 
@@ -484,7 +602,9 @@ class MainWindow(QMainWindow):
         self.record(traceback, "ERROR")
         if not self.logs.open:
             self.logs.toggle()
-        self.toast.show_message("Unexpected loader error. Details are in Logs.", "error")
+        self.load_state.update(
+            self.load_token, State.FAILED, "Unexpected loader error; details in Logs"
+        )
 
     def load_finished(self) -> None:
         """Release QThread only after it has stopped; then enable another load."""
@@ -517,14 +637,14 @@ class MainWindow(QMainWindow):
         self.focus_load()
         self.release_retired()
         self.dataset_label.setText("No dataset loaded")
-        self.setWindowTitle("TractoSphere — Diffusion MRI Research Studio — Public Alpha")
+        self.setWindowTitle("TractoSphere — Diffusion MRI Research Studio")
         self.setWindowIcon(QIcon(str(ASSETS / "branding/tractosphere-app.svg")))
         self.record("Dataset unloaded; source files unchanged.")
 
     def toggle_theme(self) -> None:
         """Change only palette/icon state; all selection and work remain intact."""
         self.theme.apply("light" if self.theme.name == "dark" else "dark")
-        self.settings.set("theme", self.theme.name)
+        self.settings.set("theme", self.theme.preference)
         self.update_theme_action()
 
     def update_theme_action(self) -> None:
@@ -546,23 +666,32 @@ class MainWindow(QMainWindow):
         margin = 6 if self.sidebar_collapsed else 12
         self.sidebar.layout().setContentsMargins(margin, 16, margin, 16)
         self.wordmark.setVisible(not self.sidebar_collapsed)
+        for heading in self.nav_headers:
+            heading.setVisible(not self.sidebar_collapsed)
         self.sidebar_note.setVisible(not self.sidebar_collapsed)
         for widget, name in self.nav_buttons:
             display = {
-                "Project": "Data && imports",
-                "Acquisitions": "Acquisitions",
-                "Viewer": "Image viewer",
+                "Project": "Import data",
+                "Acquisitions": "Projects",
+                "Viewer": "Image Viewer",
                 "Data Check": "Data validation",
-                "QC": "Quality control",
-                "Results": "Runs && reports",
+                "QC": "Quality Control",
+                "Results": "Runs && Reports",
                 "Reconstruction": "Diffusion models",
                 "Settings": "Preferences",
+                "Software Dependencies": "Software setup",
             }.get(name, name)
             widget.setText("" if self.sidebar_collapsed else display)
             widget.setToolTip(
                 name
                 + (
-                    " · Load Data"
+                    " · Planning only; execution adapters are not implemented"
+                    if name in {"Reconstruction", "Connectivity"}
+                    else " · Inspect existing tractograms and ROIs"
+                    if name == "Tractography"
+                    else " · Detect and configure scientific software"
+                    if name == "Software Dependencies"
+                    else " · Load Data"
                     if name == "Project"
                     else " · History and operation planning"
                     if name == "Preprocessing" and self.dataset is not None
@@ -640,6 +769,31 @@ class MainWindow(QMainWindow):
 
     def select_navigation(self, selected: str) -> None:
         """Reflect the active workspace using the existing semantic theme."""
+        titles = {
+            "Project": "Import data",
+            "Acquisitions": "Projects",
+            "Viewer": "Image Viewer",
+            "QC": "Quality Control",
+            "Results": "Runs & Reports",
+            "Settings": "Preferences",
+            "Software Dependencies": "Software setup",
+        }
+        self.workspace_title.setText(titles.get(selected, selected) or "Start")
+        if hasattr(self, "undo_action"):
+            self.update_edit_actions()
+        self.open_image_action.setVisible(selected in {"Viewer", "Tractography", "Project", ""})
+        viewing = selected in {"Viewer", "Tractography"}
+        self.open_tract_action.setVisible(selected == "Tractography")
+        self.plan_tracking_action.setVisible(selected == "Tractography")
+        self.inspector_action.setVisible(viewing)
+        if self.scientific_viewer:
+            self.inspector_action.setChecked(not self.scientific_viewer.inspector.isHidden())
+        if viewing:
+            self.update_scene_identity()
+        elif self.dataset:
+            self.dataset_label.setText("Processing input · " + self.dataset.paths.dwi.name)
+        else:
+            self.dataset_label.setText("No processing input loaded")
         for nav, name in self.nav_buttons:
             active = name == selected
             nav.setProperty("selected", active)
@@ -662,10 +816,298 @@ class MainWindow(QMainWindow):
                 else "text.disabled",
             )
 
+    def browse_project(self):
+        self.focus_projects()
+        self.projects.browse()
+
+    def browse_run(self):
+        self.focus_results()
+        self.results.browse()
+
     def focus_projects(self):
         """Open the acquisition ledger without replacing the active image."""
         self.workspace.setCurrentWidget(self.projects)
         self.select_navigation("Acquisitions")
+
+    def focus_registration(self):
+        self.scientific.set_stage("registration")
+        self.workspace.setCurrentWidget(self.scientific)
+        self.select_navigation("Registration")
+
+    def focus_batch(self):
+        """Open study orchestration without changing existing viewers."""
+        directory = self.scientific.tool_directory
+        if directory and (Path(directory) / "mrconvert").is_file():
+            self.batch.tool_directory = directory
+        self.workspace.setCurrentWidget(self.batch)
+        self.select_navigation("Batch Processing")
+
+    def focus_models(self):
+        """Review model contracts without requiring a preprocessed DWI or executing."""
+        self.scientific.set_stage("models")
+        self.workspace.setCurrentWidget(self.scientific)
+        self.select_navigation("Reconstruction")
+
+    def focus_connectivity(self):
+        """Plan from existing tracts/nodes; no reconstruction prerequisite invented."""
+        self.scientific.set_stage("connectivity")
+        self.workspace.setCurrentWidget(self.scientific)
+        self.select_navigation("Connectivity")
+
+    def focus_tracking_plan(self):
+        """Keep generation planning distinct from working tract visualization/editing."""
+        self.scientific.set_stage("tractography")
+        self.workspace.setCurrentWidget(self.scientific)
+        self.select_navigation("Tractography")
+        self.workspace_title.setText("Tractography")
+
+    def import_tracking_rois(self):
+        """Snapshot selected existing ROI masks into separate immutable inputs.
+
+        Never edits an atlas/ROI source. The scientist explicitly chooses the
+        export parent and associates the current source; equal physical grids
+        are checked, while subject association remains a declared claim.
+        """
+        import json
+        from uuid import uuid4
+
+        import numpy as np
+        from PySide6.QtWidgets import QFileDialog
+
+        from dmri_studio.core._mif_checks import voxel_mapping
+        from dmri_studio.core.scene import save_new_image
+        from dmri_studio.core.scientific import ImportRequest, import_artifact
+
+        page = self.scientific
+        viewer = self.scientific_viewer
+        if page.thread is not None:
+            return
+        source = next(
+            (a for a in page.artifacts if a.id == page.tracking.source.currentData()), None
+        )
+        if viewer is None or viewer.reference is None or not viewer.roi_list.selected_rows():
+            page.status.setText("Select one or more regions in the existing viewer ROI list first.")
+            return
+        if source is None or not all(
+            source.payload["declarations"].get(k) for k in ("subject_id", "space_id")
+        ):
+            page.status.setText(
+                "Select a tracking source with explicit subject and space declarations before associating viewer ROIs."
+            )
+            return
+        try:
+            voxel_mapping(
+                viewer.reference.affine,
+                viewer.reference.shape,
+                np.asarray(source.payload["geometry"]["affine_mm"]),
+                source.payload["geometry"]["shape"],
+            )
+            indices = viewer.roi_list.selected_rows()
+            if len(indices) > 8:
+                raise ValueError("Select at most eight ROI snapshots per import to bound memory.")
+            snapshots = [
+                (
+                    viewer.rois[i]["name"],
+                    np.asarray(viewer.rois[i]["data"] > 0, dtype=np.uint8),
+                    viewer.rois[i].get("role", "Display"),
+                )
+                for i in indices
+            ]
+            if any(not data.any() for _, data, _ in snapshots):
+                raise ValueError("Empty ROIs cannot seed or constrain tractography.")
+        except ValueError as exc:
+            page.status.setText(str(exc))
+            return
+        parent = QFileDialog.getExistingDirectory(
+            self, "Choose local parent for new tracking ROI snapshots"
+        )
+        if not parent:
+            return
+        folder = Path(parent) / ("tracking-rois-" + uuid4().hex[:12])
+        reference = viewer.reference
+        declarations = dict(source.payload["declarations"])
+
+        def export(cancel, progress):
+            from dmri_studio.core.process import check_cancel
+            from dmri_studio.core.storage import require_local_processing
+
+            require_local_processing([folder])
+            folder.mkdir(mode=0o700, exist_ok=False)
+            imported = []
+            provenance = []
+            for i, (name, data, role) in enumerate(snapshots):
+                check_cancel(cancel)
+                path = folder / f"roi-{i + 1:03}.nii.gz"
+                save_new_image(path, data, reference)
+                imported.append(
+                    import_artifact(
+                        ImportRequest(
+                            "roi",
+                            path,
+                            declarations=declarations,
+                            provenance=f"Separate selected viewer ROI snapshot: {name}. Source/space association reviewed by the user; no registration or resampling. Original ROI unchanged.",
+                        ),
+                        cancelled=cancel,
+                        progress=progress,
+                    )
+                )
+                provenance.append(
+                    dict(
+                        name=name,
+                        path=str(path),
+                        tracking_role=role,
+                        source_reference=str(reference.path),
+                        scientific_acceptance="unassigned",
+                    )
+                )
+            with (folder / "roi-snapshots.json").open("x") as stream:
+                json.dump(provenance, stream, indent=2)
+            return imported
+
+        page.start("import-tracking-rois", export)
+
+    def open_scientific_selection(self):
+        """Opening a saved selection rechecks inputs and never restarts a run."""
+        self.focus_models()
+        self.scientific.browse_restore()
+
+    def open_dti_product(self, product):
+        """Typed verified scalar/vector handoff to the existing shared renderer."""
+        self.focus_viewer()
+        viewer = self.scientific_viewer
+        if viewer is not None:
+            if product["kind"] == "dti_vector":
+                viewer.safe(
+                    lambda: viewer.load_image(
+                        Path(product["fa"]),
+                        direction_path=Path(product["path"]),
+                        expected_hashes={
+                            product["path"]: product["sha256"],
+                            product["fa"]: product["fa_sha256"],
+                        },
+                    )
+                )
+            else:
+                viewer.safe(
+                    lambda: viewer.load_image(
+                        Path(product["path"]), expected_hashes={product["path"]: product["sha256"]}
+                    )
+                )
+
+    def open_scientific_product(self, product):
+        """Keep FOD coefficients and responses typed; never fake scalar glyphs."""
+        if product["kind"] in {"registration_qc", "registration_alignment"}:
+            self.show_scene("image", auto_image=False)
+            self.scientific_viewer.load_registration_product(product)
+            return
+        if product["kind"] == "streamline_weights":
+            self.focus_tracking_plan()
+            self.scientific.tabs.setCurrentWidget(self.scientific.sift2)
+
+            def read(cancel, progress):
+                from dmri_studio.core.execution import hash_file
+
+                if hash_file(Path(product["path"]), cancel) != product["sha256"]:
+                    raise ValueError("Saved SIFT2 identity record changed")
+                return self.scientific.sift2.read_record(product["path"], cancel)
+
+            self.scientific.start("sift2-open", read)
+            return
+        if product["kind"] == "connectome":
+            self.focus_connectivity()
+            self.scientific.connectome.open_bundle(Path(product["path"]))
+            return
+        if product["kind"] == "tractogram":
+            self.show_scene("tractography", auto_image=False)
+            self.scientific_viewer.safe(
+                lambda: self.scientific_viewer.load_tracking_product(product)
+            )
+            return
+        if product["kind"] == "scalar":
+            self.open_dti_product(product)
+            return
+        if product["kind"] == "fod":
+            self.show_scene("image", auto_image=False)
+            self.scientific_viewer.load_fod(
+                product["path"],
+                expected_hash=product["sha256"],
+                basis=product.get("sh_basis", "mrtrix3_real_symmetric"),
+                frame=product.get("sh_frame", "world_ras"),
+            )
+            return
+        from dmri_studio.core.scientific import ImportRequest
+
+        decl = {
+            k: product[k]
+            for k in ("tissue", "normalization", "sh_basis", "sh_frame")
+            if k in product
+        }
+        if product["kind"] == "fod":
+            decl.update(tissue="wm", sh_basis="mrtrix3_real_symmetric", sh_frame="world_ras")
+        self.focus_models()
+        from dmri_studio.core.execution import hash_file
+        from dmri_studio.core.scientific import import_artifact
+
+        def inspect(cancel, progress):
+            path = Path(product["path"])
+            if hash_file(path, cancel) != product["sha256"]:
+                raise ValueError("Saved result changed; reopen run evidence")
+            artifact = import_artifact(
+                ImportRequest(
+                    product["kind"],
+                    path,
+                    declarations=decl,
+                    provenance="Hash-verified scientific output; numerical checks and scientific acceptance are separate.",
+                ),
+                cancelled=cancel,
+                progress=progress,
+            )
+            if hash_file(path, cancel) != product["sha256"]:
+                raise ValueError("Saved result changed during inspection")
+            return artifact
+
+        self.scientific.start("import-product", inspect)
+
+    def inspect_scientific_input(self, artifact):
+        """Use the existing renderer. Spatial correspondence is never inferred."""
+        path = Path(artifact.payload["path"])
+        if artifact.kind == "fod":
+            self.show_scene("image", auto_image=False)
+            self.scientific_viewer.load_fod(path)
+            return
+        if artifact.kind in {"response", "tensor"} or str(path).endswith(".mif"):
+            self.focus_models()
+            self.scientific.tabs.setCurrentWidget(self.scientific.input_page)
+            index = next(
+                (i for i, a in enumerate(self.scientific.artifacts) if a.id == artifact.id), -1
+            )
+            self.scientific.inputs.setCurrentRow(index)
+            self.scientific.show_input(index)
+            self.scientific.status.setText(
+                "Typed scientific metadata; coefficients are not scalar volumes."
+            )
+            return
+        if artifact.kind in {"tractogram", "roi", "atlas_labels", "atlas_probability"}:
+            self.focus_scientific_viewer()
+            viewer = self.scientific_viewer
+            if viewer is not None and viewer.reference is not None:
+                if artifact.kind == "tractogram":
+                    viewer.safe(lambda: viewer.load_tracts(path))
+                elif artifact.kind == "roi":
+                    viewer.safe(lambda: viewer.load_roi(path))
+                else:
+                    # Reuse the existing explicit atlas space/threshold dialog.
+                    # A successful contract import never supplies registration.
+                    viewer.safe(lambda: viewer.choose_atlas(path))
+            else:
+                self.toast.show_message(
+                    "Open the associated anatomical reference first; spatial alignment is unverified.",
+                    "warning",
+                )
+        else:
+            self.focus_viewer()
+            if self.scientific_viewer is not None:
+                self.scientific_viewer.safe(lambda: self.scientific_viewer.load_image(path))
 
     def focus_preferences(self):
         """Open display/privacy preferences, never processing defaults."""
@@ -675,44 +1117,226 @@ class MainWindow(QMainWindow):
 
     def focus_data_check(self):
         """Navigate to the actual existing input validation evidence."""
-        self.focus_load()
-        self.page.jump_validation()
+        report = (
+            self.page.failure.report
+            if self.page.failure is not None
+            else self.dataset.validation
+            if self.dataset
+            else None
+        )
+        self.validation_page.set_report(report)
+        self.workspace.setCurrentWidget(self.validation_host)
         self.select_navigation("Data Check")
 
     def focus_viewer(self):
-        """Move the existing native reader/canvases into a dedicated workspace."""
-        if self.dataset is None:
-            self.focus_scientific_viewer()
-            return
-        self.viewer_workspace_active = True
-        self.expand_preview(True)
-        self.select_navigation("Viewer")
+        """Open image tools over the same scene used by tractography."""
+        self.show_scene("image")
 
     def focus_scientific_viewer(self):
-        """Open the accelerated four-view workspace without changing processing inputs."""
+        """Open tract/ROI tools without replacing or rereading the shared image."""
+        self.show_scene("tractography")
+
+    def show_scene(self, mode, *, auto_image=True):
         if self.scientific_viewer is None:
             try:
                 from .scientific_viewer import ScientificViewer
 
                 self.scientific_viewer = ScientificViewer(self.theme)
             except ImportError as exc:
-                self.toast.show_message(f"Install dmri-studio[gui] for 3D support: {exc}", "error")
+                self.toast.show_message(f"Install dmri-studio[gui] for viewing: {exc}", "error")
                 return
             self.scientific_viewer.image_loaded.connect(self.update_scene_identity)
-            self.workspace.addWidget(self.scientific_viewer)
-        self.workspace.setCurrentWidget(self.scientific_viewer)
-        if (
-            self.scientific_viewer.reference is None
-            and self.dataset is not None
-            and not self.scientific_viewer.tasks
-        ):
-            self.scientific_viewer.safe(
-                lambda: self.scientific_viewer.load_image(self.dataset.paths.dwi)
+            self.scientific_viewer.editing_changed.connect(self.update_edit_actions)
+            self.scientific_viewer.tabs.currentChanged.connect(self.update_edit_actions)
+            self.scientific_viewer.tract_list.currentRowChanged.connect(self.update_edit_actions)
+            self.scientific_viewer.workspace_mode_changed.connect(self.scene_mode_changed)
+            self.scientific_viewer.inspector_visibility_changed.connect(
+                self.inspector_action.setChecked
             )
-        self.select_navigation("Tractography")
+            self.scientific_viewer.fod_qc_callback = lambda path: (
+                self.focus_qc(),
+                self.qc.load(path),
+            )
+            self.scientific_viewer.scene_toolbar.hide()
+            self.workspace.addWidget(self.scientific_viewer)
+        viewer = self.scientific_viewer
+        self.workspace.setCurrentWidget(viewer)
+        viewer.set_workspace_mode(mode)
+        if (
+            auto_image
+            and viewer.reference is None
+            and self.dataset is not None
+            and not viewer.tasks
+        ):
+            viewer.safe(lambda: viewer.load_image(self.dataset.paths.dwi))
+        self.select_navigation("Viewer" if mode == "image" else "Tractography")
+
+    def scene_mode_changed(self, mode):
+        if self.scientific_viewer and self.workspace.currentWidget() is self.scientific_viewer:
+            self.select_navigation("Viewer" if mode == "image" else "Tractography")
+
+    def open_image(self):
+        self.focus_viewer()
+        if self.scientific_viewer:
+            self.scientific_viewer.safe(self.scientific_viewer.choose_image)
+
+    def open_tractography(self):
+        self.focus_scientific_viewer()
+        viewer = self.scientific_viewer
+        if viewer is None:
+            return
+        if viewer.reference is None:
+            viewer.status.setText(
+                "Open the anatomical reference first, then Add Tracts from the same coordinate space."
+            )
+            viewer.safe(viewer.choose_image)
+        else:
+            viewer.safe(viewer.choose_tracts)
+
+    def toggle_inspector(self):
+        if self.scientific_viewer and self.workspace.currentWidget() is self.scientific_viewer:
+            self.scientific_viewer.set_inspector_visible(self.inspector_action.isChecked())
+
+    def focus_start(self):
+        self.start_page.refresh()
+        self.workspace.setCurrentWidget(self.start_page)
+        self.select_navigation("")
+        self.workspace_title.setText("Start")
+
+    def focus_dependencies(self):
+        self.workspace.setCurrentWidget(self.dependency_host)
+        self.select_navigation("Software Dependencies")
+
+    def remember_project(self, name):
+        import json
+
+        if not self.projects.path:
+            return
+        path = str(self.projects.path)
+        try:
+            records = json.loads(self.settings.get("recent_projects_json", "[]"))
+        except (ValueError, TypeError):
+            records = []
+        records = [{"name": name, "path": path}] + [r for r in records if r["path"] != path]
+        self.settings.set("recent_projects_json", json.dumps(records[:6]))
+
+    def setup_menus(self):
+        """Reuse validated services through standard desktop actions and shortcuts."""
+        menus = {
+            name: self.menuBar().addMenu(name)
+            for name in ("File", "Edit", "View", "Tools", "Window", "Help")
+        }
+
+        def add(menu, title, callback, shortcut=None, role=None):
+            action = QAction(title, self)
+            if shortcut:
+                action.setShortcut(QKeySequence(shortcut))
+            if role:
+                action.setMenuRole(role)
+            action.triggered.connect(callback)
+            menus[menu].addAction(action)
+            self.actions.append(action)
+            return action
+
+        add("File", "Open Image…", self.open_image, QKeySequence.StandardKey.Open)
+        add("File", "Open Project…", self.browse_project, "Ctrl+Shift+O")
+        add("File", "Import Diffusion MRI…", self.focus_load)
+        add("File", "Open Tractography…", self.open_tractography)
+        add("File", "Open FOD Coefficients…", lambda: self.scene_action("choose_fod"))
+        add("File", "Open Viewer Workspace…", lambda: self.scene_action("open_workspace"))
+        add(
+            "File",
+            "Save Viewer Workspace…",
+            lambda: self.scene_action("save_workspace"),
+            QKeySequence.StandardKey.Save,
+        )
+        add("File", "Export View…", lambda: self.scene_action("save_screenshot"))
+        self.undo_action = add(
+            "Edit", "Undo", lambda: self.edit_scene(False), QKeySequence.StandardKey.Undo
+        )
+        self.redo_action = add(
+            "Edit", "Redo", lambda: self.edit_scene(True), QKeySequence.StandardKey.Redo
+        )
+        add(
+            "Edit",
+            "Preferences…",
+            self.focus_preferences,
+            QKeySequence.StandardKey.Preferences,
+            QAction.MenuRole.PreferencesRole,
+        )
+        add("View", "Start", self.focus_start)
+        add("View", "Image Viewer", self.focus_viewer)
+        add("View", "Tractography", self.focus_scientific_viewer)
+        add("View", "Toggle Sidebar", self.toggle_sidebar, "Ctrl+B")
+        add("View", "Toggle Inspector", lambda: self.inspector_action.trigger(), "Ctrl+I")
+        add("View", "Processing Logs", self.toggle_logs, "Ctrl+J")
+        add("Tools", "Commands…", self.commands, "Ctrl+K")
+        add("Tools", "Software Dependencies…", self.focus_dependencies)
+        add("Tools", "Quality Control", self.focus_qc)
+        add("Tools", "Diffusion Models", self.focus_models)
+        add("Tools", "Generate / filter tracks…", self.focus_tracking_plan)
+        add("Tools", "Connectivity", self.focus_connectivity)
+        add(
+            "Window",
+            "Full Screen",
+            lambda: self.showNormal() if self.isFullScreen() else self.showFullScreen(),
+            "Ctrl+Shift+F",
+        )
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        add(
+            "Help",
+            "TractoSphere Documentation",
+            lambda: QDesktopServices.openUrl(
+                QUrl("https://github.com/kkartikeya-kulkarni/TractoSphere#readme")
+            ),
+        )
+        add(
+            "Help",
+            "Report an Issue…",
+            lambda: QDesktopServices.openUrl(
+                QUrl("https://github.com/kkartikeya-kulkarni/TractoSphere/issues")
+            ),
+        )
+
+    def scene_action(self, method):
+        if self.scientific_viewer is None:
+            self.focus_viewer()
+        if self.scientific_viewer:
+            self.scientific_viewer.safe(getattr(self.scientific_viewer, method))
+
+    def update_edit_actions(self, *_):
+        """Only the active ROI/group undo stack can receive standard Edit commands."""
+        viewer = self.scientific_viewer
+        undo = redo = False
+        if viewer and self.workspace.currentWidget() is viewer:
+            if viewer.tabs.currentIndex() == 2:
+                undo, redo = bool(viewer.roi_undo), bool(viewer.roi_redo)
+            elif viewer.tabs.currentIndex() == 1 and (group := viewer.current_group()):
+                undo, redo = bool(group.undo_stack), bool(group.redo_stack)
+        self.undo_action.setEnabled(undo)
+        self.redo_action.setEnabled(redo)
+        self.undo_action.setToolTip("Undo an edit in the selected tract or ROI context.")
+        self.redo_action.setToolTip("Redo an edit in the selected tract or ROI context.")
+
+    def edit_scene(self, redo):
+        viewer = self.scientific_viewer
+        if viewer and self.workspace.currentWidget() is viewer:
+            viewer.safe(
+                lambda: (
+                    viewer.undo_roi(redo)
+                    if viewer.tabs.currentIndex() == 2
+                    else viewer.tract_undo(redo)
+                )
+            )
 
     def update_scene_identity(self):
-        if self.scientific_viewer and self.scientific_viewer.reference and self.dataset is None:
+        if (
+            self.scientific_viewer
+            and self.scientific_viewer.reference
+            and self.workspace.currentWidget() is self.scientific_viewer
+        ):
             self.dataset_label.setText("Viewer · " + self.scientific_viewer.reference.path.name)
 
     def focus_results(self) -> None:
@@ -728,6 +1352,18 @@ class MainWindow(QMainWindow):
 
     def load_saved_result(self, context: dict) -> None:
         """Use the normal transactional loader; carry verified history on success only."""
+        if context.get("product", {}).get("kind") in {
+            "fod",
+            "response",
+            "tissue_scalar",
+            "tractogram",
+            "connectome",
+        }:
+            self.open_scientific_product(context["product"])
+            return
+        if context.get("product", {}).get("kind") in {"scalar", "dti_vector"}:
+            self.open_dti_product(context["product"])
+            return
         if self.load_thread is not None or self.workflow.execution.thread is not None:
             self.toast.show_message(
                 "Wait for the active load or processing operation before replacing inputs.",
@@ -840,6 +1476,7 @@ class MainWindow(QMainWindow):
             return
         panel = self.workflow.execution
         if "MRtrix3" in locations:
+            self.scientific.tool_directory = Path(locations["MRtrix3"])
             panel.tool_directory.setText(locations["MRtrix3"])
         if "ANTs" in locations:
             panel.bias_inputs["ants_directory"].setText(locations["ANTs"])
@@ -857,6 +1494,8 @@ class MainWindow(QMainWindow):
         qc_idle = self.qc.shutdown()
         results_idle = self.results.shutdown()
         projects_idle = self.projects.shutdown()
+        scientific_idle = self.scientific.shutdown()
+        batch_idle = self.batch.shutdown()
         scene_idle = self.scientific_viewer is None or self.scientific_viewer.shutdown()
         if (
             self.load_thread
@@ -866,6 +1505,8 @@ class MainWindow(QMainWindow):
             or not dependencies_idle
             or not results_idle
             or not projects_idle
+            or not scientific_idle
+            or not batch_idle
             or not scene_idle
         ):
             event.ignore()
@@ -880,7 +1521,7 @@ class MainWindow(QMainWindow):
             return
         self.close_timer.stop()
         self.settings.set("geometry", self.saveGeometry())
-        self.settings.set("theme", self.theme.name)
+        self.settings.set("theme", self.theme.preference)
         self.settings.store.sync()
         self.logger.removeHandler(self.handler)
         self.logger.setLevel(self.previous_log_level)
@@ -899,6 +1540,11 @@ class MainWindow(QMainWindow):
             and self.projects.thread is None
         ):
             self.close()
+
+    def dti_processing_busy(self, busy):
+        """Keep heavy GUI jobs sequential while preserving navigation and viewing."""
+        self.workflow.execution.setEnabled(not busy)
+        self.processing_busy(busy)
 
     def processing_busy(self, busy: bool) -> None:
         """Protect the active input without freezing navigation, viewing or theme changes."""

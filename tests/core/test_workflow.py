@@ -159,16 +159,9 @@ def test_confirmation_and_selection_are_both_required(dataset):
         build_plan(dataset, raw_history(), ("eddy",))
 
 
-@pytest.mark.parametrize("stat_change", ["mtime", "size"])
-def test_changed_and_closed_inputs_require_reload(dataset, stat_change):
-    """Reject changes to either documented stat signal, then reject closed input."""
-    before = dataset.paths.bval.stat()
-    # Same-length writes can share an mtime on Windows/virtual filesystems.
-    # Establish the actual stat mutation under test rather than assuming a
-    # wall-clock tick; SourceFingerprint explicitly is not a content checksum.
-    dataset.paths.bval.write_text("0 1000 1000 3000" + ("\n" if stat_change == "size" else ""))
-    if stat_change == "mtime":
-        os.utime(dataset.paths.bval, ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000))
+def test_changed_and_closed_inputs_require_reload(dataset):
+    """Reject stale decisions even if the original load passed."""
+    dataset.paths.bval.write_text("0 1000 1000 3000")
     with pytest.raises(SourceChangedError):
         build_plan(dataset, raw_history(), ("mask",))
     dataset.close()

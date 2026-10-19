@@ -1,6 +1,6 @@
 /* TractoSphere workstation: compact controls, restrained panels, visible focus. */
 QWidget { selection-background-color: palette(highlight); selection-color: palette(highlighted-text); }
-QFrame[card="true"] { background: palette(window); border: 1px solid palette(midlight); border-radius: 5px; }
+QFrame[card="true"] { background: palette(window); border: none; border-radius: 0; }
 QLabel { background: transparent; }
 QPushButton, QToolButton { min-height: 24px; padding: 3px 10px; border-radius: 4px; border: 1px solid palette(midlight); background: palette(button); color: palette(button-text); }
 QPushButton[iconOnly="true"] { padding: 3px; }
@@ -10,7 +10,7 @@ QPushButton:focus, QToolButton:focus, QLineEdit:focus, QComboBox:focus, QAbstrac
 QPushButton[primary="true"] { background: palette(highlight); color: palette(highlighted-text); border: 1px solid palette(highlight); }
 QPushButton[quiet="true"], QToolButton { border-color: transparent; background: transparent; }
 QPushButton[nav="true"] { text-align: left; padding: 6px 8px; border: 1px solid transparent; border-radius: 4px; }
-QPushButton[selected="true"] { border-left: 2px solid palette(highlight); }
+QPushButton[selected="true"] { border: none; background: palette(alternate-base); }
 QPushButton:checked { border-color: palette(highlight); background: palette(light); }
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox { min-height: 24px; padding: 3px 8px; background: palette(base); color: palette(text); border: 1px solid palette(mid); border-radius: 4px; }
 QComboBox { padding-right: 22px; }
@@ -18,12 +18,12 @@ QComboBox::drop-down { border: none; width: 20px; }
 QComboBox QAbstractItemView { padding: 4px; border: 1px solid palette(midlight); selection-background-color: palette(highlight); }
 QPlainTextEdit, QTextEdit, QTreeWidget, QListWidget, QTableWidget { background: palette(base); color: palette(text); border: 1px solid palette(midlight); border-radius: 4px; }
 QTreeWidget::item, QTableWidget::item { padding: 6px; }
-QListWidget::item { padding: 9px 8px; border-bottom: 1px solid palette(midlight); }
+QListWidget::item { padding: 6px 8px; border: none; }
 QListWidget::item:selected, QTreeWidget::item:selected, QTableWidget::item:selected { background: palette(highlight); color: palette(highlighted-text); }
 QHeaderView::section { background: palette(alternate-base); color: palette(window-text); padding: 8px; border: none; border-bottom: 1px solid palette(midlight); font-weight: 600; }
-QTabWidget::pane { border: 1px solid palette(midlight); border-radius: 4px; top: -1px; }
+QTabWidget::pane { border: none; top: 0px; }
 QTabBar::tab { background: transparent; color: palette(text); padding: 9px 14px; border: none; border-bottom: 2px solid transparent; }
-QTabBar::tab:selected { background: palette(base); border-bottom-color: palette(highlight); font-weight: 600; }
+QTabBar::tab:selected { background: palette(base); border-bottom-color: palette(mid); font-weight: 500; }
 QTabBar::tab:hover { background: palette(light); }
 QCheckBox, QRadioButton { spacing: 8px; padding: 3px 0; }
 QCheckBox:focus, QRadioButton:focus { outline: 1px solid palette(link); }
@@ -46,3 +46,11 @@ QDockWidget::title { background: palette(alternate-base); padding: 8px; border-b
 QMenu { padding: 4px; border: 1px solid palette(midlight); }
 QMenu::item { padding: 7px 24px 7px 10px; }
 QMenu::item:selected { background: palette(highlight); color: palette(highlighted-text); }
+
+QToolBar { border: none; border-bottom: 1px solid palette(midlight); spacing: 6px; padding: 3px 10px; }
+QStatusBar { border: none; font-size: 11px; }
+QStatusBar::item { border: none; }
+
+QPushButton[disclosure="true"], QPushButton[disclosure="true"]:checked { border: none; background: transparent; text-align: left; padding-left: 0; }
+QPushButton[disclosure="true"]:focus { border: 1px solid palette(link); }
+QToolBar::separator { width: 10px; background: transparent; border: none; }

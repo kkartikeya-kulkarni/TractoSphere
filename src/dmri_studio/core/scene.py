@@ -101,6 +101,8 @@ class TractGroup:
     undo_stack: list = field(default_factory=list)
     redo_stack: list = field(default_factory=list)
     _lengths: object = field(default=None, repr=False)
+    weights: object = field(default=None, repr=False)
+    weight_record: object = field(default=None, repr=False)
 
     @classmethod
     def load(cls, path, limit=None):

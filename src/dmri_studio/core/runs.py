@@ -15,6 +15,13 @@ from .qc import _json
 from .workflow import HistoryClaim, ProcessingHistory
 
 MANIFESTS = {
+    "registration_execution_plan": "manifest.json",
+    "mrtrix_sift2_execution_plan": "manifest.json",
+    "mrtrix_anatomy_execution_plan": "manifest.json",
+    "mrtrix_tracking_execution_plan": "manifest.json",
+    "mrtrix_connectome_execution_plan": "manifest.json",
+    "mrtrix_csd_execution_plan": "manifest.json",
+    "mrtrix_dti_execution_plan": "manifest.json",
     "mrtrix_execution_plan": "manifest.json",
     "mrtrix_native_execution_plan": "native-manifest.json",
     "fsl_correction_plan": "correction-manifest.json",
@@ -71,6 +78,12 @@ def inspect_run(path: Path, *, cancelled=lambda: False, progress=lambda _: None)
         "verified_hashes": 0,
         "notice": "Read-only saved evidence. Scientific review remains separate from execution and numerical checks.",
     }
+    if (
+        kind in {"mrtrix_dti_execution_plan", "mrtrix_csd_execution_plan"}
+        and status in {"failed", "cancelled"}
+        and (folder / "failure-qc-catalog.json").is_file()
+    ):
+        result["qc_catalog"] = str(folder / "failure-qc-catalog.json")
     if not finished:
         result["notice"] = (
             "Recorded running/incomplete status; process liveness is not established. Refresh to read newer evidence. No restart or duplicate job is offered."
@@ -112,6 +125,110 @@ def inspect_run(path: Path, *, cancelled=lambda: False, progress=lambda _: None)
             if result["recovery"]
             else "Attempt failed or was cancelled. Saved diagnostics remain available; no verified downstream handoff is offered."
         )
+        return result
+    if kind == "registration_execution_plan":
+        if plan.get("operation") == "atlas_qc":
+            from .registration_qc import verify_bundle
+            verify_bundle(folder / "atlas-qc.json", cancelled)
+            result["products"] = record["validation"]["products"]
+        elif "registered.nii.gz" in record["outputs"]:
+            result["products"] = [dict(kind="registration_alignment", path=str(folder / "registered.nii.gz"), sha256=record["outputs"]["registered.nii.gz"]["sha256"], reference=plan["reference"]["image"], reference_sha256=plan["reference"]["sha256"], label="Inspect registered anatomy / fixed reference")]
+        return result
+    if kind in {
+        "mrtrix_connectome_execution_plan",
+        "mrtrix_anatomy_execution_plan",
+        "mrtrix_sift2_execution_plan",
+    }:
+        result["products"] = record["validation"]["products"]
+        return result
+    if kind == "mrtrix_tracking_execution_plan":
+        for row in plan["bindings"]:
+            for role, name in row["outputs"].items():
+                if role in {"density", "reference"}:
+                    continue
+                result["products"].append(
+                    dict(
+                        label=name,
+                        path=str(folder / name),
+                        kind="tractogram" if role == "tracts" else "scalar",
+                        sha256=record["outputs"][name]["sha256"],
+                        reference=str(folder / row["outputs"]["reference"])
+                        if role == "tracts" and "reference" in row["outputs"]
+                        else None,
+                        subject_id=row["source"]["declarations"].get("subject_id"),
+                        space_id=row["source"]["declarations"].get("space_id"),
+                        reference_sha256=record["outputs"][row["outputs"]["reference"]]["sha256"]
+                        if role == "tracts" and "reference" in row["outputs"]
+                        else None,
+                    )
+                )
+        return result
+    if kind == "mrtrix_csd_execution_plan":
+        result["notice"] = (
+            "CSD numerical verification passed; scientific review remains required. FOD products open typed metadata; scalar coefficient/compartment previews remain explicitly labelled."
+        )
+        for row in plan["bindings"]:
+            for role, name in row["outputs"].items():
+                product_kind = (
+                    "fod"
+                    if role == "wm_fod"
+                    else "response"
+                    if role.endswith("_response")
+                    else "tissue_scalar"
+                )
+                result["products"].append(
+                    dict(
+                        label=name,
+                        path=str(folder / name),
+                        kind=product_kind,
+                        sha256=record["outputs"][name]["sha256"],
+                        tissue="wm" if role == "wm_fod" else role.removesuffix("_response"),
+                        normalization="completed"
+                        if row["algorithm"] == "mtnormalise"
+                        else "not_done",
+                        sh_basis="mrtrix3_real_symmetric",
+                        sh_frame="world_ras",
+                    )
+                )
+        for export in plan["exports"]:
+            name = export["destination"]
+            result["products"].append(
+                dict(
+                    label=name,
+                    kind="scalar",
+                    path=str(folder / name),
+                    sha256=record["outputs"][name]["sha256"],
+                    scalar_meaning="FOD zeroth coefficient C00 (not a glyph)"
+                    if export["kind"] == "fod_c00"
+                    else "Tissue-compartment amplitude (not a calibrated probability)",
+                )
+            )
+        return result
+    if kind == "mrtrix_dti_execution_plan":
+        result["notice"] = (
+            "DTI numerical verification passed; scientific review remains required. Open scalar/vector products in Diffusion Models, or load the exported scalar maps in Image Viewer."
+        )
+        result["dti_products"] = plan["exports"]
+        for export in plan["exports"]:
+            name = export["destination"]
+            if name.endswith(("-tensor.nii.gz", "-EIGENVALUES.nii.gz")):
+                continue
+            product = {
+                "label": name,
+                "path": str(folder / name),
+                "kind": "scalar",
+                "sha256": record["outputs"][name]["sha256"],
+            }
+            if name.endswith("-V1.nii.gz"):
+                fa = name.replace("-V1.nii.gz", "-FA.nii.gz")
+                if fa not in record["outputs"]:
+                    continue
+                product.update(
+                    kind="dti_vector",
+                    fa=str(folder / fa),
+                    fa_sha256=record["outputs"][fa]["sha256"],
+                )
+            result["products"].append(product)
         return result
     prior = ProcessingHistory.from_dict(plan["history"])
     done = set()

@@ -30,7 +30,7 @@ from dmri_studio import __version__
 
 from ._mif_checks import produced_mif, rearrange, voxel_mapping
 from .dataset import DwiDataset, SourceFingerprint
-from .gradients import GradientTable
+from .gradients import GradientTable, mrtrix_world_scheme
 from .process import ProcessingCancelled, check_cancel, run_command
 from .tool_versions import MRTRIX_TESTED_RELEASES
 from .validation import freeze_json, json_compatible
@@ -586,6 +586,42 @@ def execute_plan(
     and atomic new-directory creation. Failure/cancellation retains diagnostic
     files and an incomplete manifest; there is no existence-based resume.
     """
+    if plan.payload.get("kind") == "mrtrix_sift2_execution_plan":
+        from .scientific.sift2 import SIFT2Adapter
+
+        return SIFT2Adapter().run(plan, approval=approval, cancelled=cancelled, progress=progress)
+    if plan.payload.get("kind") == "registration_execution_plan":
+        from .scientific.registration import RegistrationAdapter
+
+        return RegistrationAdapter().run(plan, approval=approval, cancelled=cancelled, progress=progress)
+    if plan.payload.get("kind") == "mrtrix_anatomy_execution_plan":
+        from .scientific.anatomy import AnatomyAdapter
+
+        return AnatomyAdapter().run(plan, approval=approval, cancelled=cancelled, progress=progress)
+    if plan.payload.get("kind") == "mrtrix_dti_execution_plan":
+        from .scientific.dti import DTIAdapter
+
+        return DTIAdapter().run(plan, approval=approval, cancelled=cancelled, progress=progress)
+    if plan.payload.get("kind") == "mrtrix_csd_execution_plan":
+        from .scientific.csd import CSDAdapter
+
+        return CSDAdapter().run(plan, approval=approval, cancelled=cancelled, progress=progress)
+    if plan.payload.get("kind") == "mrtrix_connectome_execution_plan":
+        from .scientific.connectome import ConnectomeAdapter
+
+        return ConnectomeAdapter().run(
+            plan, approval=approval, cancelled=cancelled, progress=progress
+        )
+    if plan.payload.get("kind") == "mrtrix_tracking_execution_plan":
+        from .scientific.tracking import TrackingAdapter
+
+        return TrackingAdapter().run(
+            plan, approval=approval, cancelled=cancelled, progress=progress
+        )
+    if plan.payload.get("kind") == "scientific_workflow_proposal":
+        raise ValueError(
+            "Scientific workflow is a review proposal; no accepted execution adapters are available"
+        )
     if plan.payload.get("kind") == "hcp_matched_combination_plan":
         from .combination import execute_combination
 
@@ -746,6 +782,125 @@ def execute_plan(
     return manifest
 
 
+def execute_artifact_task(
+    plan: ExecutionPlan,
+    *,
+    approval: str,
+    recompile: Callable,
+    setup: Callable,
+    step_factory: Callable,
+    verify_step: Callable,
+    verify: Callable,
+    verify_sources: Callable,
+    cancelled: Callable = lambda: False,
+    progress: Callable = lambda _: None,
+) -> dict:
+    """Shared task executor for independently imported scientific artifacts.
+
+    Extend the same approval, MRtrixStep/run_command, resource, cancellation and
+    manifest infrastructure to non-DwiDataset inputs. Scientific adapters supply
+    contracts and checks, never a second subprocess runner. Recompilation must
+    derive commands from typed selections, not trust imported argv.
+    """
+    if approval != plan.digest:
+        raise ValueError("Approve the exact displayed plan digest before running.")
+    if recompile().digest != plan.digest:
+        raise ValueError(
+            "Inputs, binaries, configuration or parameters changed; review a fresh plan."
+        )
+    data = plan.to_dict()
+    folder = Path(data["output_directory"])
+    check_cancel(cancelled)
+    folder.mkdir(mode=0o700, exist_ok=False)
+    (folder / "logs").mkdir()
+    manifest = dict(
+        schema_version=1,
+        status="running",
+        started_at=_now(),
+        plan=data,
+        approval=dict(digest=approval, recorded_at=_now()),
+        steps=[],
+        validation={},
+        human_qc="pending",
+        inputs_unchanged=None,
+    )
+    _write_manifest(folder, manifest)
+    try:
+        setup(folder)
+        environment = dict(os.environ)
+        environment.update(data["environment"]["overrides"])
+        for key in data["environment"].get("unset", ()):
+            environment.pop(key, None)
+        for command in data["commands"]:
+            check_cancel(cancelled)
+            adapter = step_factory(command)
+            step = dict(
+                step=command["step"],
+                argv=command["argv"],
+                started_at=_now(),
+                status="running",
+                log=str(folder / "logs" / f"{command['step']}.log"),
+            )
+            manifest["steps"].append(step)
+            _write_manifest(folder, manifest)
+            progress("Running " + command["display"])
+            try:
+                step.update(
+                    adapter.run(
+                        folder=folder,
+                        environment=environment,
+                        cancelled=cancelled,
+                        progress=progress,
+                    )
+                )
+            except Exception as exc:
+                if hasattr(exc, "record"):
+                    step.update(exc.record)
+                raise
+            step.update(status="command_completed", finished_at=_now())
+            try:
+                step["verification"] = verify_step(command)
+            except ProcessingCancelled:
+                step["status"] = "verification_cancelled"
+                raise
+            except Exception as exc:
+                step.update(
+                    status="verification_failed",
+                    verification={"technical": "failed", "error": str(exc)},
+                )
+                raise
+            step["status"] = "validated"
+            _write_manifest(folder, manifest)
+        manifest["validation"] = verify(folder)
+        manifest["outputs"] = {
+            name: dict(
+                sha256=hash_file(folder / name, cancelled), bytes=(folder / name).stat().st_size
+            )
+            for name in data["outputs"]
+        }
+        manifest["status"] = "validated_pending_qc"
+    except (ProcessingCancelled, KeyboardInterrupt) as exc:
+        manifest.update(status="cancelled", error=str(exc))
+    except Exception as exc:
+        manifest.update(status="failed", error=f"{type(exc).__name__}: {exc}")
+    finally:
+        try:
+            progress("Verifying original input hashes after the run…")
+            verify_sources()
+            manifest["inputs_unchanged"] = True
+        except Exception as exc:
+            manifest.update(
+                status="failed", error=f"Original inputs changed: {exc}", inputs_unchanged=False
+            )
+        for step in manifest["steps"]:
+            if step["status"] == "running":
+                step.update(status=manifest["status"], finished_at=_now())
+        manifest["finished_at"] = _now()
+        _write_summary(folder, manifest)
+        _write_manifest(folder, manifest)
+    return manifest
+
+
 def _write_summary(folder: Path, manifest: dict) -> None:
     """Write the readable counterpart of completed, failed or cancelled provenance."""
     lines = [
@@ -789,13 +944,12 @@ def _validate_conversion(
         gradients = np.array(
             [[float(v) for v in row.split(",")] for row in fields.get("dw_scheme", [])]
         )
-        rotation = dataset.affine[:3, :3] / np.linalg.norm(dataset.affine[:3, :3], axis=0)
-        vectors = dataset.gradients.bvecs.copy()
-        if np.linalg.det(rotation) > 0:
-            vectors[:, 0] *= -1
-        norms = np.linalg.norm(vectors, axis=1)
-        vectors[norms > 0] /= norms[norms > 0, None]
-        expected = np.column_stack(((rotation @ vectors.T).T, dataset.gradients.bvals))
+        expected = mrtrix_world_scheme(
+            dataset.gradients.bvals,
+            dataset.gradients.bvecs,
+            convention="fsl_image_axes",
+            affine=dataset.affine,
+        )
         if (
             gradients.shape != expected.shape
             or not np.isfinite(gradients).all()

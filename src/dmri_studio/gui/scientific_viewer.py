@@ -8,6 +8,7 @@ import json
 import time
 from pathlib import Path
 
+import nibabel as nib
 import numpy as np
 from PySide6.QtCore import (
     QEvent,
@@ -29,11 +30,13 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QListWidget,
+    QMenu,
     QScrollArea,
     QSizePolicy,
     QSlider,
     QSpinBox,
     QSplitter,
+    QStackedWidget,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -45,9 +48,13 @@ from dmri_studio.core.viewer_display import robust_range
 
 from .atlas_tools import AtlasTools, RoiTree
 from .components import button, label
+from .fod_view import CoefficientBackground, FODTools
+from .operation_state import OperationState, State
 from .preview import SliceView
+from .registration_view import RegistrationView
 from .scene_renderer import SceneRenderer
 from .viewer_tools import ViewerTools
+from .workstation import EmptyState
 
 
 class Result(QObject):
@@ -68,14 +75,20 @@ class ReadTask(QRunnable):
         self.result.done.emit(value, error)
 
 
-class ScientificViewer(AtlasTools, ViewerTools, QWidget):
+class ScientificViewer(RegistrationView, FODTools, AtlasTools, ViewerTools, QWidget):
     """Editable visualization derivatives, accurate affine navigation, no source writes."""
 
     image_loaded = Signal()
+    editing_changed = Signal()
+    workspace_mode_changed = Signal(str)
+    inspector_visibility_changed = Signal(bool)
 
     def __init__(self, theme):
         super().__init__()
         self.theme = theme
+        self.workspace_mode = "image"
+        self.mode_tabs = {"image": 0, "tractography": 1}
+        self.mode_layouts = {"image": "Three orthogonal", "tractography": "Four views"}
         self.reference = None
         self.data = None
         self.scalar_map = None
@@ -90,13 +103,22 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         self.pool = QThreadPool(self)
         self.pool.setMaxThreadCount(1)
         self.volume_generation = 0
+        self.scene_generation = 0
+        self.image_state = OperationState(self)
+        self.image_loading = False
+        self.pending_tracking_product = None
+        self.tracking_identity = None
+        self.image_loaded.connect(self._tracking_background_ready)
         self.pending_restore = None
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(8)
-        toolbar = QHBoxLayout()
-        root.addLayout(toolbar)
-        toolbar.addWidget(label("MRI & tractography", "section"))
+        self.scene_toolbar = QWidget()
+        toolbar = QHBoxLayout(self.scene_toolbar)
+        toolbar.setContentsMargins(0, 0, 0, 0)
+        root.addWidget(self.scene_toolbar)
+        self.header_title = label("Image Viewer", "section")
+        toolbar.addWidget(self.header_title)
         for title, callback in [
             ("Open MRI", self.choose_image),
             ("Add tracts", self.choose_tracts),
@@ -115,8 +137,50 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         self.status.setWordWrap(True)
         self.status.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         root.addWidget(self.status)
+        self.content_stack = QStackedWidget()
+        root.addWidget(self.content_stack, 1)
         split = QSplitter()
-        root.addWidget(split, 1)
+        self.scene_split = split
+        self.content_stack.addWidget(split)
+        self.empty_state = EmptyState(
+            "No image open", "Open a NIfTI image to begin.", [("Open Image…", self.choose_image)]
+        )
+        self.content_stack.addWidget(self.empty_state)
+        self.layout_bar = QWidget()
+        layout_row = QHBoxLayout(self.layout_bar)
+        layout_row.setContentsMargins(0, 0, 0, 0)
+        self.layout_choice = QComboBox()
+        self.layout_choice.setAccessibleName("Viewport layout")
+        self.layout_choice.addItems(
+            ["Three orthogonal", "Four views", "Axial", "Sagittal", "Coronal", "3D scene"]
+        )
+        self.layout_choice.currentTextChanged.connect(self.apply_layout)
+        layout_row.addWidget(self.layout_choice)
+        self.camera_button = button("Camera")
+        self.camera_button.setAccessibleName("3D camera controls")
+        self.camera_menu = QMenu(self.camera_button)
+        for preset in (
+            "Isometric",
+            "Anterior",
+            "Posterior",
+            "Left",
+            "Right",
+            "Superior",
+            "Inferior",
+        ):
+            self.camera_menu.addAction(
+                preset, lambda _=False, name=preset: self.safe(lambda: self.set_camera_preset(name))
+            )
+        self.camera_menu.addSeparator()
+        self.camera_menu.addAction(
+            "Fit scene",
+            lambda: self.safe(lambda: self.set_camera_preset(self.camera.currentText())),
+        )
+        self.camera_menu.addAction("Toggle orthographic projection", lambda: self.parallel.toggle())
+        self.camera_button.setMenu(self.camera_menu)
+        layout_row.addWidget(self.camera_button)
+        layout_row.addStretch()
+        root.insertWidget(root.indexOf(self.content_stack), self.layout_bar)
         self.grid = QSplitter(Qt.Orientation.Vertical)
         split.addWidget(self.grid)
         self.rows = [QSplitter(), QSplitter()]
@@ -147,7 +211,9 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         heading.addStretch()
         heading.addWidget(self.action("Expand", lambda: self.expand("3d"), quiet=True))
         scene_layout.addLayout(heading)
-        self.scene = SceneRenderer()
+        # QVTK installs its parent-destruction cleanup in its constructor;
+        # adding an initially parentless widget to a layout is too late.
+        self.scene = SceneRenderer(self)
         self.scene.pick_callback = self.select_tract
         self.scene.position_callback = lambda world: (
             self.navigate(np.rint(self.reference.voxels(world)).astype(int))
@@ -161,12 +227,35 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         self.escape.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.escape.activated.connect(lambda: self.expand(self.expanded) if self.expanded else None)
         self.tabs = QTabWidget()
-        self.tabs.setMinimumWidth(400)
-        self.tabs.setMaximumWidth(560)
-        self.tabs.tabBar().setStyleSheet("QTabBar::tab {padding: 8px 6px; font-size: 11px;}")
-        split.addWidget(self.tabs)
+        self.tabs.setMinimumWidth(270)
+        self.tabs.setMaximumWidth(460)
+        self.tabs.tabBar().setExpanding(False)
+        self.tabs.setUsesScrollButtons(True)
+        self.inspector = QWidget()
+        inspector_layout = QVBoxLayout(self.inspector)
+        inspector_layout.setContentsMargins(0, 0, 0, 0)
+        inspector_layout.setSpacing(8)
+        self.inspector_choice = QComboBox()
+        self.inspector_choice.setAccessibleName("Inspector contents")
+        for title, index in [
+            ("Image display", 0),
+            ("Tract groups", 1),
+            ("Atlas & ROIs", 2),
+            ("Anatomical surfaces", 3),
+            ("Image overlays", 4),
+        ]:
+            self.inspector_choice.addItem(title, index)
+        self.inspector_choice.currentIndexChanged.connect(
+            lambda i: self.tabs.setCurrentIndex(self.inspector_choice.itemData(i))
+        )
+        self.tabs.currentChanged.connect(self.sync_inspector_choice)
+        self.tabs.tabBar().hide()
+        inspector_layout.addWidget(self.inspector_choice)
+        inspector_layout.addWidget(self.tabs, 1)
+        split.addWidget(self.inspector)
         split.setStretchFactor(0, 1)
-        split.setSizes([1000, 280])
+        split.setSizes([900, 310])
+        split.setChildrenCollapsible(False)
         for name in ["Display", "Tracts", "ROIs", "Surfaces"]:
             content = QWidget()
             content.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
@@ -182,8 +271,10 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         self.setup_tracts()
         self.setup_rois()
         self.setup_surfaces()
-        footer = QHBoxLayout()
-        root.addLayout(footer)
+        self.footer = QWidget()
+        footer = QHBoxLayout(self.footer)
+        footer.setContentsMargins(0, 0, 0, 0)
+        root.addWidget(self.footer)
         self.volume = QSlider(Qt.Orientation.Horizontal)
         self.volume.setRange(0, 0)
         self.volume.setTracking(False)
@@ -197,6 +288,114 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         root.addWidget(self.coordinates)
         self.setup_tools()
         self.setup_atlas_tools()
+        from .viewer_inspector import organize_inspector
+
+        organize_inspector(self)
+        self.setup_registration_view()
+        self.setup_fod()
+        self.set_workspace_mode("image")
+        self.update_content_state()
+
+    def set_workspace_mode(self, mode):
+        """Change presentation only; retain every loaded image/tract/ROI instance."""
+        if mode not in {"image", "tractography"}:
+            raise ValueError("Unknown scientific workspace mode")
+        if hasattr(self, "tabs"):
+            self.mode_tabs[self.workspace_mode] = self.tabs.currentIndex()
+            self.mode_layouts[self.workspace_mode] = self.layout_choice.currentText()
+        changed = mode != self.workspace_mode
+        self.workspace_mode = mode
+        self.header_title.setText("Image Viewer" if mode == "image" else "Tractography")
+        self.tabs.setTabVisible(1, mode == "tractography")
+        model = self.inspector_choice.model()
+        model.item(1).setEnabled(mode == "tractography")
+        selected = self.mode_tabs[mode]
+        self.tabs.setCurrentIndex(selected if self.tabs.isTabVisible(selected) else 0)
+        if changed:
+            self.layout_choice.setCurrentText(self.mode_layouts[mode])
+        self.apply_layout()
+        if (
+            changed
+            and not self.tasks
+            and not self.status.text().startswith(("Cannot complete action:", "Operation failed:"))
+        ):
+            if self.reference is not None:
+                self.status.setText(
+                    f"{self.reference.path.name} · volume {self.volume.value() + 1}/{self.reference.count} · source unchanged"
+                    if mode == "image"
+                    else f"{len(self.groups)} tract groups · {len(self.rois)} regions · Coordinate matching requires verified source provenance."
+                )
+        self.update_content_state()
+        self.workspace_mode_changed.emit(mode)
+
+    def set_inspector_visible(self, visible):
+        self.inspector.setVisible(visible)
+        self.inspector_visibility_changed.emit(visible)
+
+    def sync_inspector_choice(self, index):
+        self.tabs.setMinimumWidth(380 if index == 2 else 270)
+        with QSignalBlocker(self.inspector_choice):
+            self.inspector_choice.setCurrentIndex(self.inspector_choice.findData(index))
+
+    def update_content_state(self):
+        loaded = self.reference is not None and not self.image_loading
+        self.status.setVisible(
+            loaded
+            or bool(self.tasks)
+            or self.status.text().startswith(("Cannot complete action:", "Operation failed:"))
+        )
+        self.content_stack.setCurrentWidget(self.scene_split if loaded else self.empty_state)
+        self.layout_bar.setVisible(loaded)
+        self.footer.setVisible(loaded and self.reference.count > 1)
+        self.coordinates.setVisible(loaded)
+        if loaded and getattr(self, "_metadata_reference", None) is not self.reference:
+            self._metadata_reference = self.reference
+            header = self.reference.image.header
+            affine_text = "\n".join(
+                "  ".join(f"{x:.4g}" for x in row) for row in self.reference.affine
+            )
+            self.image_metadata.setText(
+                f"{self.reference.path.name}\nDimensions: {' × '.join(map(str, self.reference.shape))}\nDatatype: {header.get_data_dtype()}\nSpatial units: {header.get_xyzt_units()[0]}\nAffine source: {self.reference.affine_source}\nqform code: {int(header['qform_code'])} · sform code: {int(header['sform_code'])}\n\nWorld affine\n{affine_text}"
+            )
+            self.image_metadata.setToolTip(str(self.reference.path))
+        if not loaded and not self.tasks and self.image_state.state != State.FAILED:
+            self.empty_state.title.setText("No image open")
+            self.empty_state.description.setText("Open a NIfTI image to begin.")
+
+    def apply_layout(self, *_):
+        """Rearrange the same Qt viewports, never scientific image coordinates."""
+        if not hasattr(self, "views") or not hasattr(self, "scene_host"):
+            return
+        self.expanded = None
+        self.rows[0].insertWidget(0, self.views["axial"])
+        self.rows[0].insertWidget(1, self.views["sagittal"])
+        self.rows[1].insertWidget(0, self.views["coronal"])
+        self.rows[1].insertWidget(1, self.scene_host)
+        layout = self.layout_choice.currentText()
+        self.grid.setOrientation(Qt.Orientation.Vertical)
+        for row in self.rows:
+            row.setOrientation(Qt.Orientation.Horizontal)
+        if layout == "Three orthogonal":
+            self.grid.setOrientation(Qt.Orientation.Horizontal)
+            for row in self.rows:
+                row.setOrientation(Qt.Orientation.Vertical)
+            self.rows[1].insertWidget(0, self.views["sagittal"])
+            self.rows[1].insertWidget(1, self.views["coronal"])
+        for key, view in self.views.items():
+            view.setVisible(layout in {"Three orthogonal", "Four views"} or layout.lower() == key)
+        self.scene_host.setVisible(layout in {"Four views", "3D scene"})
+        self.camera_button.setVisible(layout in {"Four views", "3D scene"})
+        self.update_row_visibility()
+
+    def set_camera_preset(self, preset):
+        """The compact menu and inspector share the existing camera service/state."""
+        with QSignalBlocker(self.camera):
+            self.camera.setCurrentText(preset)
+        self.scene.camera(preset)
+
+    def update_row_visibility(self):
+        for row in self.rows:
+            row.setVisible(any(not row.widget(i).isHidden() for i in range(row.count())))
 
     def action(self, text, callback=None, **kwargs):
         """Every action checks prerequisites and reports failure in the visible status."""
@@ -253,17 +452,38 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         except Exception as exc:
             self.status.setText(f"Cannot complete action: {exc}")
 
-    def background(self, function, callback):
+    def background(self, function, callback, *, current=None, on_error=None):
+        generation = self.scene_generation
+        if current is None:
+
+            def current():
+                """Ignore reader results belonging to a replaced scene."""
+                return generation == self.scene_generation
+
         task = ReadTask(function)
         self.tasks.add(task)
 
         def done(value, error):
             self.tasks.discard(task)
+            if not current():
+                self.update_content_state()
+                return
             if error:
+                if on_error is not None:
+                    on_error(error)
+                    self.update_content_state()
+                    return
                 self.pending_restore = None
                 self.status.setText("Operation failed: " + error)
             else:
-                self.safe(lambda: callback(value))
+                if on_error is not None:
+                    try:
+                        callback(value)
+                    except Exception as exc:
+                        on_error(str(exc))
+                else:
+                    self.safe(lambda: callback(value))
+            self.update_content_state()
 
         task.result.done.connect(done)
         self.pool.start(task)
@@ -271,7 +491,7 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
     def setup_display(self):
         layout = self.display_layout
         form = QFormLayout()
-        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         layout.addLayout(form)
         self.low = QDoubleSpinBox()
         self.high = QDoubleSpinBox()
@@ -353,12 +573,14 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         self.tract_visible.toggled.connect(self.group_visibility)
         layout.addWidget(self.tract_visible)
         form = QFormLayout()
-        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         layout.addLayout(form)
         self.mode = QComboBox()
         self.mode.addItems(["Lines", "Tubes"])
         self.coloring = QComboBox()
-        self.coloring.addItems(["Direction RGB", "Uniform", "Length", "Image scalar"])
+        self.coloring.addItems(
+            ["Direction RGB", "Uniform", "Length", "Image scalar", "SIFT2 weight"]
+        )
         self.width = self.spin(0.1, 8, 1, 0.1)
         self.opacity = self.spin(0, 1, 1, 0.05)
         self.density = QSpinBox()
@@ -386,6 +608,17 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         self.scalar_label = label("Scalar source: displayed image", "caption")
         self.scalar_label.setWordWrap(True)
         layout.addWidget(self.scalar_label)
+        layout.addWidget(
+            self.action(
+                "Load exact-source SIFT2 weight record", lambda: self.safe(self.choose_weights)
+            )
+        )
+        self.weight_legend = label("SIFT2 factors: none attached", "caption")
+        self.weight_legend.setAccessibleName(
+            "SIFT2 factor color legend and selected source streamline weight"
+        )
+        self.weight_legend.setWordWrap(True)
+        layout.addWidget(self.weight_legend)
         layout.addWidget(
             self.action(
                 "Select tracts intersecting selected ROI", lambda: self.safe(self.select_by_roi)
@@ -441,13 +674,13 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         self.brush.addItems(["Navigate", "Draw", "Erase"])
         layout.addWidget(self.brush)
         form = QFormLayout()
-        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         layout.addLayout(form)
         self.radius = QSpinBox()
         self.radius.setRange(1, 20)
         self.radius.setValue(2)
         form.addRow("Brush radius (voxels)", self.radius)
-        self.roi_opacity = self.spin(0, 1, 0.4, 0.05)
+        self.roi_opacity = self.spin(0, 1, 0.3, 0.05)
         form.addRow("ROI opacity", self.roi_opacity)
         self.roi_opacity.valueChanged.connect(self.update_roi_style)
         layout.addWidget(self.action("ROI color", self.roi_color))
@@ -486,7 +719,7 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         )
         self.surface_threshold = self.spin(-1e6, 1e6, 0.5, 0.5)
         form = QFormLayout()
-        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         layout.addLayout(form)
         form.addRow("Isovalue", self.surface_threshold)
         self.surface_label = QSpinBox()
@@ -515,19 +748,86 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         if path:
             self.load_image(path)
 
-    def load_image(self, path):
-        self.status.setText("Reading image…")
+    def load_image(self, path, *, direction_path=None, expected_hashes=None):
+        self.roi_surface_queue.clear()
+        self.pending_tracking_product = None
+        self.tracking_identity = None
+        self.cancel_fod()
+        self.scene_generation += 1
+        token = self.image_state.begin(State.LOADING, "Opening image · " + Path(path).name)
+        self.image_loading = True
+        self.status.setText(self.image_state.message)
+        self.update_content_state()
+        if self.image_loading:
+            self.empty_state.title.setText("Opening image…")
+            self.empty_state.description.setText(
+                "Reading the requested image. The source file is unchanged."
+            )
         self.volume_generation += 1
         generation = self.volume_generation
 
         def read():
+            from dmri_studio.core.execution import hash_file
+
+            allowed = {str(Path(p).resolve()) for p in (path, direction_path) if p}
+            checks = {
+                str(Path(p).resolve()): digest for p, digest in (expected_hashes or {}).items()
+            }
+            if set(checks) - allowed:
+                raise ValueError(
+                    "Result verification must reference only the selected image/vector"
+                )
+            for name, digest in checks.items():
+                if hash_file(Path(name)) != digest:
+                    raise ValueError(
+                        "Verified DTI result changed; reload run evidence before viewing"
+                    )
             ref = ImageVolume(Path(path))
-            return ref, ref.volume(0)
+            if ref.image.header.get_intent()[0] == "vector":
+                raise ValueError(
+                    "This is a vector image, not a scalar volume series. Open V1 with its verified FA map from Diffusion Models."
+                )
+            direction = None
+            if direction_path is not None:
+                vector = nib.load(Path(direction_path), mmap=True)
+                units = vector.header.get_xyzt_units()[0]
+                factor = {"mm": 1, "meter": 1000, "micron": 0.001}.get(units)
+                if factor is None:
+                    raise ValueError("V1 requires documented physical units")
+                affine = vector.affine.copy()
+                affine[:3] *= factor
+                if vector.shape not in {
+                    (*ref.shape[:3], 1, 3),
+                    (*ref.shape[:3], 3),
+                } or not np.allclose(affine, ref.affine, atol=1e-5, rtol=0):
+                    raise ValueError("V1/FA geometry mismatch; no resampling is performed")
+                # Canonical NIfTI vectors use the fifth axis. The explicit typed
+                # path also reads preserved early development 4D exports; neither
+                # representation is ever treated as a scalar time series.
+                direction = np.asarray(
+                    vector.dataobj[:, :, :, 0, :] if len(vector.shape) == 5 else vector.dataobj,
+                    dtype=np.float32,
+                )
+                if not np.isfinite(direction).all():
+                    raise ValueError("V1 contains nonfinite components")
+            volume = ref.volume(0)
+            for name, digest in checks.items():
+                if hash_file(Path(name)) != digest:
+                    raise ValueError("DTI result changed during viewing preparation")
+            return ref, volume, direction
 
         def ready(result):
             if generation != self.volume_generation:
                 return
-            self.reference, self.data = result
+            self.reference, self.data, self.dti_direction = result
+            self.image_loading = False
+            self.dti_direction_path = str(direction_path) if direction_path else None
+            self.dti_source_hashes = expected_hashes or {}
+            self.registration_layer = None
+            self.registration_bundle = None
+            self.registration_timer.stop()
+            self.registration_blink.setChecked(False)
+            self.registration_regions.clear()
             self.layers.clear()
             self.layer_list.clear()
             self.cancel_polygon()
@@ -562,9 +862,14 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
             self.auto_contrast()
             self.refresh_volume()
             self.scene.camera("Isometric")
+            self.fod_reference_changed()
             self.status.setText(
                 f"{self.reference.path.name} · {self.reference.shape} · {self.reference.affine_source} · source unchanged"
             )
+            if direction_path is not None:
+                self.status.setText(
+                    "V1 world-RAS RGB × FA brightness · 2D direction display; 3D planes show FA · sources unchanged"
+                )
             if self.pending_restore:
                 restore = self.pending_restore
                 self.pending_restore = None
@@ -579,24 +884,56 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
                     recognized = True
                 if recognized:
                     self.load_atlas(path, same_space=True)
+            self.image_state.update(token, State.READY, self.status.text())
             self.image_loaded.emit()
 
-        self.background(read, ready)
+        def failed(error):
+            self.image_loading = False
+            self.pending_restore = None
+            retained = (
+                f" Previous image retained: {self.reference.path.name}." if self.reference else ""
+            )
+            self.status.setText("Operation failed: " + error + retained)
+            self.image_state.update(token, State.FAILED, self.status.text())
+            self.empty_state.title.setText("Could not open image")
+            self.empty_state.description.setText(error + " Choose another image or check the file.")
+
+        self.background(
+            read, ready, current=lambda: generation == self.volume_generation, on_error=failed
+        )
 
     def request_volume(self, index):
-        if self.reference is None:
+        if self.reference is None or self.image_loading:
             return
         self.volume_generation += 1
         generation = self.volume_generation
         ref = self.reference
+        token = self.image_state.begin(State.LOADING, f"Reading volume {index + 1} / {ref.count}…")
+        self.status.setText(self.image_state.message)
 
         def ready(data):
             if generation != self.volume_generation:
                 return
             self.data = data
             self.refresh_volume()
+            self.status.setText(
+                f"{ref.path.name} · volume {index + 1}/{ref.count} · source unchanged"
+            )
 
-        self.background(lambda: ref.volume(index), ready)
+            self.image_state.update(token, State.READY, self.status.text())
+
+        def failed(error):
+            self.status.setText(
+                f"Operation failed: volume {index + 1} · {error}. Previously rendered volume retained."
+            )
+            self.image_state.update(token, State.FAILED, self.status.text())
+
+        self.background(
+            lambda: ref.volume(index),
+            ready,
+            current=lambda: generation == self.volume_generation,
+            on_error=failed,
+        )
 
     def refresh_volume(self):
         self.scene.set_volume(
@@ -625,17 +962,22 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
     def auto_contrast(self):
         if self.data is not None:
             lo, hi = robust_range(self.data)
-            self.low.blockSignals(True)
-            self.high.blockSignals(True)
-            self.low.setValue(lo)
-            self.high.setValue(hi)
-            self.low.blockSignals(False)
-            self.high.blockSignals(False)
-            self.update_contrast()
+            self.range_changed(lo, hi)
 
     def range_changed(self, low, high):
+        """Preserve diffusivity-scale display limits instead of rounding to 0.001.
+
+        Only display controls change precision/step; image values, interpolation,
+        affine and scientific defaults remain unchanged.
+        """
         self.low.blockSignals(True)
         self.high.blockSignals(True)
+        decimals = 8 if max(abs(low), abs(high)) < 0.1 else 3
+        span = high - low
+        step = max(10.0 ** (np.floor(np.log10(span)) - 2), 10.0**-decimals) if span > 0 else 1
+        for box in (self.low, self.high):
+            box.setDecimals(decimals)
+            box.setSingleStep(step)
         self.low.setValue(low)
         self.high.setValue(high)
         self.low.blockSignals(False)
@@ -683,6 +1025,27 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
                     rgba.strides[0],
                     QImage.Format.Format_RGBA8888,
                 ).copy()
+            if getattr(self, "dti_direction", None) is not None:
+                # Display-only DEC: world RAS directions map to red/green/blue;
+                # FA modulates brightness. Scientific vector and FA files remain unchanged.
+                directions = np.take(self.dti_direction, self.position[g.axis], axis=g.axis)
+                components = np.stack(
+                    [g.display_plane(directions[..., i]) for i in range(3)], axis=-1
+                )
+                brightness = np.clip(g.display_plane(plane), 0, 1)
+                rgb = (np.clip(np.abs(components) * brightness[..., None], 0, 1) * 255).astype(
+                    np.uint8
+                )
+                dec = np.ascontiguousarray(
+                    np.dstack((rgb, np.full(brightness.shape, 255, dtype=np.uint8)))
+                )
+                view.canvas.image = QImage(
+                    dec.data,
+                    dec.shape[1],
+                    dec.shape[0],
+                    dec.strides[0],
+                    QImage.Format.Format_RGBA8888,
+                ).copy()
             rgba = np.zeros((*g.display_plane(plane).shape, 4), dtype=np.uint8)
 
             def composite(rgb, alpha, rgba=rgba):
@@ -703,7 +1066,34 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
                     (values - layer["low"]) / max(layer["high"] - layer["low"], 1e-12), 0, 1
                 )
                 rgb = colors(np.nan_to_num(scaled), layer["cmap"])
-                composite(rgb, np.where(np.isfinite(values) & (values != 0), layer["opacity"], 0))
+                alpha = np.where(np.isfinite(values) & (values != 0), layer["opacity"], 0)
+                if layer.get("registration"):
+                    mode = self.registration_mode.currentText()
+                    if mode == "Reference only":
+                        continue
+                    if layer.get("categorical"):
+                        from dmri_studio.core.registration_qc import label_rgba
+
+                        atlas_pixels = label_rgba(
+                            values,
+                            layer["opacity"],
+                            self.registration_visible_ids(),
+                            mode == "Outlines",
+                        )
+                        rgb, alpha = atlas_pixels[..., :3], atlas_pixels[..., 3] / 255.0
+                        current_id = int(layer["data"][self.position])
+                        self.registration_info.setText(
+                            f"Registered atlas · {self.registration_region_name(current_id)} at crosshair · review: {self.registration_review_state}"
+                        )
+                    elif mode == "Outlines":
+                        edges = np.hypot(*np.gradient(scaled))
+                        alpha = np.where(edges > 0.08, layer["opacity"], 0)
+                    if mode == "Checkerboard":
+                        yy, xx = np.indices(values.shape)
+                        alpha = np.where(((xx // 12 + yy // 12) % 2) == 0, alpha, 0)
+                    if mode == "Registered only":
+                        alpha = np.ones(values.shape)
+                composite(rgb, alpha)
             for roi in self.rois:
                 if not roi["visible"]:
                     continue
@@ -783,6 +1173,7 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         self.refresh_slices()
         self.scene.move_planes(self.position)
         self.render_settings()
+        self.schedule_fod()
 
     def eventFilter(self, obj, event):
         if obj in [v.canvas for v in self.views.values()]:
@@ -840,11 +1231,13 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
 
     def expand(self, name):
         self.expanded = None if self.expanded == name else name
+        if self.expanded is None:
+            self.apply_layout()
+            return
         for key, view in self.views.items():
-            view.setVisible(self.expanded in (None, key))
-        self.scene_host.setVisible(self.expanded in (None, "3d"))
-        self.rows[0].setVisible(self.expanded in (None, "axial", "sagittal"))
-        self.rows[1].setVisible(self.expanded in (None, "coronal", "3d"))
+            view.setVisible(key == self.expanded)
+        self.scene_host.setVisible(self.expanded == "3d")
+        self.update_row_visibility()
 
     def choose_tracts(self):
         paths, _ = QFileDialog.getOpenFileNames(
@@ -853,7 +1246,88 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         for path in paths:
             self.load_tracts(path)
 
-    def load_tracts(self, path, state=None):
+    def load_tracking_product(self, product):
+        """Open a verified generated reference and native RAS tractogram together."""
+        reference = product.get("reference")
+        identity = (product.get("subject_id"), product.get("space_id"))
+        if (
+            reference
+            and self.reference is not None
+            and all(identity)
+            and identity == self.tracking_identity
+        ):
+            current_reference = self.reference
+
+            def check():
+                from dmri_studio.core._mif_checks import voxel_mapping
+                from dmri_studio.core.execution import hash_file
+
+                if hash_file(Path(reference)) != product["reference_sha256"]:
+                    raise ValueError("Tracking reference changed; reload verified evidence")
+                candidate = ImageVolume(Path(reference))
+                voxel_mapping(
+                    candidate.affine,
+                    candidate.shape,
+                    current_reference.affine,
+                    current_reference.shape,
+                )
+                return product
+
+            self.background(check, self._load_tracking_scene)
+            return
+        if reference:
+            self.load_image(
+                Path(reference), expected_hashes={reference: product["reference_sha256"]}
+            )
+            self.pending_tracking_product = (self.volume_generation, dict(product))
+        elif self.reference is not None:
+            self._load_tracking_scene(product)
+        else:
+            raise ValueError("Open the matching reference image before this historical tractogram")
+
+    def _tracking_background_ready(self):
+        pending, self.pending_tracking_product = self.pending_tracking_product, None
+        if pending is not None and pending[0] == self.volume_generation:
+            product = pending[1]
+            self.tracking_identity = (product.get("subject_id"), product.get("space_id"))
+            self.safe(lambda: self._load_tracking_scene(product))
+
+    def _load_tracking_scene(self, product):
+        """Existing tracks/ROI tools, with immutable selected-parcel derivatives."""
+        self.load_tracts(
+            Path(product["path"]),
+            expected_hash=product["sha256"],
+            weight_record=product.get("weight_record"),
+        )
+        regions = product.get("selected_regions", ())
+        if not regions:
+            return
+        reference = self.reference
+
+        def read():
+            from dmri_studio.core.atlas import geometry_record
+            from dmri_studio.core.execution import hash_file
+            from dmri_studio.core.scientific.dti import _aligned
+
+            result = []
+            for region in regions:
+                path = Path(region["path"])
+                if hash_file(path) != region["sha256"]:
+                    raise ValueError("Selected connection ROI changed; reopen verified evidence")
+                result.append((region, _aligned(path, geometry_record(reference))))
+            return result
+
+        def ready(result):
+            if self.reference is not reference:
+                return
+            for region, array in result:
+                self.add_roi(
+                    array != 0, f"Node {region['parcel_id']} · {region['label']}", region["path"]
+                )
+
+        self.background(read, ready)
+
+    def load_tracts(self, path, state=None, *, expected_hash=None, weight_record=None):
         if self.reference is None:
             raise ValueError("Open the matching image first")
         if str(path).lower().endswith(".tt.gz"):
@@ -894,7 +1368,68 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
                 f"{group.path.name}: {len(group.streamlines):,}/{group.total:,} loaded · {inside.mean() * 100 if len(inside) else 0:.2f}% sampled points inside image FOV. Bounds do not prove anatomical correspondence."
             )
 
-        self.background(lambda: TractGroup.load(path), ready)
+        def read():
+            from dmri_studio.core.execution import hash_file
+
+            if expected_hash and hash_file(Path(path)) != expected_hash:
+                raise ValueError("Generated tractogram changed; reload verified run evidence")
+            group = TractGroup.load(path)
+            record_path = weight_record or (state or {}).get("weight_record")
+            if record_path:
+                self.read_group_weights(group, record_path)
+            if expected_hash and hash_file(Path(path)) != expected_hash:
+                group.streamlines.close()
+                raise ValueError("Generated tractogram changed during indexing")
+            return group
+
+        self.background(read, ready)
+
+    @staticmethod
+    def read_group_weights(group, path):
+        """Bind full immutable factors to exact source bytes before subset rendering."""
+        from dmri_studio.core.execution import hash_file
+        from dmri_studio.core.scientific.records import read_json
+        from dmri_studio.core.scientific.sift2 import read_weights
+
+        path = Path(path)
+        if path.stat().st_size > 1024**2:
+            raise ValueError("Oversized weight identity record")
+        record = read_json(path.read_text())
+        if (
+            record.get("schema") != "tractosphere.streamline-weights/1"
+            or record.get("representation") != "weight_factors"
+            or record.get("ordering") != "exact source file streamline order"
+            or record.get("streamlines") != group.total
+            or hash_file(group.path) != record.get("tractogram_sha256")
+            or group.cuts
+        ):
+            raise ValueError("Weights do not match this exact unedited source tractogram/order")
+        weights = read_weights(record["weights"], group.total)
+        if hash_file(Path(record["weights"])) != record["weights_sha256"]:
+            raise ValueError("SIFT2 factors changed; association rejected")
+        record["record_path"] = str(path)
+        group.weights, group.weight_record = weights, record
+
+    def choose_weights(self):
+        """Attach factors to a selected existing group, never modify track geometry."""
+        group = self.current_group()
+        if group is None:
+            raise ValueError("Open and select the exact source tractogram first")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Exact-source SIFT2 weight record", "", "Weight record (*.json)"
+        )
+        if path:
+
+            def read():
+                self.read_group_weights(group, path)
+                return group
+
+            def ready(value):
+                if any(value is g for g in self.groups):
+                    self.coloring.setCurrentText("SIFT2 weight")
+                    self.refresh_tracts()
+
+            self.background(read, ready)
 
     def choose_scalar(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -951,6 +1486,7 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
                     actor.GetProperty().SetOpacity(self.opacity.value())
             self.scene.draw()
             self.last_render_seconds = time.monotonic() - started
+            self.editing_changed.emit()
             return
         if self.sender() is self.width and self.mode.currentText() == "Lines":
             for key, actor in self.scene.actors.items():
@@ -958,6 +1494,7 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
                     actor.GetProperty().SetLineWidth(self.width.value())
             self.scene.draw()
             self.last_render_seconds = time.monotonic() - started
+            self.editing_changed.emit()
             return
         if not hasattr(self, "density"):
             return
@@ -977,11 +1514,34 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         self.tract_info(self.tract_list.currentRow())
         self.render_settings()
         self.last_render_seconds = time.monotonic() - started
+        self.editing_changed.emit()
 
     def tract_info(self, index):
         if index < 0 or index >= len(self.groups):
             return
         group = self.groups[index]
+        if group.weights is None:
+            self.weight_legend.setText(
+                "SIFT2 factors: none attached · unweighted group shown in its normal color"
+            )
+        elif group.cuts:
+            self.weight_legend.setText(
+                "Geometry edited in viewer: source weights are unavailable for these edited paths; no reweighting was performed"
+            )
+        else:
+            s = group.weight_record["statistics"]
+            selected = sorted(group.selected - group.deleted)
+            text = (
+                f"SIFT2 factors · viridis, linear: {s['minimum']:.6g} (dark) → {s['maximum']:.6g} (light)\n"
+                f"{group.total:,} source factors · displayed subset is separate · no added mu scaling"
+            )
+            if selected:
+                j = selected[0]
+                source_id = group.source_ids[j]
+                text += f"\nSelected source index {source_id:,} (0 based): factor {group.weights[source_id]:.17g}"
+                if len(selected) > 1:
+                    text += f" · {len(selected):,} selected; first shown"
+            self.weight_legend.setText(text)
         stats = group.statistics()
         mean = stats["mean_length_mm"]
         self.stats.setText(
@@ -1164,7 +1724,7 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
                 "path": path,
                 "visible": True,
                 "color": (0.95, 0.5, 0.2),
-                "opacity": 0.4,
+                "opacity": 0.3,
                 "edited": False,
                 "surface_built": False,
                 "role": "Display",
@@ -1214,8 +1774,14 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         if i < 0:
             raise ValueError("Select an ROI first")
         roi = self.rois[i]
-        self.scene.surface(
-            ("roi", i), roi["data"], self.reference.affine, 0.5, roi["color"], roi["opacity"]
+        from .roi_surfaces import roi_mesh
+
+        self.scene.roi_polydata(
+            ("roi", i),
+            roi_mesh(roi["data"], self.reference.affine, roi.get("surface_quality", "Smooth")),
+            roi["color"],
+            roi["opacity"],
+            roi.get("surface_mode", "Surface"),
         )
         self.scene.actors[("roi", i)].SetVisibility(roi["visible"])
         roi["surface_built"] = True
@@ -1223,12 +1789,7 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
     def roi_visibility(self, value):
         i = self.roi_list.currentRow()
         if i >= 0:
-            self.rois[i]["visible"] = value
-            self.roi_list.update_region(i)
-            if ("roi", i) in self.scene.actors:
-                self.scene.actors[("roi", i)].SetVisibility(value)
-                self.scene.draw()
-            self.refresh_slices()
+            self.atlas_visibility(i, value)
 
     def update_roi_style(self):
         i = self.roi_list.currentRow()
@@ -1264,6 +1825,7 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         self.roi_undo.append((i, self.rois[i]["data"].copy()))
         self.roi_undo = self.roi_undo[-5:]
         self.roi_redo.clear()
+        self.editing_changed.emit()
 
     def undo_roi(self, redo):
         source, target = (self.roi_redo, self.roi_undo) if redo else (self.roi_undo, self.roi_redo)
@@ -1278,6 +1840,7 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
             self.roi_info(i)
         else:
             self.status.setText("No ROI edit to " + ("redo" if redo else "undo"))
+        self.editing_changed.emit()
 
     def morph_roi(self, operation):
         from scipy.ndimage import binary_dilation, binary_erosion
@@ -1439,6 +2002,7 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         self.scene.renderer.SetMaximumNumberOfPeels(32 if self.quality.currentIndex() else 8)
         self.scene.renderer.SetOcclusionRatio(0.01 if self.quality.currentIndex() else 0.1)
         self.scene.renderer.SetUseFXAA(self.aa.isChecked())
+        self.apply_fod_planes()
         self.scene.draw()
 
     def save_screenshot(self):
@@ -1508,6 +2072,9 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
                     ],
                     "visible": group.visible,
                     "color": group.color,
+                    "weight_record": group.weight_record.get("record_path")
+                    if group.weight_record and target == group.path
+                    else None,
                 }
             )
         rois = []
@@ -1520,9 +2087,29 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         camera = self.scene.renderer.GetActiveCamera()
         record = {
             "schema": "tractosphere.viewer/1",
+            "ui": {
+                "mode": self.workspace_mode,
+                "layout": self.layout_choice.currentText(),
+                "mode_layouts": {
+                    **self.mode_layouts,
+                    self.workspace_mode: self.layout_choice.currentText(),
+                },
+                "mode_tabs": {**self.mode_tabs, self.workspace_mode: self.tabs.currentIndex()},
+                "inspector_visible": not self.inspector.isHidden(),
+                "split_sizes": self.scene_split.sizes(),
+            },
             "image": str(self.reference.path),
+            "fod_background": isinstance(self.reference, CoefficientBackground),
+            "fod": self.fod_settings(),
+            "dti_direction": getattr(self, "dti_direction_path", None),
+            "dti_source_hashes": getattr(self, "dti_source_hashes", {}),
             "scalar_map": self.scalar_map["path"] if self.scalar_map else None,
-            "layers": [{k: v for k, v in layer.items() if k != "data"} for layer in self.layers],
+            "registration": self.registration_workspace(),
+            "layers": [
+                {k: v for k, v in layer.items() if k != "data"}
+                for layer in self.layers
+                if not layer.get("registration")
+            ],
             "position": self.position,
             "volume": self.volume.value(),
             "range": [self.low.value(), self.high.value()],
@@ -1537,6 +2124,7 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
                 "parallel": bool(camera.GetParallelProjection()),
             },
             "render": {
+                "roi_global_opacity": self.roi_global_opacity.value(),
                 "mode": self.mode.currentText(),
                 "coloring": self.coloring.currentText(),
                 "width": self.width.value(),
@@ -1553,6 +2141,7 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
                 "highlight_selected": self.highlight_selected.isChecked(),
                 "volume_render": self.volume_render_check.isChecked(),
                 "volume_opacity": self.volume_alpha.value(),
+                "image_interpolation": self.interpolation.currentText(),
             },
         }
         with path.open("x", encoding="utf-8") as f:
@@ -1568,15 +2157,50 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         if record.get("schema") != "tractosphere.viewer/1":
             raise ValueError("Unsupported workspace schema")
         self.pending_restore = record
-        self.load_image(record["image"])
+        if record.get("fod_background"):
+            f = record["fod"]
+            self.load_fod(f["path"], expected_hash=f["sha256"], settings=f)
+            return
+        self.load_image(
+            record["image"],
+            direction_path=record.get("dti_direction"),
+            expected_hashes=record.get("dti_source_hashes"),
+        )
 
     def restore_objects(self, record):
+        if record.get("fod") and not record.get("fod_background"):
+            f = record["fod"]
+            self.load_fod(f["path"], expected_hash=f["sha256"], settings=f)
+        ui = record.get("ui", {})
+        self.set_workspace_mode(ui.get("mode", self.workspace_mode))
+        for mode in ("image", "tractography"):
+            layout = ui.get("mode_layouts", {}).get(mode)
+            layout = "3D scene" if layout == "3D anatomy" else layout
+            if layout is not None and self.layout_choice.findText(layout) >= 0:
+                self.mode_layouts[mode] = layout
+            tab = ui.get("mode_tabs", {}).get(mode)
+            if (
+                isinstance(tab, int)
+                and 0 <= tab < self.tabs.count()
+                and (mode == "tractography" or tab != 1)
+            ):
+                self.mode_tabs[mode] = tab
+        self.tabs.setCurrentIndex(self.mode_tabs[self.workspace_mode])
+        saved_layout = ui.get("layout", "Four views")
+        self.layout_choice.setCurrentText(
+            "3D scene" if saved_layout == "3D anatomy" else saved_layout
+        )
+        self.set_inspector_visible(ui.get("inspector_visible", True))
+        if isinstance(ui.get("split_sizes"), list) and len(ui["split_sizes"]) == 2:
+            self.scene_split.setSizes(ui["split_sizes"])
         if record.get("scalar_map"):
             self.load_scalar(record["scalar_map"], activate=False)
         self.range_changed(*record["range"])
         self.navigate(record["position"])
         self.volume.setValue(record["volume"])
         r = record["render"]
+        with QSignalBlocker(self.roi_global_opacity):
+            self.roi_global_opacity.setValue(r.get("roi_global_opacity", 0.3))
         self.mode.setCurrentText(r["mode"])
         self.coloring.setCurrentText(r["coloring"])
         self.width.setValue(r["width"])
@@ -1584,6 +2208,7 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         self.density.setValue(r["density"])
         self.slice_opacity.setValue(r["slice_opacity"])
         self.colormap.setCurrentText(r["colormap"])
+        self.interpolation.setCurrentText(r.get("image_interpolation", "Linear display"))
         self.light.setValue(r["lighting"])
         self.clip.setChecked(r["clip"])
         self.aa.setChecked(r["fxaa"])
@@ -1602,9 +2227,18 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
         # Restoration must not turn hidden atlas regions on merely because
         # the tree establishes a current row. Explicit user selection reveals.
         with QSignalBlocker(self.roi_list):
+            for i, saved in enumerate(record["rois"]):
+                self.rois[i]["selected"] = saved.get("selected", False)
+                self.rois[i]["selection_rank"] = saved.get("selection_rank")
             self.roi_list.rebuild()
             if self.rois:
                 self.roi_list.setCurrentRow(0)
+            for i, item in enumerate(self.roi_list.entries):
+                item.setSelected(self.rois[i].get("selected", False))
+        self.roi_selection_order = sorted(
+            [i for i, r in enumerate(self.rois) if r.get("selected")],
+            key=lambda i: self.rois[i].get("selection_rank") or 0,
+        )
         if self.rois:
             self.roi_info(0)
         for surface in record["surfaces"]:
@@ -1614,6 +2248,13 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
                 self.load_surface(surface["path"], surface["threshold"], surface["label"], surface)
         for layer in record.get("layers", []):
             self.load_layer(layer["path"], layer.get("resampled_same_space", False), layer)
+        if record.get("registration"):
+            self.registration_restore = {
+                **record["registration"],
+                "position": record["position"],
+                "range": record["range"],
+            }
+            self.load_registration_product(record["registration"]["product"])
         self.volume_alpha.setValue(r.get("volume_opacity", 0.15))
         self.volume_render_check.setChecked(r.get("volume_render", False))
         camera = self.scene.renderer.GetActiveCamera()
@@ -1628,4 +2269,22 @@ class ScientificViewer(AtlasTools, ViewerTools, QWidget):
 
     def shutdown(self):
         """Do not destroy live readers. Main window retries cooperatively."""
-        return not self.tasks
+        dialog = getattr(self, "native_roi_dialog", None)
+        if dialog is not None and dialog.thread:
+            dialog.cancel_event.set()
+            return False
+        self.fod_generation += 1
+        self.roi_surface_queue.clear()
+        self.fod_request += 1
+        self.fod_timer.stop()
+        self.scene_generation += 1
+        self.volume_generation += 1
+        if hasattr(self, "_roi_surface_timer"):
+            self._roi_surface_timer.stop()
+            self._roi_dirty.clear()
+        if self.tasks or self.pool.activeThreadCount():
+            return False
+        # Release callbacks/context while the native Qt owner is still alive,
+        # rather than depend on cyclic Python/VTK garbage-collection order.
+        self.scene.Finalize()
+        return True

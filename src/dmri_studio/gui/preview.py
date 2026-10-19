@@ -120,6 +120,8 @@ class GradientSphere(QWidget):
 class SliceView(QWidget):
     """One titled canvas, slice slider and bounded plane cache."""
 
+    escape_requested = Signal()
+
     def __init__(self, theme: Theme, orientation: Orientation) -> None:
         """Build independent view controls; the parent owns shared position state."""
         super().__init__()
@@ -171,6 +173,12 @@ class SliceView(QWidget):
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         """Keep view arrow-key semantics even when its slider/button has focus."""
+        if event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
+            # A native focus transition immediately after reparenting can send
+            # the key to a control before Qt updates the shortcut focus chain.
+            # Handle the delivered key locally as well as the normal shortcut.
+            self.escape_requested.emit()
+            return True
         if event.type() == QEvent.Type.KeyPress and event.key() in (
             Qt.Key.Key_Up,
             Qt.Key.Key_Down,
@@ -241,6 +249,7 @@ class Preview(Card):
         self.columns.setSpacing(16)
         self.views = {name: SliceView(theme, name) for name in ORIENTATIONS}
         for name, view in self.views.items():
+            view.escape_requested.connect(lambda: self.set_expanded(None))
             view.canvas.position_changed.connect(self.set_position)
             view.canvas.range_changed.connect(self.set_display_range)
             view.slider.valueChanged.connect(lambda value, n=name: self.set_slice(n, value))

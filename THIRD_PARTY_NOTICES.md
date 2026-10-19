@@ -25,6 +25,7 @@ are not transferred or relicensed. SVG icon attribution is retained.
 | NumPy | BSD-3-Clause | Imported numerical arrays and checks |
 | psutil | BSD-3-Clause | Imported read-only Windows process metrics and cross-platform peak-memory reporting |
 | NiBabel | MIT | Imported image/tract headers, proxies and formats |
+| Pillow | MIT-CMU | Core registration QC image generation and portable reports |
 | SciPy | BSD-3-Clause | Imported sampling, morphology and numerical operations |
 | PySide6 / Shiboken / Qt | LGPL-3.0 / GPL / commercial, depending on component | Imported Qt Widgets, SVG and desktop bindings |
 | VTK | BSD-3-Clause; upstream third-party component notices also apply | Imported Qt-compatible scientific rendering |
@@ -65,6 +66,7 @@ license the entire HCP pipeline.
 - DIPY: https://github.com/dipy/dipy/blob/master/LICENSE
 - NumPy: https://github.com/numpy/numpy/blob/main/LICENSE.txt
 - NiBabel: https://github.com/nipy/nibabel/blob/master/COPYING
+- Pillow: https://github.com/python-pillow/Pillow/blob/main/LICENSE
 - SciPy: https://github.com/scipy/scipy/blob/main/LICENSE.txt
 - Matplotlib: https://matplotlib.org/stable/project/license.html
 - indexed_gzip: https://github.com/pauldmccarthy/indexed_gzip/blob/master/LICENSE

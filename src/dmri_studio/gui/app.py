@@ -6,14 +6,12 @@ are package assets, so starting the application never requires a network request
 
 import sys
 
-from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from .main_window import MainWindow
 from .settings import Settings
 from .theme import ASSETS, Theme
-from .welcome import WelcomeWindow
 
 
 def main(scene=None) -> int:
@@ -24,13 +22,12 @@ def main(scene=None) -> int:
     app.setApplicationDisplayName("TractoSphere")
     app.setWindowIcon(QIcon(str(ASSETS / "branding/tractosphere-app.svg")))
     settings = Settings()
-    theme = Theme(app, str(settings.get("theme", "dark")))
+    theme = Theme(app, str(settings.get("theme", "system")))
     window = MainWindow(theme, settings)
 
     def enter_studio():
-        """First run offers optional scientific setup after the welcome screen."""
+        """Open directly; software setup is available without a modal interruption."""
         window.show()
-        QTimer.singleShot(0, lambda: window.open_dependency_setup(first_run=True))
 
     if scene is not None:
         enter_studio()
@@ -49,11 +46,8 @@ def main(scene=None) -> int:
 
             viewer.image_loaded.connect(attach)
             viewer.safe(lambda: viewer.load_image(scene.image))
-    elif settings.get("show_welcome", True):
-        welcome = WelcomeWindow(theme, settings)
-        welcome.entered.connect(enter_studio)
-        welcome.show()
     else:
+        window.focus_start()
         enter_studio()
     return app.exec()
 

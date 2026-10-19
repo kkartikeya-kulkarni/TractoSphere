@@ -16,7 +16,7 @@ import numpy as np
 
 
 @contextmanager
-def produced_mif(path: Path):
+def produced_mif(path: Path, *, allow_integer=False):
     """Yield header, geometry and a read-only array; release its mapping on exit."""
     fields = {}
     with path.open("rb") as handle:
@@ -72,6 +72,29 @@ def produced_mif(path: Path):
     elif datatype in {"Float32LE", "Float32BE"}:
         size = count * 4
         dtype = np.dtype("<f4" if datatype.endswith("LE") else ">f4")
+    elif allow_integer and datatype in {
+        "Int32LE",
+        "Int32BE",
+        "UInt32LE",
+        "UInt32BE",
+        "Int16LE",
+        "Int16BE",
+        "UInt16LE",
+        "UInt16BE",
+        "UInt8",
+        "Int8",
+    }:
+        codes = {
+            "Int32": "i4",
+            "UInt32": "u4",
+            "Int16": "i2",
+            "UInt16": "u2",
+            "Int8": "i1",
+            "UInt8": "u1",
+        }
+        stem = datatype[:-2] if datatype.endswith(("LE", "BE")) else datatype
+        dtype = np.dtype((">" if datatype.endswith("BE") else "<") + codes[stem])
+        size = count * dtype.itemsize
     else:
         raise ValueError(f"Unsupported produced MIF datatype: {datatype}")
     if path.stat().st_size != offset + size:

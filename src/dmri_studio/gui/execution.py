@@ -31,6 +31,7 @@ from dmri_studio.core.execution import (
 from .anatomy import AnatomyInputs
 from .combination import CombinationInputs
 from .components import Card, Disclosure, button, label
+from .operation_state import OperationState, State
 from .theme import Theme, font
 from .workers import ViewerTaskWorker
 
@@ -63,6 +64,7 @@ class ExecutionPanel(Card):
         self.cancel_event = Event()
         self.task_kind = ""
         self.review_ready = False
+        self.operation_state = OperationState(self)
         self.body.addWidget(
             label(
                 "Choose a new output folder, review the applicable operations and exact commands, then approve this plan. Scientific review remains separate from processing completion.",
@@ -499,6 +501,9 @@ class ExecutionPanel(Card):
             if kind == "run"
             else "Saving human QC decision…"
         )
+        self.operation_token = self.operation_state.begin(
+            State.PROCESSING if kind == "run" else State.VALIDATING, self.status.text()
+        )
         self.refresh_actions()
         self.busy_changed.emit(True)
         self.clock.start()
@@ -506,6 +511,11 @@ class ExecutionPanel(Card):
 
     def show_progress(self, text: str) -> None:
         """Expose actual stages/tool output and full logs without fake percentages."""
+        self.operation_state.update(
+            self.operation_token,
+            State.PROCESSING if self.task_kind == "run" else State.VALIDATING,
+            text,
+        )
         self.progress.setText(f"Elapsed {self.elapsed}s · " + text[-1200:])
         LOGGER.info("%s", text)
 
@@ -517,7 +527,13 @@ class ExecutionPanel(Card):
         """Distinguish prepared commands, structural validation and human approval."""
         if error:
             self.status.setText(error)
-            self.notification.emit(error, "error")
+            self.operation_state.update(
+                self.operation_token,
+                State.CANCELLED if self.cancel_event.is_set() else State.FAILED,
+                "Operation cancelled" if self.cancel_event.is_set() else error,
+            )
+            if self.cancel_event.is_set():
+                self.status.setText("Operation cancelled; saved records and originals retained")
             if self.task_kind == "run":
                 self.plan = None
             return
@@ -578,20 +594,29 @@ class ExecutionPanel(Card):
                 and "mask.nii.gz" in result.get("outputs", {})
                 else "Inspect the generated step QC. This run has no mask eligible for anatomical review."
             )
-            self.notification.emit(
-                self.status.text(),
-                "success"
-                if result["status"] in {"validated", "validated_pending_qc"}
-                else "warning"
-                if result["status"] == "cancelled"
-                else "error",
-            )
+            if result["status"] in {"validated", "validated_pending_qc"}:
+                self.notification.emit(
+                    "Processing complete · Review outputs and scientific QC", "info"
+                )
+
         else:
             self.review_ready = False
             self.qc_status.setText(f"Human QC recorded: {result}")
             self.status.setText("Anatomical QC decision saved. Processing records are retained.")
             self.manifest = None
             self.notification.emit(self.qc_status.text(), "success")
+        terminal = State.COMPLETED
+        if self.task_kind == "run":
+            terminal = (
+                State.CANCELLED
+                if result["status"] == "cancelled"
+                else State.FAILED
+                if result["status"] == "failed"
+                else State.WARNING
+                if result.get("validation", {}).get("findings")
+                else State.COMPLETED
+            )
+        self.operation_state.update(self.operation_token, terminal, self.status.text())
 
     def task_finished(self) -> None:
         """Re-enable editing only after subprocess, integrity checks and worker exit."""

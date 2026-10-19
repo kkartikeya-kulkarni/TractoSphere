@@ -7,7 +7,7 @@ workspace edits evidence; its separate execution panel uses the shared core API.
 from datetime import date
 from pathlib import Path
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QBoxLayout,
     QComboBox,
@@ -15,7 +15,10 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLineEdit,
+    QListWidget,
     QScrollArea,
+    QSplitter,
+    QStackedWidget,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -37,6 +40,7 @@ from dmri_studio.core.workflow import (
 from .components import Card, Disclosure, button, label
 from .execution import ExecutionPanel
 from .theme import GAP, PAGE_INSET, Theme
+from .workstation import EmptyState
 
 HCP_INTERPOLATION_SOURCE = "https://github.com/Washington-University/HCPpipelines/blob/6d695803a342f51660a381f703d0e22b2ffe4779/DiffusionPreprocessing/scripts/DiffusionToStructural.sh"
 
@@ -60,10 +64,11 @@ class WorkflowPage(QWidget):
         root.addWidget(label("Preprocessing plan", "title"))
         root.addWidget(
             label(
-                "Inspect input → Confirm history → Select operations → Review proposal", "caption"
+                "Review evidence, configure supported operations, approve exact commands, then inspect results.",
+                "caption",
             )
         )
-        self.summary = label("Load a dataset in Project to start.")
+        self.summary = label("Import diffusion data to plan supported preprocessing operations.")
         root.addWidget(self.summary)
         self.columns = QBoxLayout(QBoxLayout.Direction.LeftToRight)
         self.columns.setSpacing(16)
@@ -133,6 +138,19 @@ class WorkflowPage(QWidget):
                 "caption",
             )
         )
+        self.operation_list = QListWidget()
+        self.operation_list.setAccessibleName("Available preprocessing operations")
+        self.operation_list.setWordWrap(True)
+        self.operation_list.setTextElideMode(Qt.TextElideMode.ElideNone)
+        self.operation_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.operation_pages = QStackedWidget()
+        browser = QSplitter()
+        browser.addWidget(self.operation_list)
+        browser.addWidget(self.operation_pages)
+        browser.setStretchFactor(0, 2)
+        browser.setStretchFactor(1, 3)
+        operation_card.body.addWidget(browser, 1)
+        self.operation_list.currentRowChanged.connect(self.operation_pages.setCurrentIndex)
         self.selections, self.method_statuses, self.method_details = {}, {}, {}
         for operation, title in OPERATIONS.items():
             selection = button("Select · " + title)
@@ -143,15 +161,23 @@ class WorkflowPage(QWidget):
                 lambda checked, op=operation: self.selection_changed(op, checked)
             )
             self.selections[operation] = selection
-            operation_card.body.addWidget(selection)
+            self.operation_list.addItem(title)
+            self.operation_list.item(self.operation_list.count() - 1).setToolTip(title)
+            detail_page = QWidget()
+            operation_layout = QVBoxLayout(detail_page)
+            operation_layout.setContentsMargins(16, 4, 4, 4)
+            operation_layout.addWidget(label(title, "section"))
+            operation_layout.addWidget(selection)
+            self.operation_pages.addWidget(detail_page)
             status = label("Confirm history to assess eligibility.", "caption")
-            operation_card.body.addWidget(status)
+            operation_layout.addWidget(status)
             self.method_statuses[operation] = status
             details = label("")
-            disclosure = Disclosure("Requirements and method guidance", details)
+            disclosure = Disclosure("Requirements and method guidance", details, expanded=True)
             self.method_details[operation] = details
-            operation_card.body.addWidget(disclosure)
-        operation_card.body.addStretch()
+            operation_layout.addWidget(disclosure)
+            operation_layout.addStretch()
+        self.operation_list.setCurrentRow(0)
         operation_card.body.addWidget(
             label(
                 "TOPUP/EDDY requires associated calibration and acquisition metadata. N4 requires a passing pre-N4 EDDY handoff and an explicit fitting mask. Anatomy requires explicit input history; alignment requires reviewed anatomy. Optional AP/PA combination requires verified full-diffusion pairing. Unknown history stays unknown.",
@@ -197,8 +223,32 @@ class WorkflowPage(QWidget):
             scroll.setWidget(content)
             self.steps.addTab(scroll, title)
         root.addWidget(self.steps, 1)
+        self.empty = EmptyState(
+            "No diffusion input loaded",
+            "Import raw or externally preprocessed DWI, then review its history before planning corrections.",
+        )
+        root.addWidget(self.empty, 1)
+        self.stage_navigation = QWidget()
+        navigation = QHBoxLayout(self.stage_navigation)
+        navigation.setContentsMargins(0, 0, 0, 0)
+        self.previous_stage = button(
+            "Previous", lambda: self.steps.setCurrentIndex(self.steps.currentIndex() - 1)
+        )
+        self.next_stage = button(
+            "Next stage", lambda: self.steps.setCurrentIndex(self.steps.currentIndex() + 1)
+        )
+        navigation.addWidget(self.previous_stage)
+        navigation.addStretch()
+        navigation.addWidget(self.next_stage)
+        self.steps.currentChanged.connect(self.update_stage_navigation)
+        root.addWidget(self.stage_navigation)
         self.setMinimumHeight(560)
         self.set_dataset(None)
+
+    def update_stage_navigation(self, *_):
+        """Stage navigation never confirms history or authorizes execution."""
+        self.previous_stage.setEnabled(self.steps.currentIndex() > 0)
+        self.next_stage.setEnabled(self.steps.currentIndex() < self.steps.count() - 1)
 
     def resizeEvent(self, event: object) -> None:
         """Stack cards at narrow widths, without squeezing labels or controls."""
@@ -226,6 +276,10 @@ class WorkflowPage(QWidget):
     def set_dataset(self, dataset: DwiDataset | None) -> None:
         """Discard evidence and selections only after a successful input replacement."""
         self.dataset = dataset
+        self.empty.setVisible(dataset is None)
+        self.steps.setVisible(dataset is not None)
+        self.stage_navigation.setVisible(dataset is not None)
+        self.update_stage_navigation()
         self.template.blockSignals(True)
         self.template.setCurrentIndex(0)
         self.template.blockSignals(False)
@@ -238,7 +292,7 @@ class WorkflowPage(QWidget):
             selection.setEnabled(dataset is not None)
         self.confirm.setEnabled(dataset is not None)
         self.summary.setText(
-            "Load a dataset in Project to start."
+            "Import diffusion data to plan supported preprocessing operations."
             if dataset is None
             else f"{dataset.paths.dwi.name} · {' × '.join(map(str, dataset.shape))}\n{dataset.validation.coverage_message()}"
         )
@@ -298,6 +352,8 @@ class WorkflowPage(QWidget):
         )
         for status in self.method_statuses.values():
             status.setText("Confirm history to assess eligibility.")
+        for index, title in enumerate(OPERATIONS.values()):
+            self.operation_list.item(index).setText(title)
         for details in self.method_details.values():
             details.clear()
         self.plan_status.setText("Confirm history and select an operation.")
@@ -370,6 +426,17 @@ class WorkflowPage(QWidget):
         try:
             decisions = assess_operations(self.dataset, self.history)
             for decision in decisions:
+                index = list(OPERATIONS).index(decision.operation)
+                checked = self.selections[decision.operation].isChecked()
+                self.operation_list.item(index).setText(
+                    ("Selected · " if checked else "")
+                    + OPERATIONS[decision.operation]
+                    + "\n"
+                    + decision.status.capitalize()
+                )
+                self.operation_list.item(index).setToolTip(
+                    OPERATIONS[decision.operation] + "\n" + "; ".join(decision.reasons)
+                )
                 self.method_statuses[decision.operation].setText(
                     decision.status.capitalize()
                     + " · "

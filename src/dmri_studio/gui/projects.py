@@ -8,10 +8,12 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QHBoxLayout,
+    QHeaderView,
     QInputDialog,
+    QLineEdit,
     QPlainTextEdit,
-    QTableWidget,
-    QTableWidgetItem,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -30,6 +32,7 @@ from dmri_studio.core.workflow import ProcessingHistory
 
 from .components import Disclosure, button, label
 from .execution import ProcessingWorker
+from .workstation import EmptyState
 
 EXECUTION_LABELS = {
     "validated_pending_qc": "Technical checks passed · Review pending",
@@ -37,6 +40,90 @@ EXECUTION_LABELS = {
     "failed": "Failed · Evidence retained",
     "cancelled": "Cancelled · Incomplete outputs retained",
 }
+
+
+class AcquisitionTree(QTreeWidget):
+    """Real subject/session hierarchy; stable acquisition identity at every leaf.
+
+    The row adapter preserves callers of the former flat table. It indexes
+    acquisition records, never tree position or an inferred run combination.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.leaves = []
+        self.setColumnCount(3)
+        self.setHeaderLabels(["Acquisition", "Attempts", "Execution status"])
+        self.setSelectionMode(QTreeWidget.SelectionMode.SingleSelection)
+        self.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.header().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.header().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.setAccessibleName("Project subjects, sessions and acquisitions")
+
+    def rowCount(self):
+        return len(self.leaves)
+
+    def currentRow(self):
+        item = self.currentItem()
+        return (
+            item.data(0, Qt.ItemDataRole.UserRole)
+            if item and item.data(0, Qt.ItemDataRole.UserRole) is not None
+            else -1
+        )
+
+    def selectRow(self, row):
+        if 0 <= row < len(self.leaves):
+            self.setCurrentItem(self.leaves[row])
+
+    def populate(self, acquisitions, selected_id=None):
+        self.clear()
+        self.leaves = []
+        subjects, sessions = {}, {}
+        for index, row in enumerate(acquisitions):
+            identity = row["identity"]
+            subject = identity.get("sub") or "Subject not recorded"
+            session = identity.get("ses") or "Session not recorded"
+            if subject not in subjects:
+                subjects[subject] = QTreeWidgetItem(self, [subject])
+            key = (subject, session)
+            if key not in sessions:
+                sessions[key] = QTreeWidgetItem(subjects[subject], [session])
+            name = (
+                " / ".join(identity.get(k, "") for k in ("acq", "run", "dir") if identity.get(k))
+                or Path(row["paths"]["dwi"]).name
+            )
+            status = (
+                EXECUTION_LABELS.get(row["attempts"][-1]["status"], row["attempts"][-1]["status"])
+                if row["attempts"]
+                else "Not processed here"
+            )
+            item = QTreeWidgetItem(sessions[key], [name, str(len(row["attempts"])), status])
+            item.setData(0, Qt.ItemDataRole.UserRole, index)
+            item.setToolTip(0, row["paths"]["dwi"])
+            item.setToolTip(2, status)
+            self.leaves.append(item)
+            if row["id"] == selected_id:
+                self.setCurrentItem(item)
+        self.expandAll()
+
+    def search(self, text):
+        text = text.casefold()
+        for leaf in self.leaves:
+            identity = (
+                leaf.text(0)
+                + leaf.parent().text(0)
+                + leaf.parent().parent().text(0)
+                + leaf.toolTip(0)
+            )
+            leaf.setHidden(text not in identity.casefold())
+        for i in range(self.topLevelItemCount()):
+            subject = self.topLevelItem(i)
+            for j in range(subject.childCount()):
+                session = subject.child(j)
+                session.setHidden(
+                    all(session.child(k).isHidden() for k in range(session.childCount()))
+                )
+            subject.setHidden(all(subject.child(j).isHidden() for j in range(subject.childCount())))
 
 
 class ProjectPage(QWidget):
@@ -59,7 +146,7 @@ class ProjectPage(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(20, 20, 20, 20)
         root.setSpacing(12)
-        root.addWidget(label("Project acquisitions", "title"))
+        root.addWidget(label("Projects", "title"))
         root.addWidget(
             label(
                 "Keep subjects, sessions and acquisitions distinct. Shared calibration remains explicitly associated. Open one acquisition in the existing viewer and preprocessing workspace.",
@@ -78,18 +165,19 @@ class ProjectPage(QWidget):
             "Create a project snapshot outside your source-data folders.", "caption"
         )
         root.addWidget(self.status)
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(
-            ["Subject", "Session", "Acquisition / run / direction", "Attempts", "Latest execution"]
+        self.empty = EmptyState(
+            "No project open",
+            "Create a project or open an existing one.",
+            [("Open project…", self.browse), ("New project…", self.create)],
         )
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        root.addWidget(self.empty, 1)
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Find subject, session or acquisition…")
+        self.search.setAccessibleName("Search project acquisitions")
+        root.addWidget(self.search)
+        self.table = AcquisitionTree()
+        self.search.textChanged.connect(self.table.search)
         self.table.itemSelectionChanged.connect(self.selection)
-        self.table.setMinimumHeight(180)
-        self.table.setAlternatingRowColors(True)
-        self.table.verticalHeader().hide()
         root.addWidget(self.table, 1)
         self.acquisition_summary = label(
             "Select an acquisition to inspect its metadata and associations.", "caption"
@@ -108,7 +196,8 @@ class ProjectPage(QWidget):
         self.details = QPlainTextEdit()
         self.details.setReadOnly(True)
         self.details.setMaximumHeight(210)
-        root.addWidget(Disclosure("Detailed paths and provenance", self.details))
+        self.advanced = Disclosure("Detailed paths and provenance", self.details)
+        root.addWidget(self.advanced)
 
         self.actions()
 
@@ -415,33 +504,13 @@ class ProjectPage(QWidget):
             selected_id = self.selected()["id"] if self.selected() else None
             self.project, self.path, self.snapshot_sha256 = result
             self.project_changed.emit(self.project["name"])
-            self.table.setRowCount(len(self.project["acquisitions"]))
-            for i, row in enumerate(self.project["acquisitions"]):
-                identity = row["identity"]
-                values = [
-                    identity.get("sub", ""),
-                    identity.get("ses", ""),
-                    " / ".join(identity.get(k, "") for k in ("acq", "run", "dir")),
-                    str(len(row["attempts"])),
-                    EXECUTION_LABELS.get(
-                        row["attempts"][-1]["status"], row["attempts"][-1]["status"]
-                    )
-                    if row["attempts"]
-                    else "Not processed here",
-                ]
-                for j, value in enumerate(values):
-                    item = QTableWidgetItem(value)
-                    item.setToolTip(value)
-                    self.table.setItem(i, j, item)
-                if row["id"] == selected_id:
-                    self.table.selectRow(i)
-            self.table.resizeColumnsToContents()
-            for column, width in ((0, 110), (1, 90), (3, 90)):
-                self.table.setColumnWidth(column, max(width, self.table.columnWidth(column)))
+            self.table.populate(self.project["acquisitions"], selected_id)
+            self.table.search(self.search.text())
             subjects = len({r["identity"]["sub"] for r in self.project["acquisitions"]})
             self.status.setText(
-                f"{self.project['name']} · {subjects} subject(s) · {len(self.project['acquisitions'])} acquisitions · Scientific review separate\nSnapshot: {self.path}"
+                f"{self.project['name']} · {subjects} subject(s) · {len(self.project['acquisitions'])} acquisitions · Scientific review separate"
             )
+            self.status.setToolTip(str(self.path))
             self.selection()
             if self.kind == "record_attempt":
                 self.notification.emit(
@@ -463,6 +532,29 @@ class ProjectPage(QWidget):
 
     def actions(self):
         idle = not self.thread and not self.busy
+        populated = bool(self.project and self.project["acquisitions"])
+        self.empty.setVisible(not populated)
+        self.empty.title.setText("No acquisitions yet" if self.project else "No project open")
+        self.empty.description.setText(
+            "Import BIDS acquisitions or add a validated input to this project."
+            if self.project
+            else "Create a project or open an existing one."
+        )
+        for widget in (
+            self.search,
+            self.table,
+            self.acquisition_summary,
+            self.attempt_choice,
+            self.load_input,
+            self.attach,
+            self.inspect,
+            self.advanced,
+        ):
+            widget.setVisible(populated)
+        for control in (self.new, self.open, self.scan, self.add):
+            control.setVisible(self.project is not None)
+        for action in self.empty.actions:
+            action.setEnabled(idle)
         self.new.setEnabled(idle)
         self.open.setEnabled(idle)
         for control in (self.scan, self.add):

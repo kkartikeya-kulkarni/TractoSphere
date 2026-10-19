@@ -1,92 +1,99 @@
-"""Display-only preferences; never edit processing or authentication settings."""
+"""Presentation preferences, separate from scientific executable configuration."""
 
-from typing import TYPE_CHECKING
-
+from PySide6.QtCore import QSignalBlocker
 from PySide6.QtWidgets import QCheckBox, QComboBox, QVBoxLayout, QWidget
 
-from .components import Card, label
+from .components import button, label
 from .dependency_setup import DependencyWidget
-from .theme import PAGE_INSET
-
-if TYPE_CHECKING:
-    from .main_window import MainWindow
+from .workstation import PageHeader, inspector_section
 
 
 class PreferencesPage(QWidget):
-    """Small, functional settings workspace with explicit presentation boundaries."""
+    """Use system appearance by default; never change scientific parameters."""
 
-    def __init__(self, window: "MainWindow") -> None:
-        """Expose existing theme and privacy controls without duplicating services."""
+    def __init__(self, window):
         super().__init__()
-        theme, settings = window.theme, window.settings
-        self.settings = settings
+        self.theme = window.theme
+        self.settings = window.settings
         root = QVBoxLayout(self)
-        root.setContentsMargins(*([PAGE_INSET] * 4))
+        root.setContentsMargins(24, 24, 24, 24)
         root.setSpacing(16)
-        root.addWidget(label("Preferences", "title"))
-        root.addWidget(
-            label(
-                "Personalize the workstation. Scientific parameters stay with each processing plan.",
-                "caption",
-            )
-        )
-        display = Card(theme, "Appearance & accessibility")
+        root.addWidget(PageHeader("Preferences", "Application appearance and accessibility."))
         self.scheme = QComboBox()
-        self.scheme.addItems(["Dark workstation", "Light workstation"])
-        self.scheme.setCurrentIndex(theme.name == "light")
-        self.scheme.setAccessibleName("Application color theme")
+        self.scheme.addItem("Follow system appearance", "system")
+        self.scheme.addItem("Light", "light")
+        self.scheme.addItem("Dark", "dark")
+        self.scheme.setCurrentIndex(max(0, self.scheme.findData(window.theme.preference)))
+        self.scheme.setAccessibleName("Application appearance")
 
-        def change(index: int) -> None:
-            """Synchronize the central palette and persistent display preference."""
-            theme.apply("light" if index else "dark")
-            settings.set("theme", theme.name)
+        def change(index):
+            preference = self.scheme.itemData(index)
+            window.theme.apply(preference)
+            self.settings.set("theme", preference)
             window.update_theme_action()
 
         self.scheme.currentIndexChanged.connect(change)
-        theme.changed.connect(
-            lambda: (
-                self.scheme.setCurrentIndex(theme.name == "light")
-                if self.scheme.currentIndex() != (theme.name == "light")
-                else None
+        window.theme.changed.connect(self.refresh)
+        root.addWidget(
+            inspector_section(
+                "Appearance",
+                [("Color scheme", self.scheme)],
+                [
+                    label(
+                        "Interface colors follow your system accent where Qt exposes it. Scientific image and tract colors stay independent.",
+                        "caption",
+                    )
+                ],
             )
         )
-        display.body.addWidget(self.scheme)
-        self.reduce = QCheckBox("Reduce motion and disable welcome animation")
-        self.reduce.setChecked(settings.get("reduced_motion", False))
-
-        def change_motion(value: bool) -> None:
-            """Apply presentation-only motion preference to future UI animations."""
-            settings.set("reduced_motion", value)
-            theme.reduced_motion = value
-
-        self.reduce.toggled.connect(change_motion)
-        display.body.addWidget(self.reduce)
-        self.welcome = QCheckBox("Show the welcome screen at startup")
-        self.welcome.setChecked(settings.get("show_welcome", True))
-        self.welcome.toggled.connect(lambda value: settings.set("show_welcome", value))
-        display.body.addWidget(self.welcome)
-        root.addWidget(display)
-        about = Card(theme, "TractoSphere")
-        about.body.addWidget(label("Diffusion MRI Research Studio\nFrom Diffusion to Discovery"))
-        about.body.addWidget(
-            label(
-                "Internal project: dMRI Studio 2.0\nModeling, tractography generation and connectivity are not yet implemented. The 3D viewer supports imported tractography. Scientific QC requires human review.",
-                "caption",
+        self.reduce = QCheckBox("Suppress nonessential interface motion")
+        self.reduce.setChecked(True)
+        self.reduce.setEnabled(False)
+        self.reduce.setToolTip("The redesigned interface contains no decorative animation.")
+        root.addWidget(
+            inspector_section(
+                "Accessibility",
+                widgets=[
+                    self.reduce,
+                    label(
+                        "Native keyboard controls, visible focus and system fonts are used throughout. Image navigation retains its scientific keyboard shortcuts.",
+                        "caption",
+                    ),
+                ],
+                advanced=True,
             )
         )
-        root.addWidget(about)
+        root.addWidget(
+            inspector_section(
+                "Scientific software",
+                widgets=[
+                    label(
+                        "Viewing, atlas and ROI tools do not require external processing software."
+                    ),
+                    button("Open Software Dependencies…", window.focus_dependencies),
+                ],
+            )
+        )
+        root.addWidget(
+            inspector_section(
+                "About",
+                widgets=[
+                    label("TractoSphere · Diffusion MRI Research Studio"),
+                    label(
+                        "Public alpha · Research use only · Not for clinical use. Scientific validation ongoing. Diffusion modelling and connectivity execution are not implemented; imported tractography can be inspected and edited.",
+                        "caption",
+                    ),
+                ],
+                advanced=True,
+            )
+        )
+        # One existing controller and widget, hosted by the separate setup route.
         self.dependencies = DependencyWidget(
             window.dependencies, lambda: window.workflow.execution.thread is None
         )
-        root.addWidget(self.dependencies)
         root.addStretch()
 
-    def refresh(self) -> None:
-        """Reflect choices made in the welcome screen without emitting edits."""
-        for control, key, default in (
-            (self.reduce, "reduced_motion", False),
-            (self.welcome, "show_welcome", True),
-        ):
-            control.blockSignals(True)
-            control.setChecked(self.settings.get(key, default))
-            control.blockSignals(False)
+    def refresh(self):
+        """No account services, scientific defaults, or image files are touched."""
+        with QSignalBlocker(self.scheme):
+            self.scheme.setCurrentIndex(max(0, self.scheme.findData(self.theme.preference)))

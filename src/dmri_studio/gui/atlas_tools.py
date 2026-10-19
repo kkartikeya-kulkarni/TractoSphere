@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-import numpy as np
 from PySide6.QtCore import QSignalBlocker, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import (
@@ -28,6 +27,7 @@ from dmri_studio.core.atlas import Atlas, filter_streamlines, find_table, xml_im
 from dmri_studio.core.scene import TractGroup
 
 from .components import label
+from .roi_controls import RoiControls
 
 
 class RegionItem(QTreeWidgetItem):
@@ -48,6 +48,7 @@ class RoiTree(QTreeWidget):
         super().__init__()
         self.rois = rois
         self.entries = []
+        self.filter_text = ""
         self.setColumnCount(3)
         self.setHeaderLabels(["Region / label", "mm³", "Role"])
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -111,7 +112,15 @@ class RoiTree(QTreeWidget):
                     parent.setFirstColumnSpanned(True)
                     parent.setExpanded(True)
                     parents[key] = parent
-                name = f"{roi['label_id']} · {roi['name']}" if "label_id" in roi else roi["name"]
+                name = (
+                    (
+                        f"{roi['label_id']} · {roi['name']}"
+                        if roi.get("name_available", False)
+                        else f"{roi['label_id']} · name unavailable"
+                    )
+                    if "label_id" in roi
+                    else roi["name"]
+                )
                 volume = roi.get("volume_mm3")
                 item = RegionItem(
                     [
@@ -137,6 +146,18 @@ class RoiTree(QTreeWidget):
             if 0 <= current < len(self.entries):
                 self.setCurrentItem(self.entries[current])
 
+        self.filter_regions(self.filter_text)
+
+    def filter_regions(self, text):
+        """Search list labels only; never alter the ROI masks or visibility."""
+        self.filter_text = text
+        query = text.casefold().strip()
+        for item in self.entries:
+            item.setHidden(bool(query and query not in item.text(0).casefold()))
+        for i in range(self.topLevelItemCount()):
+            parent = self.topLevelItem(i)
+            parent.setHidden(all(parent.child(j).isHidden() for j in range(parent.childCount())))
+
     def changed(self, item, column):
         index = item.data(0, Qt.ItemDataRole.UserRole)
         if column == 0 and index is not None:
@@ -157,10 +178,10 @@ class RoiTree(QTreeWidget):
                 item.setIcon(0, QIcon(pix))
 
 
-class AtlasTools:
+class AtlasTools(RoiControls):
     def setup_atlas_tools(self):
         self.atlas_status = label(
-            "Atlas regions appear here after import. Select a region to show it in 3D.", "caption"
+            "Select rows independently of visibility checkboxes and filtering roles.", "caption"
         )
         self.atlas_status.setWordWrap(True)
         self.rois_layout.insertWidget(0, self.action("Import anatomical atlas", self.choose_atlas))
@@ -184,7 +205,7 @@ class AtlasTools:
         )
         self.rois_layout.insertWidget(5, self.roi_filter_mode)
         self.rois_layout.insertWidget(
-            6, self.action("Filter tracts with ROI roles", self.filter_roi_roles)
+            6, self.action("Filter full source with MRtrix…", self.open_native_roi_filter)
         )
         self.rois_layout.insertWidget(
             7, self.action("Save selected tract group", self.export_selected_group)
@@ -202,6 +223,7 @@ class AtlasTools:
         self.tract_list.currentRowChanged.connect(
             lambda _: self.tract_space_confirmed.setChecked(False)
         )
+        self.setup_bulk_rois()
 
     def choose_atlas(self, path=None):
         if self.reference is None:
@@ -328,10 +350,15 @@ class AtlasTools:
         self.background(lambda: Atlas(path, ref, **options), ready)
 
     def atlas_selection(self):
-        for i in self.roi_list.selected_rows():
-            if self.rois[i].get("atlas_id"):
-                self.atlas_visibility(i, True)
         selected = set(self.roi_list.selected_rows())
+        order = getattr(self, "roi_selection_order", [])
+        self.roi_selection_order = [i for i in order if i in selected] + [
+            i for i in sorted(selected) if i not in order
+        ]
+        for i, roi in enumerate(self.rois):
+            roi["selected"] = i in selected
+            roi["selection_rank"] = self.roi_selection_order.index(i) if i in selected else None
+            roi.setdefault("original_color", roi["color"])
         for key, actor in self.scene.actors.items():
             if key[0] == "roi":
                 # Highlight without obscuring the anatomy with every triangle edge.
@@ -345,18 +372,7 @@ class AtlasTools:
         roi = self.rois[i]
         roi["visible"] = visible
         if visible and ("roi", i) not in self.scene.actors:
-            # A zero border closes masks at the image edge without changing
-            # source voxels. Translate the padded grid back by one voxel.
-            padded = np.pad(roi["data"], 1)
-            shift = np.eye(4)
-            shift[:3, 3] = -1
-            self.scene.surface(
-                ("roi", i), padded, self.reference.affine @ shift, 0.5, roi["color"], roi["opacity"]
-            )
-            if self.scene.actors[("roi", i)].GetMapper().GetInput().GetNumberOfPoints() == 0:
-                self.scene.remove(("roi", i))
-                raise ValueError("Surface generation produced no geometry; check selected mask")
-            roi["surface_built"] = True
+            self.queue_roi_surface(i)
         if ("roi", i) in self.scene.actors:
             self.scene.actors[("roi", i)].SetVisibility(visible)
         # Bound retained hidden surface cache; visible selections are user-controlled.
@@ -373,12 +389,30 @@ class AtlasTools:
         self.scene.draw()
 
     def assign_roi_role(self):
-        ids = self.roi_list.selected_rows()
+        ids = self.roi_selection_order
         if not ids:
             raise ValueError("Select one or more regions first")
-        for i in ids:
-            self.rois[i]["role"] = self.roi_role.currentText()
+        role = self.roi_role.currentText()
+        # Keep previously assigned waypoints first; append the entered block in
+        # its exact order. Reassigning all selected regions replaces that order.
+        prior = sorted(
+            (i for i, r in enumerate(self.rois) if r.get("role") == role and i not in ids),
+            key=lambda i: self.rois[i].get("role_rank", i),
+        )
+        for rank, i in enumerate(prior + ids):
+            self.rois[i]["role"] = role
+            self.rois[i]["role_rank"] = rank
             self.roi_list.update_region(i)
+
+    def open_native_roi_filter(self):
+        from .roi_filter_dialog import RoiFilterDialog
+
+        current = getattr(self, "native_roi_dialog", None)
+        if current is not None and current.thread:
+            current.show()
+            return
+        self.native_roi_dialog = RoiFilterDialog(self)
+        self.native_roi_dialog.show()
 
     def filter_roi_roles(self):
         group = self.current_group()

@@ -39,6 +39,7 @@ class SliceCanvas(QWidget):
         self.image: QImage | None = None
         self.aspect = 1.0
         self.display_range = (0.0, 1.0)
+        self.fod_image: QImage | None = None
         self.overlay_image: QImage | None = None
         self.zoom = 1.0
         self.pan = QPointF()
@@ -47,7 +48,8 @@ class SliceCanvas(QWidget):
         self.drag_origin = QPointF()
         self.drag_pan = QPointF()
         self.drag_display = self.display_range
-        self.message = "Reading native slice…"
+        self.message = "No image open"
+        self.smooth_image = True
         self.setMinimumSize(160, 200)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -236,7 +238,7 @@ class SliceCanvas(QWidget):
         """Smoothly fit image pixels; draw dual-stroke crosshairs above any intensity."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, self.smooth_image)
         painter.setBrush(self.theme.color("viewer.canvas"))
         painter.setPen(
             QPen(self.theme.color("focus.ring"), 2) if self.hasFocus() else Qt.PenStyle.NoPen
@@ -250,6 +252,9 @@ class SliceCanvas(QWidget):
             if self.overlay_image is not None:
                 painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
                 painter.drawImage(rect, self.overlay_image)
+            if self.fod_image is not None:
+                painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+                painter.drawImage(rect, self.fod_image)
             if self.geometry is not None:
                 x, y = self.geometry.display_position(self.position)
                 center = QPointF(rect.left() + x * rect.width(), rect.top() + y * rect.height())

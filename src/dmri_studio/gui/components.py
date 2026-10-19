@@ -84,36 +84,8 @@ def button(
     widget.setCursor(Qt.CursorShape.PointingHandCursor)
     if callback is not None:
         widget.clicked.connect(callback)
-    theme = getattr(QApplication.instance(), "tractosphere_theme", None)
-    # One pinned Lucide family for ordinary actions, never decorative raster art.
-    prefixes = {
-        "open": "folder-open",
-        "browse": "folder-open",
-        "choose": "file-input",
-        "load": "upload",
-        "import": "upload",
-        "export": "download",
-        "save": "download",
-        "copy": "copy",
-        "new": "plus",
-        "clear": "x",
-        "cancel": "square",
-        "stop": "square",
-        "reset": "rotate-ccw",
-        "refresh": "rotate-ccw",
-        "confirm": "shield-check",
-        "prepare": "list-checks",
-        "inspect": "scan",
-        "continue": "arrow-right",
-        "review": "list-checks",
-        "enter": "arrow-right",
-        "approve": "play",
-        "record": "file-chart-column",
-        "models": "sliders-vertical",
-        "auto": "sliders-horizontal",
-    }
-    if theme and (word := text.split(" ", 1)[0].lower()) in prefixes:
-        theme.set_icon(widget, prefixes[word], "accent.on" if primary else "text.secondary")
+    # Text actions stay quiet. Explicit toolbar/navigation icons are supplied by
+    # their owner; do not decorate every verb with an automatically guessed icon.
     return widget
 
 
@@ -143,6 +115,7 @@ class Disclosure(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
         self.toggle = button(title, quiet=True)
+        self.toggle.setProperty("disclosure", True)
         self.theme = getattr(QApplication.instance(), "tractosphere_theme", None)
         if self.theme:
             self.theme.set_icon(self.toggle, "chevron-down" if expanded else "chevron-right")
@@ -377,14 +350,30 @@ class Toast(QFrame):
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.hide)
+        self.scope = None
+        self.last_message = None
         self.hide()
 
-    def show_message(self, text: str, tone: str = "success") -> None:
+    def resolve(self, scope: str) -> None:
+        """Resolve only the active operation, retaining its real logs elsewhere."""
+        if self.scope == scope:
+            self.timer.stop()
+            self.hide()
+            self.last_message = None
+
+    def show_message(self, text: str, tone: str = "success", *, scope=None) -> None:
         """Auto-dismiss success; retain warnings/errors until explicitly dismissed."""
+        key = (scope, text, tone)
+        if self.isVisible() and key == self.last_message:
+            return
+        self.last_message, self.scope = key, scope
         self.timer.stop()
         self.message.setText(text)
         self.setAccessibleName(text)
-        self.theme.bind(self, f"{tone}.bg", f"{tone}.fg")
+        self.theme.bind(self, "bg.raised", "text.primary") if tone in {
+            "success",
+            "info",
+        } else self.theme.bind(self, f"{tone}.bg", f"{tone}.fg")
         self.setFixedWidth(min(420, self.parentWidget().width() - 48))
         self.adjustSize()
         self.move(self.parentWidget().width() - self.width() - GAP, 80)
@@ -399,5 +388,5 @@ class Toast(QFrame):
             self.fade.start()
         else:
             self.opacity.setOpacity(1.0)
-        if tone == "success":
+        if tone in {"success", "info"}:
             self.timer.start(4000)

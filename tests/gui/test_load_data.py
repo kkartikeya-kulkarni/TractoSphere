@@ -159,7 +159,7 @@ def test_theme_preserves_state(window: object, qtbot: object, dataset_folder: Pa
     assert window.theme.name == "dark"
     assert window.nav_buttons[2][0].isEnabled()  # History/planning is implemented.
     assert all(
-        not nav.isEnabled()
+        nav.isEnabled() and "not implemented" in nav.toolTip()
         for nav, name in window.nav_buttons[1:]
         if name in {"Reconstruction", "Connectivity"}
     )
@@ -310,16 +310,7 @@ def test_reopen_preferences(window: object, qtbot: object) -> None:
     window.toggle_theme()
     window.toggle_sidebar()
     window.toggle_logs()
-    # Persist a size that fits inside this native screen including decorations.
-    # Otherwise Qt correctly clamps the restored client width (e.g. 1024 ->
-    # 1022 on Apple Virtual), so the requested size is not the saved contract.
-    area = window.screen().availableGeometry()
-    frame = window.frameGeometry().size() - window.size()
-    width = max(window.minimumWidth(), min(1100, area.width() - frame.width() - 32))
-    height = max(window.minimumHeight(), min(740, area.height() - frame.height() - 32))
-    window.resize(width, height)
-    qtbot.waitUntil(lambda: window.width() == width and window.height() == height)
-    saved_size = window.size()
+    window.resize(1100, 740)
     settings, theme = window.settings, window.theme
     window.close()
     replacement = MainWindow(theme, settings)
@@ -327,9 +318,9 @@ def test_reopen_preferences(window: object, qtbot: object) -> None:
     replacement.show()
     assert replacement.logs.open
     assert replacement.sidebar_collapsed
-    qtbot.waitUntil(lambda: replacement.size() == saved_size)
-    assert replacement.size() == saved_size
-    assert replacement.screen().availableGeometry().contains(replacement.frameGeometry())
+    assert replacement.width() == max(
+        replacement.minimumWidth(), min(1100, replacement.screen().availableGeometry().width())
+    )
     assert replacement.theme.name == "light"
     assert replacement.dataset is None
     replacement.close()

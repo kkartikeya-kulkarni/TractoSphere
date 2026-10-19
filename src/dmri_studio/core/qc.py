@@ -20,7 +20,7 @@ from .process import check_cancel
 from .validation import freeze_json, json_compatible
 
 EXECUTION = {"completed", "running", "failed", "skipped", "pending", "unknown"}
-CHECKS = {"passed", "failed", "pending", "unavailable", "not_applicable"}
+CHECKS = {"passed", "failed", "pending", "unavailable", "not_applicable", "completed_with_findings"}
 KINDS = {"report", "figure", "metrics", "log", "history", "comparison"}
 
 
@@ -40,7 +40,9 @@ def _json(path: Path) -> dict:
     def invalid(value):
         raise ValueError(f"Invalid JSON constant: {value}")
 
-    value = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=pairs, parse_constant=invalid)
+    value = json.loads(
+        path.read_text(encoding="utf-8"), object_pairs_hook=pairs, parse_constant=invalid
+    )
     if not isinstance(value, dict):
         raise ValueError("QC document must be an object")
     return value

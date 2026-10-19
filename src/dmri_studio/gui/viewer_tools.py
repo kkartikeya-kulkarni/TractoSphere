@@ -467,17 +467,40 @@ class ViewerTools:
             same = image.shape[:3] == ref.shape[:3] and np.allclose(
                 image.image.affine, ref.image.affine
             )
+            lossless = None
+            if (
+                not same
+                and image.physical_units_known
+                and ref.physical_units_known
+                and image.affine_source != "fallback"
+                and ref.affine_source != "fallback"
+            ):
+                from dmri_studio.core._mif_checks import rearrange, voxel_mapping
+
+                try:
+                    axes, flips = voxel_mapping(image.affine, image.shape, ref.affine, ref.shape)
+                except ValueError:
+                    pass
+                else:
+                    # MRtrix exports may have a lossless voxel-axis flip relative
+                    # to the NIfTI background. Reindex the display view, never
+                    # interpolate fractions or ask for an identity registration.
+                    if image.count != 1:
+                        raise ValueError("Choose a 3D overlay")
+                    lossless = dict(axes=list(axes), flips=list(flips))
+                    return rearrange(image.volume(), axes, flips), lossless
             if not same and not allow_resample:
                 raise ValueError(
                     "Different grid: explicitly confirm same world space before display resampling"
                 )
-            return resample_overlay(image, ref, order=1)
+            return resample_overlay(image, ref, order=1), lossless
 
-        def ready(data):
+        def ready(result):
             from dmri_studio.core.viewer_display import robust_range
 
             if ref is not self.reference:
                 return
+            data, lossless = result
             lo, hi = robust_range(data)
             item = state or {
                 "path": str(Path(path).resolve()),
@@ -486,7 +509,8 @@ class ViewerTools:
                 "low": lo,
                 "high": hi,
                 "cmap": "hot",
-                "resampled_same_space": allow_resample,
+                "resampled_same_space": allow_resample and lossless is None,
+                "lossless_axis_reindexing": lossless,
             }
             self.layers.append({**item, "data": data})
             self.layer_list.addItem(Path(path).name)

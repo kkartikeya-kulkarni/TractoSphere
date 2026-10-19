@@ -15,7 +15,6 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-from scipy.ndimage import affine_transform
 
 from .scene import ImageVolume
 
@@ -278,6 +277,9 @@ class Atlas:
     def sample(self, data, order):
         if self.direct:
             return data
+        # Metadata-only imports remain available without the optional viewer SciPy extra.
+        from scipy.ndimage import affine_transform
+
         return affine_transform(
             data,
             self.mapping[:3, :3],
@@ -318,6 +320,7 @@ class Atlas:
             dict(
                 label_id=key,
                 name=self.names.get(key, f"Region {key}"),
+                name_available=key in self.names and bool(self.names[key].strip()),
                 voxel_count=count,
                 volume_mm3=count * abs(np.linalg.det(self.reference.affine[:3, :3])),
                 color=color,
@@ -342,7 +345,10 @@ class Atlas:
                     transform=self.transform,
                     path=str(self.image.path),
                     visible=False,
-                    opacity=0.5,
+                    opacity=0.3,
+                    surface_quality="Smooth",
+                    surface_mode="Surface",
+                    selected=False,
                     edited=False,
                     surface_built=False,
                     role="Display",
