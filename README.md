@@ -12,7 +12,9 @@ metadata-aware preprocessing and saved QC. The alpha supports visualization and
 editing of existing tractograms; diffusion reconstruction, new tractography
 generation and connectome analysis are future capabilities.
 
-![TractoSphere MRI and real tractography workspace](docs/screenshots/viewer-dark.png)
+![Redesigned TractoSphere tractography viewer displaying a public TractoInferno bundle](docs/screenshots/scientific-toolbox-development-dark.png)
+
+The screenshot previews the newer [scientific development branch](https://github.com/kkartikeya-kulkarni/TractoSphere/tree/development/scientific-toolbox-2026-10) with the public TractoInferno sample. The v0.1.1-alpha download retains its released interface.
 
 Current download: **[v0.1.1-alpha](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/tag/v0.1.1-alpha)**.
 See the [release notes](docs/release-notes-v0.1.1-alpha.md) for fixes and verification scope.
