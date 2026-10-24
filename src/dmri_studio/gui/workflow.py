@@ -63,6 +63,7 @@ class WorkflowPage(QWidget):
     """Keep unconfirmed edits separate from the evidence used by the planner."""
 
     notification = Signal(str, str)
+    import_requested = Signal()
 
     def __init__(self, theme: Theme) -> None:
         """Create an explicit, session-only history editor with no automatic claims."""
@@ -241,6 +242,7 @@ class WorkflowPage(QWidget):
         self.empty = EmptyState(
             "No diffusion input loaded",
             "Import raw or externally preprocessed DWI, then review its history before planning corrections.",
+            [("Select diffusion data", self.import_requested.emit)],
         )
         root.addWidget(self.empty, 1)
         self.stage_navigation = QWidget()

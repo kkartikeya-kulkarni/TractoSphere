@@ -69,7 +69,7 @@ def test_theme_navigation_unload_keep_viewer_contract(window, qtbot, dataset_fol
     assert page.dataset is None and page.plan is None
     navigation = {name: control for control, name in window.nav_buttons}
     assert navigation["Viewer"].isEnabled()  # Standalone image inspection needs no DWI plan.
-    assert not navigation["Preprocessing"].isEnabled()
+    assert navigation["Preprocessing"].isEnabled()  # Empty state guides input selection.
     assert not navigation["Data Check"].isEnabled()
 
 

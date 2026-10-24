@@ -309,6 +309,7 @@ class MainWindow(QMainWindow):
         self.workflow_scroll = QScrollArea()
         self.workflow_scroll.setWidgetResizable(True)
         self.workflow = WorkflowPage(theme)
+        self.workflow.import_requested.connect(self.focus_load)
         self.workflow_scroll.setWidget(self.workflow)
         self.workspace.addWidget(self.workflow_scroll)
         self.qc = QCPage(theme)
@@ -712,30 +713,23 @@ class MainWindow(QMainWindow):
                 "Software Dependencies": "Software setup",
             }.get(name, name)
             widget.setText("" if self.sidebar_collapsed else display)
-            widget.setToolTip(
-                name
-                + (
-                    " · Planning only; execution adapters are not implemented"
-                    if name in {"Reconstruction", "Connectivity"}
-                    else " · Inspect existing tractograms and ROIs"
-                    if name == "Tractography"
-                    else " · Detect and configure scientific software"
-                    if name == "Software Dependencies"
-                    else " · Load Data"
-                    if name == "Project"
-                    else " · History and operation planning"
-                    if name == "Preprocessing" and self.dataset is not None
-                    else " · Load a dataset first"
-                    if name == "Preprocessing"
-                    else " · Inspect saved processing evidence"
-                    if name == "QC"
-                    else " · Load a dataset first"
-                    if name in {"Viewer", "Data Check"} and self.dataset is None
-                    else ""
-                    if name in {"Acquisitions", "Viewer", "Data Check", "Results", "Settings"}
-                    else " · Not implemented"
-                )
-            )
+            description = {
+                "Project": "Import and inspect diffusion data",
+                "Acquisitions": "Open subjects, sessions and saved acquisitions",
+                "Viewer": "Inspect supported images and tractograms",
+                "Data Check": "Review loaded acquisition and gradient evidence",
+                "Preprocessing": "Select DWI, review history and plan supported corrections",
+                "Reconstruction": "Fit tensors or estimate fiber orientation distributions",
+                "Tractography": "Generate, filter or map streamlines",
+                "Registration": "Align images, transform derivatives or inspect QC",
+                "Connectivity": "Build a matrix from a tractogram and registered atlas",
+                "Batch Processing": "Process selected acquisitions through a reviewed batch plan",
+                "QC": "Inspect saved technical and scientific review evidence",
+                "Results": "Reopen verified outputs and processing history",
+                "Settings": "Configure application preferences",
+                "Software Dependencies": "Verify and save scientific installations",
+            }.get(name, "Open workspace")
+            widget.setToolTip(f"{name} · {description}")
             widget.setAccessibleDescription(widget.toolTip())
         self.theme.set_icon(
             self.collapse, "panel-left-open" if self.sidebar_collapsed else "panel-left-close"
@@ -786,14 +780,15 @@ class MainWindow(QMainWindow):
             self.page.another.setFocus()
 
     def set_workflow_available(self, available: bool) -> None:
-        """Enable only the implemented planning workspace for an active dataset."""
+        """Keep preprocessing discoverable; validation still needs loaded data."""
         for nav, name in self.nav_buttons:
             if name in {"Preprocessing", "Data Check"}:
-                nav.setEnabled(available)
+                enabled = name == "Preprocessing" or available
+                nav.setEnabled(enabled)
                 self.theme.set_icon(
                     nav,
                     nav.property("iconName"),
-                    "text.secondary" if available else "text.disabled",
+                    "text.secondary" if enabled else "text.disabled",
                 )
         self.apply_sidebar()
 
@@ -1506,12 +1501,13 @@ class MainWindow(QMainWindow):
 
     def focus_workflow(self) -> None:
         """Open the history/planning screen without reloading or changing viewer state."""
-        if self.dataset is None:
-            return
         self.page.preview.set_expanded(None)
         self.workspace.setCurrentWidget(self.workflow_scroll)
         self.select_navigation("Preprocessing")
-        self.workflow.confirm.setFocus()
+        if self.dataset is None:
+            self.workflow.empty.actions[0].setFocus()
+        else:
+            self.workflow.confirm.setFocus()
 
     def expand_preview(self, expanded: bool) -> None:
         """Move the same live preview into a full-content host and restore it on return."""

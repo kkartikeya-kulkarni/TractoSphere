@@ -4,6 +4,20 @@ from dmri_studio.core.workflow import OPERATIONS
 from dmri_studio.gui.workflow import OPERATION_GUIDANCE
 
 
+def test_preprocessing_empty_state_routes_to_import_without_processing(window):
+    assert window.dataset is None
+    window.focus_workflow()
+    assert window.workspace.currentWidget() is window.workflow_scroll
+    assert window.workflow.empty.isVisible()
+    assert window.workflow.plan is None
+    assert "Fit tensors" in next(
+        button.toolTip() for button, name in window.nav_buttons if name == "Reconstruction"
+    )
+    window.workflow.empty.actions[0].click()
+    assert window.workspace.currentWidget() is window.scroll
+    assert window.dataset is None
+
+
 def test_preprocessing_stage_review_retains_proposal(window, qtbot, dataset_folder):
     window.page.fill_folder(dataset_folder)
     window.start_load()
