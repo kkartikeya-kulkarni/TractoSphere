@@ -136,6 +136,45 @@ This command is a proposed native check, not a recorded pass. Real-file
 picker, visual Viewer and human anatomical review must be recorded separately
 using the private guide.
 
+## Native low-b summary failure and repair
+
+At `87b8043`, the user's normal Mac Terminal ran the requested Registration
+suite: **19 passed, 1 failed in 66.35 s, exit 1**. The one failure was
+`test_native_guided_low_b_reference_uses_gradients`: the execution manifest
+recorded selected gradient-derived indices `[1, 3]`, but the guided summary
+said there was no approved plan. The earlier GUI launch at `372002d` was not
+a test of this application code.
+
+The failure reproduced offscreen with the same synthetic four-volume DWI and
+an actual MRtrix reference run. Preview preparation completed and its exact
+`mrconvert -coord 3 1,3` command, threshold 50 s/mm², indices `[1, 3]`, and
+approval digest were correct. Execution completed with verified mean-b0 output
+and the expected indices in its validation record. Publication of that new
+reference refreshed the shared artifact inventory. The refresh correctly
+cleared the old *runnable* approval and summary, but the GUI rendered the
+completed result **before** this refresh, so the summary was overwritten.
+
+Application commit **`f4733b4`** renders the completed, read-only plan from
+the execution manifest *after* inventory refresh. The runnable plan remains
+invalidated, approval stays cleared and Run remains disabled. The display
+retains exact commands, selected indices, output and recorded digest; it does
+not grant a new approval. The new offscreen test first failed with the user's
+exact assertion, then passed after the repair. It also checks asynchronous
+preview/run completion, parameter-edit invalidation, re-preview, command
+indices, verified output record and post-run summary. The Cocoa test now
+asserts the plan and command **before** execution as well as the recorded
+summary afterward.
+
+Focused results after this correction: **21/21 offscreen Registration GUI**
+tests and **20/20 core Registration/association** tests passed. The two most
+direct GUI cases passed **2/2** after formatting; Ruff lint and formatting
+checks passed. An additional attempt to run all of
+`tests/gui/test_registration_gui.py` offscreen entered a native VTK Viewer
+case and segfaulted during `QVTKRenderWindowInteractor` construction. This is
+not a valid offscreen test of that native Viewer route; it must be rerun with
+Cocoa on a Mac desktop. The corrected `f4733b4` code has **not** yet received
+a native Cocoa pass, so the Registration native suite remains open.
+
 ## Branch integration and next verification
 
 This focused branch includes the post-Phase-6 usability and real-data fixes

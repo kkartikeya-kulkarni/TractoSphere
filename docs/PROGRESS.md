@@ -1,5 +1,17 @@
 # Outstanding Scientific Verification and Release Blockers
 
+## 2026-10-24 — Native Registration low-b summary follow-up
+
+The user's native Cocoa suite at `87b8043` returned **19 passed, 1 failed**:
+the low-b result had correct gradient-derived indices `[1, 3]` in its verified
+execution record, but the guided summary was cleared by the resulting artifact
+refresh. [The Registration repair handoff](REGISTRATION_WORKFLOW_REPAIR_2026-10-24.md#native-low-b-summary-failure-and-repair)
+records the offscreen reproduction and code repair at `f4733b4`. Preview and
+execution identity remain exact; publishing a derivative still invalidates the
+old runnable plan. Focused offscreen GUI/core checks passed, but corrected
+native Cocoa verification is pending. The 38-task scientific backlog is
+unchanged.
+
 ## 2026-10-24 — Registration input-role repair on the latest real-data checkpoint
 
 The [Registration repair handoff](REGISTRATION_WORKFLOW_REPAIR_2026-10-24.md)
