@@ -285,6 +285,9 @@ class TrackingExecutionPanel(QScrollArea):
         from .tracking_guided import GuidedTracking
 
         self.guided = GuidedTracking(self)
+        for inventory in self.constraints.values():
+            inventory.itemChanged.connect(lambda *_: self.guided.refresh_constraints())
+            inventory.model().rowsMoved.connect(lambda *_: self.guided.refresh_constraints())
         root.addWidget(self.guided)
         advanced = QWidget()
         advanced_layout = QVBoxLayout(advanced)

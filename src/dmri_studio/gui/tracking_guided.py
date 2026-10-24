@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -16,6 +17,8 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QPlainTextEdit,
     QSpinBox,
     QStackedWidget,
@@ -55,10 +58,14 @@ METHOD_HELP = {
 class GuidedTracking(QWidget):
     """A small, contextual view of the legacy panel's authoritative controls."""
 
+    highlight_requested = Signal(str)
+
     def __init__(self, owner):
         super().__init__(owner)
         self.owner = owner
         self._syncing = False
+        self.roi_metadata = {}
+        self._roi_signature = None
         root = QVBoxLayout(self)
         root.addWidget(label("What would you like to do?", "title"))
         root.addWidget(
@@ -84,6 +91,8 @@ class GuidedTracking(QWidget):
         self.pages.addWidget(self._filter_page())
         self.pages.addWidget(self._density_page())
         root.addWidget(self.pages)
+        self.roi_section = Disclosure("Choose pathway regions", self._roi_page(), expanded=True)
+        root.addWidget(self.roi_section)
 
         output = QFormLayout()
         self.output = QLineEdit()
@@ -249,6 +258,216 @@ class GuidedTracking(QWidget):
         layout.addStretch()
         return page
 
+    def _roi_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.addWidget(
+            label(
+                "Select an imported region, then assign its role. Required regions use Include ALL: a track must intersect every selected mask. Exclude ANY rejects a track that intersects any excluded mask.",
+                "caption",
+            )
+        )
+        self.roi_search = QLineEdit()
+        self.roi_search.setPlaceholderText("Search imported regions")
+        self.roi_search.setAccessibleName("Search tracking regions")
+        self.roi_search.textChanged.connect(self._filter_roi_inventory)
+        layout.addWidget(self.roi_search)
+        self.roi_inventory = QListWidget()
+        self.roi_inventory.setAccessibleName("Available verified ROI masks")
+        self.roi_inventory.setMaximumHeight(150)
+        layout.addWidget(self.roi_inventory)
+        actions = QHBoxLayout()
+        actions.addWidget(button("Must pass through", lambda: self.assign_roi("include")))
+        actions.addWidget(button("Must avoid", lambda: self.assign_roi("exclude")))
+        actions.addWidget(button("Add waypoint", lambda: self.assign_roi("ordered")))
+        layout.addLayout(actions)
+        self.highlight_button = button("Inspect selected region in Viewer", self.highlight_roi)
+        layout.addWidget(self.highlight_button)
+        self.roi_notice = label(
+            "No region selected. Select an imported ROI, or use the existing Viewer to create one.",
+            "caption",
+        )
+        layout.addWidget(self.roi_notice)
+        self.import_rois = button(
+            "Use selected Viewer ROIs…", self.owner.owner.roi_import_requested.emit
+        )
+        layout.addWidget(self.import_rois)
+        groups = QHBoxLayout()
+        self.roi_groups = {}
+        for role, title, explanation in (
+            ("include", "Must pass through (all)", "Every required mask must be crossed."),
+            ("exclude", "Must avoid (any)", "Any excluded-mask hit rejects the track."),
+            (
+                "ordered",
+                "Pass through in this order",
+                "Waypoint order follows the saved streamline vertex direction for filtering.",
+            ),
+        ):
+            column = QVBoxLayout()
+            column.addWidget(label(title, "section"))
+            column.addWidget(label(explanation, "caption"))
+            items = QListWidget()
+            items.setAccessibleName(title)
+            items.setMaximumHeight(120)
+            column.addWidget(items)
+            column.addWidget(button("Remove selected", lambda _=False, r=role: self.remove_roi(r)))
+            if role == "ordered":
+                moves = QHBoxLayout()
+                moves.addWidget(button("Move up", lambda: self.move_waypoint(-1)))
+                moves.addWidget(button("Move down", lambda: self.move_waypoint(1)))
+                column.addLayout(moves)
+            groups.addLayout(column)
+            self.roi_groups[role] = items
+        layout.addLayout(groups)
+        layout.addWidget(
+            label(
+                "Endpoint-only filtering tests the actual streamline endpoints against the selected masks; it is not the same as passing through them. Ordered waypoints cannot be combined with endpoint-only filtering.",
+                "caption",
+            )
+        )
+        return page
+
+    def set_imported_roi_metadata(self, metadata):
+        """Keep display names/colors separate from immutable scientific artifacts."""
+        self.roi_metadata.update(metadata)
+        self._roi_signature = None
+        self.refresh_roi_inventory()
+
+    def _roi_name(self, artifact):
+        metadata = self.roi_metadata.get(artifact.id, {})
+        if metadata.get("name"):
+            return str(metadata["name"])
+        statement = artifact.payload.get("provenance", {}).get("statement", "")
+        prefix = "Separate selected viewer ROI snapshot: "
+        if statement.startswith(prefix):
+            return statement[len(prefix) :].split(". Source/space association", 1)[0]
+        return Path(artifact.payload["path"]).name
+
+    def refresh_roi_inventory(self):
+        artifacts = [a for a in self.owner.owner.artifacts if a.kind == "roi"]
+        signature = tuple((a.id, self._roi_name(a)) for a in artifacts)
+        if signature != self._roi_signature:
+            current = self.roi_inventory.currentItem()
+            selected = current.data(Qt.ItemDataRole.UserRole) if current else None
+            self.roi_inventory.clear()
+            for artifact in artifacts:
+                item = QListWidgetItem(self._roi_name(artifact))
+                item.setData(Qt.ItemDataRole.UserRole, artifact.id)
+                item.setToolTip(str(artifact.payload["path"]))
+                color = self.roi_metadata.get(artifact.id, {}).get("color")
+                if color:
+                    item.setForeground(QColor.fromRgbF(*color[:3]))
+                self.roi_inventory.addItem(item)
+                if artifact.id == selected:
+                    self.roi_inventory.setCurrentItem(item)
+            self._roi_signature = signature
+        self._filter_roi_inventory()
+        self.refresh_constraints()
+
+    def _filter_roi_inventory(self, *_):
+        query = self.roi_search.text().casefold().strip()
+        for index in range(self.roi_inventory.count()):
+            item = self.roi_inventory.item(index)
+            item.setHidden(bool(query and query not in item.text().casefold()))
+
+    def refresh_constraints(self):
+        for role, source in self.owner.constraints.items():
+            target = self.roi_groups[role]
+            selected = target.currentItem()
+            selected_id = selected.data(Qt.ItemDataRole.UserRole) if selected else None
+            values = [
+                source.item(i).data(Qt.ItemDataRole.UserRole)
+                for i in range(source.count())
+                if source.item(i).checkState() == Qt.CheckState.Checked
+            ]
+            existing = [
+                target.item(i).data(Qt.ItemDataRole.UserRole) for i in range(target.count())
+            ]
+            if values == existing:
+                continue
+            target.clear()
+            for key in values:
+                artifact = next((a for a in self.owner.owner.artifacts if a.id == key), None)
+                if artifact is None:
+                    continue
+                item = QListWidgetItem(self._roi_name(artifact))
+                item.setData(Qt.ItemDataRole.UserRole, key)
+                target.addItem(item)
+                if key == selected_id:
+                    target.setCurrentItem(item)
+        self.roi_notice.setText(
+            f"{self.roi_inventory.count()} imported regions available. "
+            "Original masks and tractograms remain unchanged."
+            if self.roi_inventory.count()
+            else "No imported regions. Select ROIs in the Viewer, then use selected Viewer ROIs."
+        )
+
+    def _selected_roi(self):
+        item = self.roi_inventory.currentItem()
+        if item is None or item.isHidden():
+            self.roi_notice.setText("Select a visible imported region first.")
+            return None
+        return item.data(Qt.ItemDataRole.UserRole)
+
+    def assign_roi(self, role):
+        key = self._selected_roi()
+        if not key:
+            return
+        source = self.owner.constraints[role]
+        for index in range(source.count()):
+            item = source.item(index)
+            if item.data(Qt.ItemDataRole.UserRole) == key:
+                if item.checkState() != Qt.CheckState.Checked:
+                    item.setCheckState(Qt.CheckState.Checked)
+                break
+        self.refresh_constraints()
+
+    def remove_roi(self, role):
+        selected = self.roi_groups[role].currentItem()
+        if selected is None:
+            return
+        key = selected.data(Qt.ItemDataRole.UserRole)
+        source = self.owner.constraints[role]
+        for index in range(source.count()):
+            item = source.item(index)
+            if item.data(Qt.ItemDataRole.UserRole) == key:
+                item.setCheckState(Qt.CheckState.Unchecked)
+                break
+        self.refresh_constraints()
+
+    def move_waypoint(self, delta):
+        target = self.roi_groups["ordered"]
+        selected = target.currentItem()
+        if selected is None:
+            return
+        ids = [target.item(i).data(Qt.ItemDataRole.UserRole) for i in range(target.count())]
+        position = ids.index(selected.data(Qt.ItemDataRole.UserRole))
+        new_position = position + delta
+        if not 0 <= new_position < len(ids):
+            return
+        ids[position], ids[new_position] = ids[new_position], ids[position]
+        source = self.owner.constraints["ordered"]
+        all_items = []
+        while source.count():
+            all_items.append(source.takeItem(0))
+        items = {item.data(Qt.ItemDataRole.UserRole): item for item in all_items}
+        # Preserve unchecked inventory after the selected waypoints.
+        for key in ids:
+            source.addItem(items.pop(key))
+        for item in items.values():
+            source.addItem(item)
+        self.owner.invalidate()
+        self.refresh_constraints()
+        for i in range(target.count()):
+            if target.item(i).data(Qt.ItemDataRole.UserRole) == ids[new_position]:
+                target.setCurrentRow(i)
+                break
+
+    def highlight_roi(self):
+        key = self._selected_roi()
+        if key:
+            self.highlight_requested.emit(key)
+
     def select_task(self, task):
         index = self.owner.operation.findData(task)
         if index >= 0:
@@ -262,6 +481,7 @@ class GuidedTracking(QWidget):
             if key == current:
                 self.pages.setCurrentIndex(index)
                 self.task_help.setText(explanation)
+        self.roi_section.setVisible(current != "density")
         self.clear_plan()
         self.update_actions()
 
@@ -309,6 +529,7 @@ class GuidedTracking(QWidget):
         self._count_from_advanced(self.owner.count.value())
         self._ends_from_advanced(self.owner.ends.isChecked())
         self._method_from_advanced()
+        self.refresh_roi_inventory()
         self.update_actions()
 
     def _method_from_advanced(self, *_):
@@ -385,3 +606,4 @@ class GuidedTracking(QWidget):
         self.open_button.setEnabled(idle and self.owner.maps.count() > 0)
         self.qc_button.setEnabled(idle and self.owner.qc_button.isEnabled())
         self.details_button.setEnabled(idle and self.owner.manifest is not None)
+        self.roi_section.setEnabled(idle)

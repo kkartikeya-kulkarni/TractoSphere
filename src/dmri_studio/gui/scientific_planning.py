@@ -463,6 +463,7 @@ class ScientificPlanningPage(QWidget):
     execution_busy = Signal(bool)
     inspect_requested = Signal(object)
     roi_import_requested = Signal()
+    roi_imported = Signal(object)
     qc_requested = Signal()
 
     def __init__(
@@ -1129,10 +1130,14 @@ class ScientificPlanningPage(QWidget):
                 "Input inspected and source hashes recorded. Scientific review remains required."
             )
         elif self.pending == "import-tracking-rois":
-            for artifact in result:
+            imported = result["artifacts"] if isinstance(result, dict) else result
+            metadata = result.get("metadata", {}) if isinstance(result, dict) else {}
+            for artifact in imported:
                 if all(a.id != artifact.id for a in self.artifacts):
                     self.artifacts.append(artifact)
             self.refresh()
+            self.tracking.guided.set_imported_roi_metadata(metadata)
+            self.roi_imported.emit(metadata)
             self.status.setText(
                 "Selected viewer ROI snapshots imported. Review their roles and coordinate association before tracking."
             )

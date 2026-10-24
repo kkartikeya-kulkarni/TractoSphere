@@ -68,6 +68,8 @@ class MainWindow(QMainWindow):
         self.pending_result = None
         self.project_binding = None
         self.running_project_binding = None
+        self._tracking_roi_viewer_refs = {}
+        self._tracking_roi_pending = {}
         self.request = 0
         self.load_state = OperationState(self)
         self.load_thread: QThread | None = None
@@ -432,6 +434,8 @@ class MainWindow(QMainWindow):
             page.tracking.qc_requested.connect(self.open_generated_qc)
             page.tracking.run_requested.connect(self.open_saved_run)
             page.roi_import_requested.connect(self.import_tracking_rois)
+            page.roi_imported.connect(self._tracking_rois_imported)
+            page.tracking.guided.highlight_requested.connect(self.highlight_tracking_roi)
             page.csd.qc_requested.connect(self.open_generated_qc)
             page.csd.run_requested.connect(self.open_saved_run)
             page.dti.qc_requested.connect(self.open_generated_qc)
@@ -915,9 +919,12 @@ class MainWindow(QMainWindow):
         viewer = self.scientific_viewer
         if page.thread is not None:
             return
-        source = next(
-            (a for a in page.artifacts if a.id == page.tracking.source.currentData()), None
+        source_key = (
+            page.tracking.source.currentData()
+            if page.tracking.operation.currentData() == "generate"
+            else page.tracking.reference.currentData()
         )
+        source = next((a for a in page.artifacts if a.id == source_key), None)
         if viewer is None or viewer.reference is None or not viewer.roi_list.selected_rows():
             page.status.setText("Select one or more regions in the existing viewer ROI list first.")
             return
@@ -925,7 +932,7 @@ class MainWindow(QMainWindow):
             source.payload["declarations"].get(k) for k in ("subject_id", "space_id")
         ):
             page.status.setText(
-                "Select a tracking source with explicit subject and space declarations before associating viewer ROIs."
+                "Select a tracking source or filter reference with explicit subject and space declarations before associating viewer ROIs."
             )
             return
         try:
@@ -940,13 +947,15 @@ class MainWindow(QMainWindow):
                 raise ValueError("Select at most eight ROI snapshots per import to bound memory.")
             snapshots = [
                 (
+                    i,
                     viewer.rois[i]["name"],
                     np.asarray(viewer.rois[i]["data"] > 0, dtype=np.uint8),
                     viewer.rois[i].get("role", "Display"),
+                    tuple(viewer.rois[i].get("color", (0.95, 0.5, 0.2))),
                 )
                 for i in indices
             ]
-            if any(not data.any() for _, data, _ in snapshots):
+            if any(not data.any() for _, _, data, _, _ in snapshots):
                 raise ValueError("Empty ROIs cannot seed or constrain tractography.")
         except ValueError as exc:
             page.status.setText(str(exc))
@@ -959,6 +968,7 @@ class MainWindow(QMainWindow):
         folder = Path(parent) / ("tracking-rois-" + uuid4().hex[:12])
         reference = viewer.reference
         declarations = dict(source.payload["declarations"])
+        self._tracking_roi_pending = {i: (reference, viewer.rois[i]) for i in indices}
 
         def export(cancel, progress):
             from dmri_studio.core.process import check_cancel
@@ -968,36 +978,77 @@ class MainWindow(QMainWindow):
             folder.mkdir(mode=0o700, exist_ok=False)
             imported = []
             provenance = []
-            for i, (name, data, role) in enumerate(snapshots):
+            metadata = {}
+            for i, (viewer_index, name, data, role, color) in enumerate(snapshots):
                 check_cancel(cancel)
                 path = folder / f"roi-{i + 1:03}.nii.gz"
                 save_new_image(path, data, reference)
-                imported.append(
-                    import_artifact(
-                        ImportRequest(
-                            "roi",
-                            path,
-                            declarations=declarations,
-                            provenance=f"Separate selected viewer ROI snapshot: {name}. Source/space association reviewed by the user; no registration or resampling. Original ROI unchanged.",
-                        ),
-                        cancelled=cancel,
-                        progress=progress,
-                    )
+                artifact = import_artifact(
+                    ImportRequest(
+                        "roi",
+                        path,
+                        declarations=declarations,
+                        provenance=f"Separate selected viewer ROI snapshot: {name}. Source/space association reviewed by the user; no registration or resampling. Original ROI unchanged.",
+                    ),
+                    cancelled=cancel,
+                    progress=progress,
+                )
+                imported.append(artifact)
+                metadata[artifact.id] = dict(
+                    name=name,
+                    color=color,
+                    viewer_index=viewer_index,
+                    source_reference=str(reference.path),
                 )
                 provenance.append(
                     dict(
                         name=name,
                         path=str(path),
                         tracking_role=role,
+                        color=color,
                         source_reference=str(reference.path),
                         scientific_acceptance="unassigned",
                     )
                 )
             with (folder / "roi-snapshots.json").open("x") as stream:
                 json.dump(provenance, stream, indent=2)
-            return imported
+            return {"artifacts": imported, "metadata": metadata}
 
         page.start("import-tracking-rois", export)
+
+    def _tracking_rois_imported(self, metadata):
+        for key, record in metadata.items():
+            origin = self._tracking_roi_pending.get(record["viewer_index"])
+            if origin is not None:
+                self._tracking_roi_viewer_refs[key] = (
+                    id(origin[0]),
+                    id(origin[1]),
+                    getattr(self.scientific_viewer, "volume_generation", None),
+                )
+        self._tracking_roi_pending = {}
+
+    def highlight_tracking_roi(self, artifact_id):
+        """Select only the exact still-open ROI object that supplied this snapshot."""
+        viewer = self.scientific_viewer
+        origin = self._tracking_roi_viewer_refs.get(artifact_id)
+        if (
+            viewer is None
+            or origin is None
+            or id(viewer.reference) != origin[0]
+            or getattr(viewer, "volume_generation", None) != origin[2]
+        ):
+            self.scientific.status.setText(
+                "The original Viewer ROI is no longer open. Select it in the Viewer; the imported snapshot remains available."
+            )
+            return
+        for index, roi in enumerate(viewer.rois):
+            if id(roi) == origin[1]:
+                viewer.roi_list.setCurrentRow(index)
+                self.focus_viewer()
+                return
+        self.scientific.status.setText(
+            "The original Viewer ROI changed or was removed. Review the imported snapshot before use."
+        )
 
     def open_scientific_selection(self):
         """Opening a saved selection rechecks inputs and never restarts a run."""
