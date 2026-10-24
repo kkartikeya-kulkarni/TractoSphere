@@ -180,6 +180,23 @@ class GuidedTracking(QWidget):
         )
         return combo
 
+    def _input_row(self, form, title, combo, kind):
+        row = QWidget()
+        line = QHBoxLayout(row)
+        line.setContentsMargins(0, 0, 0, 0)
+        line.addWidget(combo, 1)
+        action = button(
+            "Import…",
+            lambda _=False, requested=kind: self.owner.owner.browse_import(
+                requested() if callable(requested) else requested
+            ),
+        )
+        action.setAccessibleName(f"Import {title}")
+        line.addWidget(action)
+        form.addRow(title, row)
+        self.import_buttons[title] = action
+        return row
+
     def _generate_page(self):
         page, layout, form = self._form_page(
             "Generate New Streamlines",
@@ -217,6 +234,8 @@ class GuidedTracking(QWidget):
         self.crop.toggled.connect(self.owner.crop.setChecked)
         self.owner.backtrack.toggled.connect(lambda value: self._copy_check(self.backtrack, value))
         self.owner.crop.toggled.connect(lambda value: self._copy_check(self.crop, value))
+        self.import_buttons = {}
+        self.generate_input_rows = {}
         for title, widget in (
             ("Tracking input", self.source),
             ("Method", self.method),
@@ -232,7 +251,28 @@ class GuidedTracking(QWidget):
             ("ACT backtracking", self.backtrack),
             ("ACT endpoint cropping", self.crop),
         ):
-            form.addRow(title, widget)
+            kinds = {
+                "Tracking input": lambda: (
+                    "dwi"
+                    if self.owner.method.currentData()
+                    in {"tckgen.tensor_det", "tckgen.tensor_prob"}
+                    else "fod"
+                ),
+                "Seed region or mask": lambda: (
+                    "roi"
+                    if self.owner.seed_method.currentData() == "roi"
+                    else "gmwmi"
+                    if self.owner.seed_method.currentData() == "gmwmi"
+                    else "mask"
+                ),
+                "Where may tracks travel? Tracking mask": "mask",
+                "Five-tissue anatomy": "5tt",
+                "Reference image": "anatomy",
+            }
+            if title in kinds:
+                self.generate_input_rows[title] = self._input_row(form, title, widget, kinds[title])
+            else:
+                form.addRow(title, widget)
         self.generate_form = form
         self.method_help = label("", "caption")
         layout.addWidget(self.method_help)
@@ -267,8 +307,8 @@ class GuidedTracking(QWidget):
         self.filter_count.setAccessibleName("Maximum retained streamline count")
         self.filter_count.valueChanged.connect(self.owner.filter_count.setValue)
         self.owner.filter_count.valueChanged.connect(self._filter_count_from_advanced)
-        form.addRow("Existing tractogram", self.filter_tracts)
-        form.addRow("Reference image", self.filter_reference)
+        self._input_row(form, "Filter existing tractogram", self.filter_tracts, "tractogram")
+        self._input_row(form, "Filter reference image", self.filter_reference, "anatomy")
         form.addRow(self.ends_only)
         form.addRow(self.filter_limit)
         form.addRow("Maximum retained streamlines", self.filter_count)
@@ -293,8 +333,8 @@ class GuidedTracking(QWidget):
         )
         self.density_tracts = self._linked_combo(self.owner.tracts, "Density source tractogram")
         self.density_reference = self._linked_combo(self.owner.reference, "Density reference grid")
-        form.addRow("Existing tractogram", self.density_tracts)
-        form.addRow("Reference image / grid", self.density_reference)
+        self._input_row(form, "Density existing tractogram", self.density_tracts, "tractogram")
+        self._input_row(form, "Density reference image / grid", self.density_reference, "anatomy")
         layout.addWidget(
             label(
                 "Density is streamline-derived spatial information, not a direct measure of axon counts. Directional channels are in Advanced Settings.",
@@ -338,6 +378,7 @@ class GuidedTracking(QWidget):
             "Use selected Viewer ROIs…", self.owner.owner.roi_import_requested.emit
         )
         layout.addWidget(self.import_rois)
+        layout.addWidget(button("Import ROI mask…", lambda: self.owner.owner.browse_import("roi")))
         groups = QHBoxLayout()
         self.roi_groups = {}
         for role, title, explanation in (
@@ -619,12 +660,14 @@ class GuidedTracking(QWidget):
         self.method_help.setText(
             METHOD_HELP.get(self.owner.method.currentData(), "Choose a supported method.")
         )
-        self.generate_form.setRowVisible(self.five_tt, self.owner.mode.currentData() == "act")
         self.generate_form.setRowVisible(
-            self.reference_generate, self.owner.mode.currentData() == "act"
+            self.generate_input_rows["Five-tissue anatomy"], self.owner.mode.currentData() == "act"
         )
         self.generate_form.setRowVisible(
-            self.seed,
+            self.generate_input_rows["Reference image"], self.owner.mode.currentData() == "act"
+        )
+        self.generate_form.setRowVisible(
+            self.generate_input_rows["Seed region or mask"],
             self.owner.seed_method.currentData()
             in {"image", "roi", "random_per_voxel", "grid_per_voxel", "gmwmi"},
         )

@@ -137,3 +137,40 @@ def test_dti_optional_mask_and_csd_input_rows_have_scoped_import(window, qtbot):
         qtbot.mouseClick(csd.import_buttons[title], Qt.MouseButton.LeftButton)
     assert "Import beside" in csd.source.itemText(0)
     assert csd.plan is None and not csd.approval.isChecked()
+
+
+def test_guided_tracking_imports_follow_task_and_algorithm(window, qtbot):
+    window.focus_tracking_plan()
+    panel = window.scientific.tracking
+    guided = panel.guided
+
+    def cancel(kind):
+        dialog = QApplication.activeModalWidget()
+        assert isinstance(dialog, ImportDialog)
+        assert dialog.kind.currentData() == kind
+        qtbot.mouseClick(
+            dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Cancel),
+            Qt.MouseButton.LeftButton,
+        )
+
+    def import_cancel(title, kind):
+        QTimer.singleShot(0, lambda: cancel(kind))
+        qtbot.mouseClick(guided.import_buttons[title], Qt.MouseButton.LeftButton)
+
+    import_cancel("Tracking input", "fod")
+    panel.method.setCurrentIndex(panel.method.findData("tckgen.tensor_det"))
+    import_cancel("Tracking input", "dwi")
+    import_cancel("Where may tracks travel? Tracking mask", "mask")
+    guided.seed_method.setCurrentIndex(guided.seed_method.findData("roi"))
+    import_cancel("Seed region or mask", "roi")
+    guided.mode.setCurrentIndex(guided.mode.findData("act"))
+    assert guided.generate_form.isRowVisible(guided.generate_input_rows["Five-tissue anatomy"])
+    import_cancel("Five-tissue anatomy", "5tt")
+    import_cancel("Reference image", "anatomy")
+    guided.select_task("filter")
+    import_cancel("Filter existing tractogram", "tractogram")
+    import_cancel("Filter reference image", "anatomy")
+    guided.select_task("density")
+    import_cancel("Density existing tractogram", "tractogram")
+    import_cancel("Density reference image / grid", "anatomy")
+    assert panel.plan is None and not panel.approval.isChecked()

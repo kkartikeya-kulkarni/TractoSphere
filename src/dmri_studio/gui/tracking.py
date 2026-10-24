@@ -406,13 +406,16 @@ class TrackingExecutionPanel(QScrollArea):
             old = combo.currentData()
             combo.blockSignals(True)
             combo.clear()
-            combo.addItem("Choose…", None)
+            name = next(iter(kinds))
+            combo.addItem(f"Select imported {name}…", None)
             for item in self.owner.artifacts:
                 if item.kind in kinds:
                     combo.addItem(Path(item.payload["path"]).name, item.id)
                     combo.setItemData(
                         combo.count() - 1, str(item.payload["path"]), Qt.ItemDataRole.ToolTipRole
                     )
+            if combo.count() == 1:
+                combo.setItemText(0, f"No imported {name} — use Import in the guided task")
             combo.setCurrentIndex(max(0, combo.findData(old)))
             combo.blockSignals(False)
         for w in self.constraints.values():
