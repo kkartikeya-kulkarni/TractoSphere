@@ -129,9 +129,10 @@ class GuidedTracking(QWidget):
         root.addWidget(self.result)
         result_actions = QHBoxLayout()
         self.open_button = button("Open Result in Viewer", owner.open_result)
+        self.original_button = button("View Original Tracks", owner.open_original)
         self.qc_button = button("Review QC", owner.open_qc)
         self.details_button = button("View Run Details", owner.open_run)
-        for action in (self.open_button, self.qc_button, self.details_button):
+        for action in (self.open_button, self.original_button, self.qc_button, self.details_button):
             result_actions.addWidget(action)
         root.addLayout(result_actions)
         root.addStretch()
@@ -309,6 +310,27 @@ class GuidedTracking(QWidget):
         self.owner.filter_count.valueChanged.connect(self._filter_count_from_advanced)
         self._input_row(form, "Filter existing tractogram", self.filter_tracts, "tractogram")
         self._input_row(form, "Filter reference image", self.filter_reference, "anatomy")
+        self.convert_trk_button = button(
+            "Convert reviewed full-source TRK to TCK…", self.owner.convert_trk
+        )
+        layout.addWidget(self.convert_trk_button)
+        self.viewer_source_notice = label(
+            "Open a tractogram in the Viewer, select its group, then use Filter These Tracks to carry its full source here.",
+            "caption",
+        )
+        layout.addWidget(self.viewer_source_notice)
+        viewer_actions = QHBoxLayout()
+        self.review_viewer_source = button(
+            "Review Viewer track source…", self.owner.viewer_source_requested.emit
+        )
+        self.review_viewer_reference = button(
+            "Review Viewer reference…", self.owner.viewer_reference_requested.emit
+        )
+        viewer_actions.addWidget(self.review_viewer_source)
+        viewer_actions.addWidget(self.review_viewer_reference)
+        layout.addLayout(viewer_actions)
+        self.review_viewer_source.hide()
+        self.review_viewer_reference.hide()
         form.addRow(self.ends_only)
         form.addRow(self.filter_limit)
         form.addRow("Maximum retained streamlines", self.filter_count)
@@ -376,6 +398,9 @@ class GuidedTracking(QWidget):
         layout.addWidget(self.roi_notice)
         self.import_rois = button(
             "Use selected Viewer ROIs…", self.owner.owner.roi_import_requested.emit
+        )
+        layout.addWidget(
+            button("Choose regions in Viewer…", self.owner.viewer_regions_requested.emit)
         )
         layout.addWidget(self.import_rois)
         layout.addWidget(button("Import ROI mask…", lambda: self.owner.owner.browse_import("roi")))
@@ -656,6 +681,78 @@ class GuidedTracking(QWidget):
         self.refresh_roi_inventory()
         self.update_actions()
 
+    def show_viewer_source(self, context):
+        """Identify the original source separately from Viewer display edits."""
+        source = context["source"]
+        reference = context["reference"]
+        if context["edited"]:
+            changes = (
+                "Viewer selections or edits are display state. Filtering uses every streamline "
+                "in the unchanged source file. Export a reviewed derivative first if you intend "
+                "to filter the edited selection."
+            )
+        elif context["displayed"] < context["total"]:
+            changes = (
+                "Only a display subset is rendered. Filtering uses every streamline "
+                "in the complete source file."
+            )
+        else:
+            changes = "Filtering uses the complete source file."
+        missing = []
+        if self.owner.tracts.currentData() is None:
+            missing.append("Review/import the track source with subject and spatial identity.")
+        if self.owner.reference.currentData() is None:
+            missing.append("Review/import the matching reference image and its spatial identity.")
+        selected = [
+            next(
+                (a for a in self.owner.owner.artifacts if a.id == combo.currentData()),
+                None,
+            )
+            for combo in (self.owner.tracts, self.owner.reference)
+        ]
+        for title, item in zip(("Tractogram", "Reference image"), selected, strict=True):
+            if item is None:
+                continue
+            declarations = item.payload.get("declarations", {})
+            absent = [name for name in ("subject_id", "space_id") if not declarations.get(name)]
+            if absent:
+                missing.append(
+                    f"{title} is imported but needs {', '.join(absent)}. "
+                    "Use its Review Viewer action to supply documented evidence."
+                )
+        if all(selected):
+            left, right = (item.payload.get("declarations", {}) for item in selected)
+            for key, title in (("subject_id", "subject"), ("space_id", "space")):
+                if left.get(key) and right.get(key) and left[key] != right[key]:
+                    missing.append(
+                        f"Tractogram and reference declare different {title} identities; "
+                        "choose a matching input or review documented evidence."
+                    )
+        selected_source = selected[0]
+        selected_path = (
+            Path(selected_source.payload["path"]) if selected_source is not None else None
+        )
+        if source.suffix.lower() == ".trk" and (
+            selected_path is None or selected_path.suffix.lower() == ".trk"
+        ):
+            missing.append(
+                "TRK is viewable, but the validated tckedit filter accepts TCK only. "
+                "Use the explicit full-source conversion below after reviewing its reference; "
+                "conversion is never automatic."
+            )
+        elif source.suffix.lower() == ".trk":
+            missing.append(
+                "The selected TCK derivative differs from the Viewer TRK source. "
+                "Review its conversion record and exact plan before approval."
+            )
+        self.viewer_source_notice.setText(
+            f"Viewer source: {source.name} · {context['total']:,} source streamlines. "
+            f"Viewer reference: {reference.name}. {changes} " + " ".join(missing)
+        )
+        self.viewer_source_notice.setToolTip(f"Source: {source}\nReference: {reference}")
+        self.review_viewer_source.show()
+        self.review_viewer_reference.show()
+
     def _method_from_advanced(self, *_):
         self.method_help.setText(
             METHOD_HELP.get(self.owner.method.currentData(), "Choose a supported method.")
@@ -811,6 +908,26 @@ class GuidedTracking(QWidget):
             idle and self.owner.plan is not None and self.owner.approval.isChecked()
         )
         self.open_button.setEnabled(idle and self.owner.maps.count() > 0)
+        source = next(
+            (a for a in self.owner.owner.artifacts if a.id == self.owner.tracts.currentData()),
+            None,
+        )
+        self.convert_trk_button.setEnabled(
+            idle
+            and source is not None
+            and Path(source.payload["path"]).suffix.lower() == ".trk"
+            and self.owner.reference.currentData() is not None
+        )
+        self.original_button.setEnabled(
+            idle
+            and self.owner.manifest is not None
+            and self.owner.manifest.get("status") == "validated_pending_qc"
+            and self.owner.manifest.get("inputs_unchanged")
+            and any(
+                row.get("algorithm") == "tckedit"
+                for row in self.owner.manifest.get("plan", {}).get("bindings", ())
+            )
+        )
         self.qc_button.setEnabled(idle and self.owner.qc_button.isEnabled())
         self.details_button.setEnabled(idle and self.owner.manifest is not None)
         self.roi_section.setEnabled(idle)

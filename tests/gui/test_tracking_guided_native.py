@@ -10,6 +10,123 @@ import pytest
 
 @pytest.mark.skipif(
     os.environ.get("QT_QPA_PLATFORM") != "cocoa"
+    or not Path("/usr/local/mrtrix3/bin/tckedit").is_file(),
+    reason="Native Cocoa/VTK and MRtrix3 3.0.5 are required",
+)
+def test_native_viewer_selected_group_filters_full_source_and_opens_result(window, qtbot, tmp_path):
+    """Use the visible Viewer action, real selected group and approved full-source engine."""
+    import shutil
+
+    import nibabel as nib
+    import numpy as np
+    from PySide6.QtCore import Qt
+
+    from dmri_studio.core.execution import hash_file
+    from dmri_studio.core.scientific import ImportRequest, import_artifact
+
+    spec = importlib.util.spec_from_file_location(
+        "roi_fixture", Path(__file__).parents[1] / "core/test_roi_filtering.py"
+    )
+    fixture = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fixture)
+    source, declarations = fixture.roi_case.__wrapped__(tmp_path)
+    other = source / "other-tracks.tck"
+    shutil.copyfile(source / "tracks.tck", other)
+    labels = nib.load(source / "atlas.nii.gz")
+    for name, value in (("required", 3), ("excluded", 20)):
+        image = nib.Nifti1Image(
+            (np.asarray(labels.dataobj) == value).astype("u1"), labels.affine, labels.header
+        )
+        nib.save(image, source / f"{name}.nii.gz")
+    artifacts = [
+        import_artifact(
+            ImportRequest("tractogram", source / "tracks.tck", declarations=declarations)
+        ),
+        import_artifact(ImportRequest("tractogram", other, declarations=declarations)),
+        import_artifact(
+            ImportRequest("anatomy", source / "reference.nii.gz", declarations=declarations)
+        ),
+        import_artifact(
+            ImportRequest("roi", source / "required.nii.gz", declarations=declarations)
+        ),
+        import_artifact(
+            ImportRequest("roi", source / "excluded.nii.gz", declarations=declarations)
+        ),
+    ]
+    original = hash_file(source / "tracks.tck")
+    window.focus_tracking_plan()
+    page = window.scientific
+    page.artifacts = artifacts
+    page.tool_directory = Path("/usr/local/mrtrix3/bin")
+    page.refresh()
+    window.focus_scientific_viewer()
+    viewer = window.scientific_viewer
+    viewer.load_image(source / "reference.nii.gz")
+    qtbot.waitUntil(lambda: not viewer.tasks and viewer.reference is not None, timeout=15000)
+    viewer.load_tracts(source / "tracks.tck")
+    qtbot.waitUntil(lambda: not viewer.tasks and len(viewer.groups) == 1, timeout=15000)
+    viewer.load_tracts(other)
+    qtbot.waitUntil(lambda: not viewer.tasks and len(viewer.groups) == 2, timeout=15000)
+    viewer.tract_list.setCurrentRow(1)
+    viewer.density.setValue(2)
+    viewer.tabs.widget(1).ensureWidgetVisible(viewer.filter_tracks_action)
+    qtbot.mouseClick(viewer.filter_tracks_action, Qt.MouseButton.LeftButton)
+    panel = page.tracking
+    assert panel.operation.currentData() == "filter"
+    assert panel.tracts.currentData() == artifacts[1].id
+    assert "display subset" in panel.guided.viewer_source_notice.text()
+    window.focus_scientific_viewer()
+    viewer.tract_list.setCurrentRow(0)
+    viewer.tabs.widget(1).ensureWidgetVisible(viewer.filter_tracks_action)
+    qtbot.mouseClick(viewer.filter_tracks_action, Qt.MouseButton.LeftButton)
+    assert panel.tracts.currentData() == artifacts[0].id
+    assert panel.reference.currentData() == artifacts[2].id
+    guided = panel.guided
+    guided.roi_inventory.setCurrentRow(0)
+    guided.assign_roi("include")
+    guided.roi_inventory.setCurrentRow(1)
+    guided.assign_roi("exclude")
+    assert guided.roi_groups["include"].count() == 1
+    assert guided.roi_groups["exclude"].count() == 1
+    guided.output.setText(str(tmp_path / "filtered-attempt"))
+    guided.preview.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=15000)
+    assert panel.plan is not None, page.status.text()
+    command = next(c for c in panel.plan.to_dict()["commands"] if c["step"].endswith("filter"))
+    assert str(source / "tracks.tck") in command["argv"]
+    assert str(other) not in command["argv"]
+    assert "-include" in command["argv"] and "-exclude" in command["argv"]
+    assert not guided.run_button.isEnabled()
+    guided.approval.setChecked(True)
+    guided.run_button.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=30000)
+    assert panel.manifest["status"] == "validated_pending_qc", page.status.text()
+    assert hash_file(source / "tracks.tck") == original
+    product = panel.maps.currentData()
+    assert product["kind"] == "tractogram"
+    guided.open_button.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=15000)
+    qtbot.waitUntil(
+        lambda: any(g.path == Path(product["path"]) for g in viewer.groups) and not viewer.tasks,
+        timeout=20000,
+    )
+    assert viewer.current_group().path == Path(product["path"])
+    window.focus_tracking_plan()
+    assert guided.original_button.isEnabled()
+    guided.original_button.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=15000)
+    qtbot.waitUntil(
+        lambda: (
+            viewer.current_group() is not None
+            and viewer.current_group().path == source / "tracks.tck"
+            and not viewer.tasks
+        ),
+        timeout=20000,
+    )
+
+
+@pytest.mark.skipif(
+    os.environ.get("QT_QPA_PLATFORM") != "cocoa"
     or not Path("/usr/local/mrtrix3/bin/tckgen").is_file(),
     reason="Native Cocoa/VTK and an actual MRtrix installation are required",
 )

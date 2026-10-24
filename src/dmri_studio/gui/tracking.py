@@ -48,6 +48,9 @@ class TrackingExecutionPanel(QScrollArea):
     view_requested = Signal(dict)
     qc_requested = Signal(object)
     run_requested = Signal(object)
+    viewer_source_requested = Signal()
+    viewer_reference_requested = Signal()
+    viewer_regions_requested = Signal()
 
     def __init__(self, owner):
         super().__init__(owner)
@@ -57,6 +60,7 @@ class TrackingExecutionPanel(QScrollArea):
         self.owner = owner
         self.plan = None
         self.manifest = None
+        self.viewer_filter_context = None
         root = QVBoxLayout(content)
         from .selected_task import SelectedTask
 
@@ -295,6 +299,8 @@ class TrackingExecutionPanel(QScrollArea):
         from .tracking_guided import GuidedTracking
 
         self.guided = GuidedTracking(self)
+        for combo in (self.tracts, self.reference):
+            combo.currentIndexChanged.connect(self._update_viewer_filter_notice)
         for inventory in self.constraints.values():
             inventory.itemChanged.connect(lambda *_: self.guided.refresh_constraints())
             inventory.model().rowsMoved.connect(lambda *_: self.guided.refresh_constraints())
@@ -438,10 +444,141 @@ class TrackingExecutionPanel(QScrollArea):
             self.guided.refresh_inventory()
         self.update_actions()
 
+    def use_viewer_filter_source(
+        self,
+        source,
+        reference,
+        *,
+        total,
+        displayed,
+        edited,
+        expected_hash=None,
+        source_signature=None,
+    ):
+        """Select only unambiguous recorded inputs; planning rechecks their bytes."""
+        self.viewer_filter_context = dict(
+            source=Path(source).resolve(),
+            reference=Path(reference).resolve(),
+            total=total,
+            displayed=displayed,
+            edited=edited,
+            expected_hash=expected_hash,
+            source_signature=source_signature,
+        )
+        self.guided.select_task("filter")
+        self.refresh()
+        source_count = self._select_viewer_artifact(
+            "tractogram",
+            self.viewer_filter_context["source"],
+            self.tracts,
+            expected_hash=expected_hash,
+        )
+        reference_count = self._select_viewer_artifact(
+            "anatomy", self.viewer_filter_context["reference"], self.reference
+        )
+        self.guided.show_viewer_source(self.viewer_filter_context)
+        return source_count, reference_count
+
+    def _select_viewer_artifact(self, kind, path, combo, *, expected_hash=None):
+        matches = [
+            a
+            for a in self.owner.artifacts
+            if a.kind == kind
+            and Path(a.payload["path"]).resolve() == path
+            and (
+                expected_hash is None
+                or any(
+                    Path(s["path"]).resolve() == path and s["sha256"] == expected_hash
+                    for s in a.payload.get("sources", ())
+                )
+            )
+        ]
+        if len(matches) == 1:
+            index = combo.findData(matches[0].id)
+            if index >= 0:
+                combo.setCurrentIndex(index)
+        else:
+            combo.setCurrentIndex(0)
+        return len(matches)
+
+    def select_viewer_import(self, artifact):
+        context = self.viewer_filter_context
+        if context is None or artifact.kind not in {"tractogram", "anatomy"}:
+            return
+        path = Path(artifact.payload["path"]).resolve()
+        role = "source" if artifact.kind == "tractogram" else "reference"
+        if path != context[role]:
+            return
+        if role == "source" and context["source_signature"] is not None:
+            stat = path.stat()
+            if (stat.st_size, stat.st_mtime_ns) != tuple(context["source_signature"]):
+                self.owner.status.setText(
+                    "The Viewer track source changed after it was loaded. Reopen the tractogram "
+                    "in the Viewer before filtering."
+                )
+                return False
+        if (
+            role == "source"
+            and context["expected_hash"]
+            and not any(
+                Path(s["path"]).resolve() == path and s["sha256"] == context["expected_hash"]
+                for s in artifact.payload.get("sources", ())
+            )
+        ):
+            self.owner.status.setText(
+                "The Viewer source changed since it was opened. Reload its verified evidence before filtering."
+            )
+            return
+        combo = self.tracts if role == "source" else self.reference
+        index = combo.findData(artifact.id)
+        if index >= 0:
+            combo.setCurrentIndex(index)
+        self.guided.show_viewer_source(context)
+        return True
+
+    def _update_viewer_filter_notice(self, *_):
+        if self.viewer_filter_context is not None:
+            self.guided.show_viewer_source(self.viewer_filter_context)
+
     def choose_parent(self):
         path = QFileDialog.getExistingDirectory(self, "Tractography output parent")
         if path:
             self.output.setText(str(Path(path) / "tracking-attempt001"))
+
+    def convert_trk(self):
+        """Create an explicit full-source TCK derivative through the Qt-free verifier."""
+        if self.owner.thread is not None:
+            return
+        source = next((a for a in self.owner.artifacts if a.id == self.tracts.currentData()), None)
+        reference = next(
+            (a for a in self.owner.artifacts if a.id == self.reference.currentData()), None
+        )
+        if source is None or reference is None:
+            self.owner.status.setText(
+                "Import and select the TRK source and its documented NIfTI reference first."
+            )
+            return
+        if Path(source.payload["path"]).suffix.lower() != ".trk":
+            self.owner.status.setText(
+                "The selected tractogram is already TCK; no conversion is needed."
+            )
+            return
+        target, _ = QFileDialog.getSaveFileName(
+            self, "Save new full-source TCK derivative", "", "MRtrix tractogram (*.tck)"
+        )
+        if not target:
+            return
+        destination = Path(target)
+        if destination.suffix.lower() != ".tck":
+            destination = destination.with_suffix(".tck")
+        from dmri_studio.core.tract_filter_conversion import convert_verified_trk
+
+        self.owner.start(
+            "tracking-convert-trk",
+            lambda cancel, progress: convert_verified_trk(
+                source, reference, destination, cancelled=cancel, progress=progress
+            ),
+        )
 
     def _legacy_filter_count_changed(self, value):
         """Retain old form callers without imposing a silent filter cap."""
@@ -567,6 +704,23 @@ class TrackingExecutionPanel(QScrollArea):
             if not self.output.text().strip():
                 raise ValueError("Choose a new derivative directory")
             task = self.selected_task()
+            context = self.viewer_filter_context
+            if context is not None and task.algorithm == "tckedit":
+                selected = next(
+                    (a for a in self.owner.artifacts if a.id == task.inputs.get("tracts")), None
+                )
+                if (
+                    selected is not None
+                    and Path(selected.payload["path"]).resolve() == context["source"]
+                ):
+                    signature = context["source_signature"]
+                    stat = context["source"].stat()
+                    if signature is not None and (stat.st_size, stat.st_mtime_ns) != tuple(
+                        signature
+                    ):
+                        raise ValueError(
+                            "The Viewer track source changed after loading. Reopen it before planning."
+                        )
             self.owner.tasks = [t for t in self.owner.tasks if t.id != task.id] + [task]
             art = tuple(self.owner.artifacts)
             output = Path(self.output.text())
@@ -834,6 +988,56 @@ class TrackingExecutionPanel(QScrollArea):
             return product
 
         self.owner.start("tracking-view", verify)
+
+    def open_original(self):
+        """Reopen the exact approved filter source against its verified output grid."""
+        record = self.manifest
+        if (
+            not record
+            or record.get("status") != "validated_pending_qc"
+            or not record.get("inputs_unchanged")
+        ):
+            return
+        plan = record["plan"]
+        row = next(
+            (item for item in plan.get("bindings", ()) if item.get("algorithm") == "tckedit"),
+            None,
+        )
+        if row is None:
+            return
+        source = row["source"]
+        digest = next(
+            (
+                item["sha256"]
+                for item in source["sources"]
+                if Path(item["path"]).resolve() == Path(source["path"]).resolve()
+            ),
+            None,
+        )
+        reference_name = row["outputs"]["reference"]
+        reference = Path(plan["output_directory"]) / reference_name
+        reference_digest = record["outputs"][reference_name]["sha256"]
+        if digest is None:
+            self.owner.status.setText("Original source hash is missing from this run record.")
+            return
+        product = dict(
+            kind="tractogram",
+            path=source["path"],
+            sha256=digest,
+            reference=str(reference),
+            reference_sha256=reference_digest,
+            subject_id=source["declarations"].get("subject_id"),
+            space_id=source["declarations"].get("space_id"),
+        )
+
+        def verify(cancel, progress):
+            if hash_file(Path(product["path"]), cancel) != digest:
+                raise ValueError("Original tractogram changed; reopen historical run evidence")
+            if hash_file(reference, cancel) != reference_digest:
+                raise ValueError("Verified reference changed; reopen historical run evidence")
+            return product
+
+        self.owner.start("tracking-original-view", verify)
 
     def open_qc(self):
         if self.manifest:

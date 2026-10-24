@@ -449,6 +449,9 @@ class MainWindow(QMainWindow):
             page.connectome.run_requested.connect(self.open_saved_run)
             page.tracking.qc_requested.connect(self.open_generated_qc)
             page.tracking.run_requested.connect(self.open_saved_run)
+            page.tracking.viewer_source_requested.connect(self.import_viewer_filter_source)
+            page.tracking.viewer_reference_requested.connect(self.import_viewer_filter_reference)
+            page.tracking.viewer_regions_requested.connect(self.focus_scientific_viewer)
             page.roi_import_requested.connect(self.import_tracking_rois)
             page.roi_imported.connect(self._tracking_rois_imported)
             page.roi_filter_requested.connect(self.open_tracking_atlas_filter)
@@ -1079,6 +1082,47 @@ class MainWindow(QMainWindow):
         except ValueError as exc:
             self.scientific.status.setText(str(exc))
 
+    def filter_viewer_tracks(self, context):
+        """Transfer the selected full source into the existing approved filter form."""
+        viewer = self.scientific_viewer
+        if viewer is None or viewer.reference is None or viewer.current_group() is None:
+            return
+        if (
+            str(viewer.current_group().path) != context["source"]
+            or str(viewer.reference.path) != context["reference"]
+        ):
+            viewer.status.setText("Viewer source changed; select the intended tract group again.")
+            return
+        self.focus_tracking_plan()
+        page = self.scientific
+        source_count, _reference_count = page.tracking.use_viewer_filter_source(**context)
+        if source_count == 0:
+            page.status.setText(
+                "Viewer tracks are visible but need scientific import and identity review before filtering. "
+                "Their exact source path is already selected."
+            )
+            page.browse_viewer_input("tractogram", Path(context["source"]))
+        elif source_count > 1:
+            page.status.setText(
+                "Multiple scientific records describe this Viewer source. Choose the correct "
+                "subject and space association in the filter selector before planning."
+            )
+        else:
+            page.status.setText(
+                "The selected Viewer tract group is available in Filter Existing Streamlines. "
+                "The plan will reverify its full source and compatible ROIs."
+            )
+
+    def import_viewer_filter_source(self):
+        context = self.scientific.tracking.viewer_filter_context
+        if context is not None:
+            self.scientific.browse_viewer_input("tractogram", context["source"])
+
+    def import_viewer_filter_reference(self):
+        context = self.scientific.tracking.viewer_filter_context
+        if context is not None:
+            self.scientific.browse_viewer_input("anatomy", context["reference"])
+
     def open_scientific_selection(self):
         """Opening a saved selection rechecks inputs and never restarts a run."""
         self.focus_models()
@@ -1216,7 +1260,15 @@ class MainWindow(QMainWindow):
             viewer = self.scientific_viewer
             if viewer is not None and viewer.reference is not None:
                 if artifact.kind == "tractogram":
-                    viewer.safe(lambda: viewer.load_tracts(path))
+                    digest = next(
+                        (
+                            source["sha256"]
+                            for source in artifact.payload.get("sources", ())
+                            if Path(source["path"]).resolve() == path.resolve()
+                        ),
+                        None,
+                    )
+                    viewer.safe(lambda: viewer.load_tracts(path, expected_hash=digest))
                 elif artifact.kind == "roi":
                     viewer.safe(lambda: viewer.load_roi(path))
                 else:
@@ -1231,7 +1283,18 @@ class MainWindow(QMainWindow):
         else:
             self.focus_viewer()
             if getattr(self, "scientific_viewer", None) is not None:
-                self.scientific_viewer.safe(lambda: self.scientific_viewer.load_image(path))
+                digest = next(
+                    (
+                        source["sha256"]
+                        for source in artifact.payload.get("sources", ())
+                        if Path(source["path"]).resolve() == path.resolve()
+                    ),
+                    None,
+                )
+                hashes = {str(path): digest} if digest else None
+                self.scientific_viewer.safe(
+                    lambda: self.scientific_viewer.load_image(path, expected_hashes=hashes)
+                )
 
     def focus_preferences(self):
         """Open display/privacy preferences, never processing defaults."""
@@ -1277,6 +1340,7 @@ class MainWindow(QMainWindow):
             self.scientific_viewer.tabs.currentChanged.connect(self.update_edit_actions)
             self.scientific_viewer.tract_list.currentRowChanged.connect(self.update_edit_actions)
             self.scientific_viewer.workspace_mode_changed.connect(self.scene_mode_changed)
+            self.scientific_viewer.filter_tracks_requested.connect(self.filter_viewer_tracks)
             self.scientific_viewer.inspector_visibility_changed.connect(
                 self.inspector_action.setChecked
             )

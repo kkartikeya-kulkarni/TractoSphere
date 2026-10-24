@@ -82,6 +82,7 @@ class ScientificViewer(RegistrationView, FODTools, AtlasTools, ViewerTools, QWid
     editing_changed = Signal()
     workspace_mode_changed = Signal(str)
     inspector_visibility_changed = Signal(bool)
+    filter_tracks_requested = Signal(object)
 
     def __init__(self, theme):
         super().__init__()
@@ -626,6 +627,11 @@ class ScientificViewer(RegistrationView, FODTools, AtlasTools, ViewerTools, QWid
         )
         layout.addWidget(self.action("Select all loaded in group", lambda: self.select_all(True)))
         layout.addWidget(self.action("Clear selection", lambda: self.select_all(False)))
+        self.filter_tracks_action = self.action("Filter These Tracks…", self.request_filter_tracks)
+        self.filter_tracks_action.setAccessibleName(
+            "Filter the selected Viewer tract group using its complete source file"
+        )
+        layout.addWidget(self.filter_tracks_action)
         for name, operation in [
             ("Hide selected", "hide"),
             ("Delete selected", "delete"),
@@ -1346,6 +1352,7 @@ class ScientificViewer(RegistrationView, FODTools, AtlasTools, ViewerTools, QWid
         def ready(group):
             if ref is not self.reference:
                 return
+            group.expected_hash = expected_hash
             if state:
                 group.hidden = set(state.get("hidden", []))
                 group.selected = set(state.get("selected", []))
@@ -1477,6 +1484,38 @@ class ScientificViewer(RegistrationView, FODTools, AtlasTools, ViewerTools, QWid
     def current_group(self):
         i = self.tract_list.currentRow()
         return self.groups[i] if i >= 0 else None
+
+    def request_filter_tracks(self):
+        """Handoff the selected group's full source, never its rendered subset."""
+        group = self.current_group()
+        if group is None or self.reference is None:
+            self.status.setText("Select a loaded tract group and its reference image first.")
+            return
+        try:
+            group.streamlines.verify_source()
+        except (OSError, ValueError) as exc:
+            self.status.setText(f"Track source changed after loading; reopen it first. {exc}")
+            return
+        if not self.reference.source_fingerprint.unchanged(self.reference.path):
+            self.status.setText(
+                "Reference image changed after loading; reopen it before filtering."
+            )
+            return
+        displayed = min(
+            self.density.value(),
+            max(0, len(group.streamlines) - len(group.hidden | group.deleted)),
+        )
+        self.filter_tracks_requested.emit(
+            dict(
+                source=str(group.path),
+                reference=str(self.reference.path),
+                total=group.total,
+                displayed=displayed,
+                edited=bool(group.selected or group.hidden or group.deleted or group.cuts),
+                expected_hash=getattr(group, "expected_hash", None),
+                source_signature=group.streamlines.signature,
+            )
+        )
 
     def refresh_tracts(self, *_):
         started = time.monotonic()

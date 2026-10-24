@@ -75,6 +75,7 @@ class ImportDialog(QDialog):
         *,
         initial_kind: str | None = None,
         initial_artifact: Artifact | None = None,
+        viewer_path: Path | None = None,
     ) -> None:
         """Build native controls over the shared scientific contracts; start no processing."""
         super().__init__(parent)
@@ -317,6 +318,17 @@ class ImportDialog(QDialog):
         root.addWidget(actions)
         if initial_artifact is not None:
             self._populate_imported_input(initial_artifact, actions)
+        elif viewer_path is not None:
+            self.paths["path"].setText(str(Path(viewer_path).resolve()))
+            self.paths["path"].setReadOnly(True)
+            self.kind.setEnabled(False)
+            for action in self.findChildren(QPushButton):
+                if action.accessibleName() == "Browse Input file":
+                    action.setEnabled(False)
+            self.purpose.setText(
+                "This exact file is already open in the Viewer. Review its scientific identity "
+                "before filtering; display overlap does not establish anatomical correspondence."
+            )
 
     def _populate_imported_input(self, artifact: Artifact, actions: QDialogButtonBox) -> None:
         """Review declarations on one original source without choosing its file again."""
@@ -1064,6 +1076,27 @@ class ScientificPlanningPage(QWidget):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.import_request(dialog.request())
 
+    def browse_viewer_input(self, kind: str, path: Path) -> None:
+        """Review a loaded source without asking for its file a second time."""
+        matches = [
+            item
+            for item in self.artifacts
+            if item.kind == kind and Path(item.payload["path"]).resolve() == Path(path).resolve()
+        ]
+        if len(matches) == 1:
+            self.review_input_declarations(matches[0].id)
+            return
+        if len(matches) > 1:
+            self.status.setText(
+                "Several scientific records refer to this Viewer file. Choose the intended "
+                "record in the imported-input inventory before reviewing its declarations."
+            )
+            self.tabs.setCurrentWidget(self.input_page)
+            return
+        dialog = ImportDialog(self, initial_kind=kind, viewer_path=path)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.import_request(dialog.request())
+
     def review_selected_input(self) -> None:
         item = self.inputs.currentItem()
         if item is not None:
@@ -1428,9 +1461,23 @@ class ScientificPlanningPage(QWidget):
                 self.connectome.failed(str(exc))
                 self.operation_state.update(self.operation_token, State.FAILED, str(exc))
                 return
+        elif self.pending == "tracking-convert-trk":
+            if all(a.id != result.id for a in self.artifacts):
+                self.artifacts.append(result)
+            self.refresh()
+            selector = self.tracking.tracts
+            selector.setCurrentIndex(selector.findData(result.id))
+            self.tracking.guided.select_task("filter")
+            if self.tracking.viewer_filter_context is not None:
+                self.tracking.guided.show_viewer_source(self.tracking.viewer_filter_context)
+            self.status.setText(
+                "Full-source TRK converted to a new, coordinate-verified TCK. "
+                "The original is unchanged; spatial association and filtering still require "
+                "plan review and approval."
+            )
         elif self.pending in {"tracking-preview", "tracking-run"}:
             self.tracking.result(self.pending, result)
-        elif self.pending == "tracking-view":
+        elif self.pending in {"tracking-view", "tracking-original-view"}:
             self.status.setText("Result hash verified; opening tractography product.")
             self.product_handoff = result
         elif self.pending == "csd-view":
@@ -1443,12 +1490,14 @@ class ScientificPlanningPage(QWidget):
             if all(a.id != result.id for a in self.artifacts):
                 self.artifacts.append(result)
             self.refresh()
+            viewer_selection = self.tracking.select_viewer_import(result)
             selector = self.registration.guided.imported_anatomy
             if selector.findData(result.id) >= 0:
                 selector.setCurrentIndex(selector.findData(result.id))
-            self.status.setText(
-                "Input inspected and source hashes recorded. Scientific review remains required."
-            )
+            if viewer_selection is not False:
+                self.status.setText(
+                    "Input inspected and source hashes recorded. Scientific review remains required."
+                )
         elif self.pending == "revise-input":
             old_id = self.pending_revision_id
             self.pending_revision_id = None
@@ -1460,12 +1509,14 @@ class ScientificPlanningPage(QWidget):
                 return
             self.artifacts[index] = result
             self.refresh()
+            viewer_selection = self.tracking.select_viewer_import(result)
             selector = self.registration.guided.imported_anatomy
             if selector.findData(result.id) >= 0:
                 selector.setCurrentIndex(selector.findData(result.id))
-            self.status.setText(
-                "Input declarations updated after source reinspection. Workflow eligibility and exact plan validation remain separate."
-            )
+            if viewer_selection is not False:
+                self.status.setText(
+                    "Input declarations updated after source reinspection. Workflow eligibility and exact plan validation remain separate."
+                )
         elif self.pending == "import-tracking-rois":
             imported = result["artifacts"] if isinstance(result, dict) else result
             metadata = result.get("metadata", {}) if isinstance(result, dict) else {}
@@ -1547,7 +1598,7 @@ class ScientificPlanningPage(QWidget):
             thread.deleteLater()
         product, self.product_handoff = self.product_handoff, None
         if product is not None:
-            if self.pending == "tracking-view":
+            if self.pending in {"tracking-view", "tracking-original-view"}:
                 self.tracking.view_requested.emit(product)
             elif self.pending == "registration-view":
                 self.registration.view_requested.emit(product)

@@ -18,9 +18,13 @@ class ImageVolume:
     path: Path
     image: object = field(init=False)
     affine_source: str = field(init=False)
+    source_fingerprint: object = field(init=False, repr=False)
 
     def __post_init__(self):
         self.path = Path(self.path).resolve()
+        from .dataset import SourceFingerprint
+
+        self.source_fingerprint = SourceFingerprint.capture(self.path)
         self.image = nib.load(self.path, mmap=True)
         if len(self.image.shape) not in (3, 4):
             raise ValueError("Viewer supports scalar 3D/4D NIfTI images")
@@ -105,7 +109,7 @@ class TractGroup:
     weight_record: object = field(default=None, repr=False)
 
     @classmethod
-    def load(cls, path, limit=None):
+    def load(cls, path, limit=None, *, cancelled=lambda: False):
         """Reservoir sample deterministically; full source is never materialized."""
         path = Path(path).resolve()
         if path.suffix.lower() not in (".tck", ".trk"):
@@ -113,7 +117,7 @@ class TractGroup:
         if limit is None:
             from .tract_index import IndexedStreamlines
 
-            indexed = IndexedStreamlines(path)
+            indexed = IndexedStreamlines(path, cancelled=cancelled)
             group = cls(path, indexed, range(len(indexed)), len(indexed))
             group._lengths = indexed.lengths
             return group
@@ -246,7 +250,7 @@ class TractGroup:
             ids += np.searchsorted(removed_ranks, ranks, side="right")
         return ids.tolist()
 
-    def export(self, path, reference):
+    def export(self, path, reference, *, cancelled=lambda: False):
         """Export retained loaded streamlines only, in RAS+ mm. Source untouched."""
         path = Path(path)
         if path.exists():
@@ -257,8 +261,11 @@ class TractGroup:
             self.streamlines.verify_source()
         from nibabel.streamlines.tractogram import LazyTractogram, TractogramItem
 
+        from .execution import check_cancel
+
         def items():
             for i in range(len(self.streamlines)):
+                check_cancel(cancelled)
                 if i in self.deleted:
                     continue
                 original = self.streamlines.item(i) if hasattr(self.streamlines, "item") else None
