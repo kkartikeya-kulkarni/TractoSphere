@@ -47,10 +47,10 @@ class DTIExecutionPanel(QScrollArea):
         self.setWidget(content)
         root = QVBoxLayout(content)
         root.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
-        root.addWidget(label("Fit a diffusion tensor model", "section"))
+        root.addWidget(label("Diffusion tensor processing", "section"))
         root.addWidget(
             label(
-                "Select a compatible preprocessed DWI and its measured shells. Fitting estimates a tensor; FA, MD, AD and RD maps are derived measurements, not diagnoses. No preprocessing is repeated.",
+                "Fit a tensor from compatible DWI, or calculate maps from an existing six-component MRtrix tensor. FA, MD, AD and RD are derived measurements, not diagnoses. No preprocessing is repeated.",
                 "caption",
             )
         )
@@ -58,6 +58,12 @@ class DTIExecutionPanel(QScrollArea):
         form.setVerticalSpacing(8)
         form.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        self.form = form
+        self.task_mode = QComboBox()
+        self.task_mode.setAccessibleName("DTI task")
+        self.task_mode.addItem("Fit a tensor from diffusion MRI", "fit")
+        self.task_mode.addItem("Calculate maps from an existing tensor", "metrics")
+        form.addRow("What would you like to do?", self.task_mode)
         self.source = QComboBox()
         self.source.setAccessibleName("DTI DWI input")
         self.source.setPlaceholderText("No imported DWI — use Import DWI")
@@ -95,6 +101,19 @@ class DTIExecutionPanel(QScrollArea):
         self.import_dwi.setAccessibleName("Import DWI for tensor fitting")
         source_layout.addWidget(self.import_dwi)
         form.addRow("DWI", source_row)
+        self.source_row = source_row
+        self.tensor = QComboBox()
+        self.tensor.setAccessibleName("Existing DTI tensor input")
+        self.tensor.currentIndexChanged.connect(self.tensor_info)
+        tensor_row = QWidget()
+        tensor_layout = QHBoxLayout(tensor_row)
+        tensor_layout.setContentsMargins(0, 0, 0, 0)
+        tensor_layout.addWidget(self.tensor, 1)
+        self.import_tensor = button("Import tensor…", lambda: self.owner.browse_import("tensor"))
+        self.import_tensor.setAccessibleName("Import existing six-component tensor")
+        tensor_layout.addWidget(self.import_tensor)
+        form.addRow("Existing tensor", tensor_row)
+        self.tensor_row = tensor_row
         for title, field in [
             ("Shells (s/mm²)", self.shells),
             ("Fit", self.fit),
@@ -106,6 +125,7 @@ class DTIExecutionPanel(QScrollArea):
         root.addWidget(self.acquisition)
         advanced = QWidget()
         advanced_form = QFormLayout(advanced)
+        self.advanced_form = advanced_form
         advanced_form.addRow("IWLS reweightings", self.iterations)
         mask_row = QWidget()
         mask_line = QHBoxLayout(mask_row)
@@ -118,12 +138,11 @@ class DTIExecutionPanel(QScrollArea):
         advanced_form.addRow("Threads", self.threads)
         self.advanced = Disclosure("Advanced tensor fitting settings", advanced)
         root.addWidget(self.advanced)
-        root.addWidget(
-            label(
-                "Guided recommendation: IWLS with two reweightings, following MRtrix 3.0.5. Select shells explicitly after acquisition review. Advanced task parameters remain in Algorithms / Configure task.",
-                "caption",
-            )
+        self.guided_note = label(
+            "Guided recommendation: IWLS with two reweightings, following MRtrix 3.0.5. Select shells explicitly after acquisition review. Advanced task parameters remain in Algorithms / Configure task.",
+            "caption",
         )
+        root.addWidget(self.guided_note)
         actions = QHBoxLayout()
         self.guided = button("Configure tensor and metric tasks", self.add_guided)
         self.preview = button("Validate and review commands", self.prepare)
@@ -160,11 +179,31 @@ class DTIExecutionPanel(QScrollArea):
         root.addLayout(results)
         self.output.textChanged.connect(self.invalidate)
         self.threads.valueChanged.connect(self.invalidate)
-        for combo in (self.source, self.mask, self.fit):
+        for combo in (self.task_mode, self.source, self.tensor, self.mask, self.fit):
             combo.currentIndexChanged.connect(self.invalidate)
+        self.task_mode.currentIndexChanged.connect(self.show_task_mode)
         self.shells.textChanged.connect(self.invalidate)
         self.iterations.valueChanged.connect(self.invalidate)
         self.refresh()
+
+    def show_task_mode(self, *_):
+        """Expose only the input and parameters used by the selected operation."""
+        fitting = self.task_mode.currentData() == "fit"
+        for widget in (self.source_row, self.shells, self.fit):
+            self.form.setRowVisible(widget, fitting)
+        self.form.setRowVisible(self.tensor_row, not fitting)
+        self.advanced_form.setRowVisible(self.iterations, fitting)
+        self.guided_note.setVisible(fitting)
+        if fitting:
+            self.source_info()
+        else:
+            self.tensor_info()
+        self.guided.setText(
+            "Configure tensor and metric tasks"
+            if fitting
+            else "Configure metrics from existing tensor"
+        )
+        self.update_actions()
 
     def invalidate(self, *_):
         """Any configuration change requires a new command preview and approval."""
@@ -176,21 +215,32 @@ class DTIExecutionPanel(QScrollArea):
         """Inventory changes invalidate approval but never change source scientific files."""
         self.invalidate()
         selected_source = self.source.currentData()
+        selected_tensor = self.tensor.currentData()
+        selected_mask = self.mask.currentData()
         self.source.clear()
+        self.tensor.clear()
+        self.tensor.addItem("No imported tensor — use Import tensor", None)
         self.mask.clear()
         self.mask.addItem("No mask — all voxels must be valid", None)
         for artifact in self.owner.artifacts:
             if artifact.kind == "dwi":
                 self.source.addItem(Path(artifact.payload["path"]).name, artifact.id)
+            elif artifact.kind == "tensor":
+                self.tensor.addItem(Path(artifact.payload["path"]).name, artifact.id)
             elif artifact.kind == "mask":
                 self.mask.addItem(Path(artifact.payload["path"]).name, artifact.id)
         if self.source.count():
             restored = self.source.findData(selected_source) if selected_source else -1
             self.source.setCurrentIndex(restored if restored >= 0 else 0)
+        self.tensor.setCurrentIndex(max(0, self.tensor.findData(selected_tensor)))
+        self.mask.setCurrentIndex(max(0, self.mask.findData(selected_mask)))
+        self.show_task_mode()
         self.update_actions()
 
     def source_info(self, *_):
         """Show actual imported shell/frame evidence; never infer gradient anatomy."""
+        if self.task_mode.currentData() == "metrics":
+            return
         current = self.source.currentData()
         artifact = next((a for a in self.owner.artifacts if a.id == current), None)
         if artifact is None:
@@ -202,6 +252,38 @@ class DTIExecutionPanel(QScrollArea):
             f"Available b-value groups (s/mm²): {groups}. Frame: {g['convention']}. Corrected-gradient correspondence and external scientific provenance require review."
         )
 
+    def tensor_info(self, *_):
+        """Keep imported tensors visible while explaining metric eligibility."""
+        if self.task_mode.currentData() != "metrics":
+            return
+        artifact = next(
+            (a for a in self.owner.artifacts if a.id == self.tensor.currentData()), None
+        )
+        if artifact is None:
+            self.acquisition.setText(
+                "Import a six-component tensor. Declare its component order, coordinate frame and mm²/s units from source documentation."
+            )
+            return
+        declarations = artifact.payload["declarations"]
+        if self._metric_tensor_eligible(artifact):
+            self.acquisition.setText(
+                "Tensor format is eligible for metric planning. Confirm its source identity and scientific processing history during review."
+            )
+        else:
+            self.acquisition.setText(
+                "Imported tensor is not eligible for MRtrix tensor metrics: this operation requires MRtrix D11/D22/D33/D12/D13/D23 order, world-RAS frame and mm²/s units. Review its declarations against source documentation, or use a separately validated conversion; no conversion is inferred. "
+                f"Current declarations: {declarations.get('tensor_layout', 'unknown')}, {declarations.get('tensor_frame', 'unknown')}, {declarations.get('tensor_units', 'unknown')}."
+            )
+
+    @staticmethod
+    def _metric_tensor_eligible(artifact):
+        declarations = artifact.payload["declarations"]
+        return (
+            declarations.get("tensor_layout") == "mrtrix_D11_D22_D33_D12_D13_D23"
+            and declarations.get("tensor_frame") == "world_ras"
+            and declarations.get("tensor_units") == "mm2/s"
+        )
+
     def choose_parent(self):
         """Select a parent; users choose a new immutable attempt name in the field."""
         path = QFileDialog.getExistingDirectory(self, "DTI output parent")
@@ -211,6 +293,9 @@ class DTIExecutionPanel(QScrollArea):
     def add_guided(self):
         """Suggest documented IWLS without implicitly choosing acquisition shells."""
         try:
+            if self.task_mode.currentData() == "metrics":
+                self.add_existing_tensor_metrics()
+                return
             source = self.source.currentData()
             if source is None:
                 raise ValueError("Import DWI with matching gradients first")
@@ -254,6 +339,40 @@ class DTIExecutionPanel(QScrollArea):
             )
         except (ValueError, TypeError) as exc:
             self.owner.status.setText(str(exc))
+
+    def add_existing_tensor_metrics(self):
+        """Use the shared tensor2metric contract, without refitting diffusion data."""
+        tensor = self.tensor.currentData()
+        if tensor is None:
+            raise ValueError("Import an existing six-component tensor first")
+        artifact = next((a for a in self.owner.artifacts if a.id == tensor), None)
+        if artifact is None or not self._metric_tensor_eligible(artifact):
+            raise ValueError(
+                "This tensor's declared component order, frame or units are incompatible with MRtrix tensor metrics. Review declarations or use a validated conversion."
+            )
+        if any(
+            task.algorithm == "tensor2metric" and task.inputs.get("tensor") == tensor
+            for task in self.owner.tasks
+        ):
+            raise ValueError("Metrics for this tensor are already configured in Workflow review")
+        number = 1
+        while any(task.id == f"metrics{number}" for task in self.owner.tasks):
+            number += 1
+        inputs = {"tensor": tensor}
+        if self.mask.currentData():
+            inputs["mask"] = self.mask.currentData()
+        self.owner.tasks.append(
+            Task(
+                f"metrics{number}",
+                "tensor2metric",
+                inputs,
+                {"metrics": ["FA", "MD", "AD", "RD", "V1"]},
+            )
+        )
+        self.owner.refresh()
+        self.owner.status.setText(
+            "Tensor metric task added. Confirm component order, frame, units and source history in the exact plan before approval."
+        )
 
     def prepare(self):
         """Compile full input/binary checks off-thread; do not start MRI commands."""
@@ -369,12 +488,17 @@ class DTIExecutionPanel(QScrollArea):
         idle = self.owner.thread is None
         for control in (
             self.source,
+            self.tensor,
+            self.task_mode,
             self.shells,
             self.fit,
             self.mask,
             self.output,
             self.threads,
             self.guided,
+            self.import_dwi,
+            self.import_tensor,
+            self.import_mask,
             self.preview,
         ):
             control.setEnabled(idle)

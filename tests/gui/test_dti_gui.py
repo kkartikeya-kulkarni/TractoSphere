@@ -8,8 +8,87 @@ import pytest
 
 from dmri_studio.core.execution import hash_file
 from dmri_studio.core.scientific import ImportRequest
+from dmri_studio.core.scientific.planning import build_workflow
 
 BIN = Path("/usr/local/mrtrix3/bin")
+
+
+def test_imported_tensor_can_configure_metrics_without_dwi(window, qtbot, tmp_path):
+    """An existing valid tensor reaches the guided DTI route and shared planner."""
+    path = tmp_path / "existing-tensor.nii.gz"
+    data = np.zeros((5, 6, 7, 6), dtype=np.float32)
+    data[..., :3] = [0.0015, 0.0005, 0.0003]
+    image = nib.Nifti1Image(data, np.diag([2, 2, 2, 1]))
+    image.header.set_xyzt_units("mm")
+    nib.save(image, path)
+    original = hash_file(path)
+    window.focus_models()
+    page = window.scientific
+    panel = page.dti
+    page.tabs.setCurrentWidget(panel)
+    assert panel.tensor.count() == 1
+    panel.task_mode.setCurrentIndex(panel.task_mode.findData("metrics"))
+    assert panel.tensor_row.isVisibleTo(panel) and not panel.source_row.isVisibleTo(panel)
+    assert not panel.iterations.isVisibleTo(panel) and not panel.guided_note.isVisibleTo(panel)
+    panel.guided.click()
+    assert "Import an existing" in page.status.text()
+    page.import_request(
+        ImportRequest(
+            "tensor",
+            path,
+            declarations={
+                "tensor_layout": "mrtrix_D11_D22_D33_D12_D13_D23",
+                "tensor_frame": "world_ras",
+                "tensor_units": "mm2/s",
+            },
+        )
+    )
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    artifact = page.artifacts[0]
+    assert panel.tensor.findData(artifact.id) > 0
+    assert panel.tensor.currentData() is None
+    panel.tensor.setCurrentIndex(panel.tensor.findData(artifact.id))
+    panel.guided.click()
+    assert len(page.tasks) == 1
+    assert page.tasks[0].algorithm == "tensor2metric"
+    assert page.tasks[0].inputs["tensor"] == artifact.id
+    proposal = build_workflow(tuple(page.artifacts), tuple(page.tasks), verify_sources=False)
+    assert not [i for i in proposal.to_dict()["issues"] if i["severity"] == "error"]
+    mask_path = tmp_path / "optional-mask.nii.gz"
+    mask_image = nib.Nifti1Image(np.ones((5, 6, 7), dtype=np.uint8), image.affine)
+    mask_image.header.set_xyzt_units("mm")
+    nib.save(mask_image, mask_path)
+    page.import_request(ImportRequest("mask", mask_path))
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    mask_id = page.artifacts[-1].id
+    assert page.artifacts[-1].payload["path"] == str(mask_path), page.status.text()
+    assert panel.mask.findData(mask_id) > 0
+    panel.mask.setCurrentIndex(panel.mask.findData(mask_id))
+    assert panel.mask.currentData() == mask_id
+    incompatible = tmp_path / "fsl-order-tensor.nii.gz"
+    nib.save(image, incompatible)
+    page.import_request(
+        ImportRequest(
+            "tensor",
+            incompatible,
+            declarations={
+                "tensor_layout": "fsl_Dxx_Dxy_Dxz_Dyy_Dyz_Dzz",
+                "tensor_frame": "fsl_image_axes",
+                "tensor_units": "mm2/s",
+            },
+        )
+    )
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    blocked = page.artifacts[-1]
+    assert panel.mask.currentData() == mask_id
+    assert panel.tensor.findData(blocked.id) > 0
+    panel.tensor.setCurrentIndex(panel.tensor.findData(blocked.id))
+    assert "not eligible" in panel.acquisition.text()
+    panel.guided.click()
+    assert "validated conversion" in page.status.text()
+    assert len(page.tasks) == 1
+    assert not panel.run_button.isEnabled()
+    assert hash_file(path) == original
 
 
 @pytest.mark.skipif(
