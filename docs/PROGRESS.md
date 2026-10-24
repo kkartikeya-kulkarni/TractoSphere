@@ -1,5 +1,17 @@
 # Outstanding Scientific Verification and Release Blockers
 
+## 2026-10-24 — bounded real-data import and selection audit
+
+The [real-data functional audit](REAL_DATA_FUNCTIONAL_AUDIT_2026-10-24.md)
+records read-only TractoSphere imports from bounded local research-data roots,
+offscreen propagation across scientific workspaces, a real DWI Project →
+Preprocessing → DTI/CSD path, non-BIDS custom discovery, and verified historical
+Results/QC reopening. Local repairs add declaration review for imported draft
+inputs, supported FA/MD/mean-b0 import choices, accurate Registration spatial
+eligibility, and a T1-only 5TT generation source selector. Native Cocoa
+interaction and broader scientific plan acceptance remain unverified at this
+checkpoint. The permanent 38-task backlog and Phase 7 EDDY work are unchanged.
+
 ## 2026-10-24 — Registration anatomical declaration review
 
 The [post-audit handoff](USABILITY_AUDIT_FIXES_2026-10-24.md#registration-anatomical-import-eligibility-follow-up) records a fix for imported T1 anatomy that was hidden from the EPI-to-T1 Reference selector. Imported images are now visible apart from role eligibility, with specific missing-declaration reasons and a path-preserving review/reinspection action. HCP ACPC-aligned subject T1 structural space is explained without filename inference or automatic MNI/raw classification. The synthetic Registration import-to-selection flow passed **2 focused offscreen tests**; the selected Registration/import/core run passed **57 tests, 10 deselected**. Native Cocoa picker/layout checks and real HCP association/registration remain open. Scientific planning, approval, source hashing and the 38-task validation backlog are unchanged.
