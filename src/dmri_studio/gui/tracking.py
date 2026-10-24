@@ -208,6 +208,12 @@ class TrackingExecutionPanel(QScrollArea):
         self.skip = QSpinBox()
         self.skip.setRange(0, 100000000)
         self.skip.setValue(0)
+        self.filter_limit = QCheckBox("Limit the number of retained streamlines")
+        self.filter_count = QSpinBox()
+        self.filter_count.setRange(1, 1000000)
+        self.filter_count.setValue(1000)
+        self.filter_minimum = number(0, 1000000, 0, 1)
+        self.filter_maximum = number(0.01, 1000000, 1000000, 1)
         for title, w in [
             ("FOD amplitude power", self.power),
             ("Initial seed direction", self.seed_direction),
@@ -225,6 +231,9 @@ class TrackingExecutionPanel(QScrollArea):
             ("iFOD2 arc samples", self.samples),
             ("iFOD sampling trials", self.trials),
             ("Skip selected input tracks", self.skip),
+            ("Filter: maximum retained tracks", self.filter_count),
+            ("Filter: minimum length (mm)", self.filter_minimum),
+            ("Filter: maximum length (mm)", self.filter_maximum),
             ("Threads", self.threads),
         ]:
             a.addRow(title, w)
@@ -235,6 +244,7 @@ class TrackingExecutionPanel(QScrollArea):
             self.directional,
             self.unidirectional,
             self.stop_after_includes,
+            self.filter_limit,
         ):
             a.addRow(w)
         setup.addWidget(Disclosure("Advanced tracking and filtering", advanced, expanded=False))
@@ -336,8 +346,15 @@ class TrackingExecutionPanel(QScrollArea):
             self.samples,
             self.trials,
             self.skip,
+            self.filter_count,
+            self.filter_minimum,
+            self.filter_maximum,
         ):
             w.valueChanged.connect(self.invalidate)
+        self.filter_limit.toggled.connect(self.invalidate)
+        self.count.valueChanged.connect(self._legacy_filter_count_changed)
+        self.minimum.valueChanged.connect(self._legacy_filter_minimum_changed)
+        self.maximum.valueChanged.connect(self._legacy_filter_maximum_changed)
         for w in (self.ends, self.directional, self.rk4, self.backtrack, self.crop):
             w.toggled.connect(self.invalidate)
         self.refresh()
@@ -423,6 +440,20 @@ class TrackingExecutionPanel(QScrollArea):
         if path:
             self.output.setText(str(Path(path) / "tracking-attempt001"))
 
+    def _legacy_filter_count_changed(self, value):
+        """Retain old form callers without imposing a silent filter cap."""
+        if self.operation.currentData() == "filter":
+            self.filter_limit.setChecked(True)
+            self.filter_count.setValue(value)
+
+    def _legacy_filter_minimum_changed(self, value):
+        if self.operation.currentData() == "filter":
+            self.filter_minimum.setValue(value)
+
+    def _legacy_filter_maximum_changed(self, value):
+        if self.operation.currentData() == "filter":
+            self.filter_maximum.setValue(value)
+
     def selected_task(self):
         selected = self.task_source.task()
         if selected is not None:
@@ -501,15 +532,16 @@ class TrackingExecutionPanel(QScrollArea):
             inputs = dict(tracts=self.tracts.currentData(), reference=self.reference.currentData())
             p = (
                 dict(
-                    min_length_mm=self.minimum.value(),
-                    max_length_mm=self.maximum.value(),
-                    number=self.count.value(),
+                    min_length_mm=self.filter_minimum.value(),
+                    max_length_mm=self.filter_maximum.value(),
                     skip=self.skip.value(),
                     ends_only="on" if self.ends.isChecked() else "off",
                 )
                 if operation == "filter"
                 else dict(directional="on" if self.directional.isChecked() else "off")
             )
+            if operation == "filter" and self.filter_limit.isChecked():
+                p["number"] = self.filter_count.value()
         if operation != "density":
             for role, w in self.constraints.items():
                 selected = [
@@ -624,7 +656,7 @@ class TrackingExecutionPanel(QScrollArea):
                 folder = Path(result["plan"]["output_directory"])
                 for row in result["plan"]["bindings"]:
                     for role, name in row["outputs"].items():
-                        if role in {"density", "reference"}:
+                        if role == "reference":
                             continue
                         self.maps.addItem(
                             name,
@@ -688,7 +720,7 @@ class TrackingExecutionPanel(QScrollArea):
             self.backtrack.setChecked(False)
             self.backtrack.blockSignals(False)
         self.form.setRowVisible(self.tracts, not generate)
-        self.form.setRowVisible(self.count, op != "density")
+        self.form.setRowVisible(self.count, generate)
         for field in (
             self.step,
             self.angle,
@@ -705,7 +737,14 @@ class TrackingExecutionPanel(QScrollArea):
         ):
             self.advanced_form.setRowVisible(field, generate)
         for field in (self.minimum, self.maximum):
-            self.advanced_form.setRowVisible(field, op != "density")
+            self.advanced_form.setRowVisible(field, generate)
+        for field in (
+            self.filter_limit,
+            self.filter_count,
+            self.filter_minimum,
+            self.filter_maximum,
+        ):
+            self.advanced_form.setRowVisible(field, op == "filter")
         self.advanced_form.setRowVisible(self.ends, op == "filter")
         self.advanced_form.setRowVisible(self.skip, op == "filter")
         self.advanced_form.setRowVisible(self.directional, op == "density")
@@ -728,7 +767,11 @@ class TrackingExecutionPanel(QScrollArea):
         self.tracts.setEnabled(idle and not generate)
         self.reference.setEnabled(idle)
         for w in (self.count, self.minimum, self.maximum):
-            w.setEnabled(idle and op != "density")
+            w.setEnabled(idle and generate)
+        self.filter_limit.setEnabled(idle and op == "filter")
+        self.filter_count.setEnabled(idle and op == "filter" and self.filter_limit.isChecked())
+        self.filter_minimum.setEnabled(idle and op == "filter")
+        self.filter_maximum.setEnabled(idle and op == "filter")
         self.seed.setEnabled(
             idle
             and generate

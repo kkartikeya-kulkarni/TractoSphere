@@ -46,9 +46,23 @@ No automatic registration, nonlinear warps or arbitrary FLIRT/ANTs matrices.
 
 ## Filtering existing tractography
 
-Assign selected regions Include/Exclude. Confirm the tract group's subject and
-reference space using provenance. Select ALL or ANY inclusion, then Filter tracts
-with ROI roles. Any exclusion hit rejects the fiber. Volumetric voxel-cell segment
+In **Tractography → Select or Filter Existing Streamlines**, select a verified
+tractogram and reference image. Imported binary ROI snapshots can be assigned to
+**Must pass through** (every selected ROI), **Must avoid** (any hit excludes the
+streamline), and **Pass through in this order**. Move waypoint rows up or down
+to set their actual command order. **Endpoints only** tests the streamline
+endpoints instead of full-path intersections. It cannot be combined with ordered
+waypoints. Imported ROI snapshots retain their original subject and spatial
+association; importing an edited Viewer ROI again creates a new snapshot.
+
+For original discrete-label Viewer atlases, **Filter using original Viewer
+atlas** opens the full-source atlas filter. Select named regions there without
+first assigning Viewer roles. **Include ANY** creates one verified union mask;
+**Include ALL** requires every selected region; **ORDERED** uses the saved
+streamline vertex direction, so reversing point order can change the result.
+Selecting a region can identify it in the existing Viewer. Edited masks and
+unverified atlas/reference grids are rejected by this route. All routes require
+exact plan preview and approval before running. Volumetric voxel-cell segment
 intersections include crossings between sparse vertices and do not depend on the
 screen camera or rendered subset. Boundaries use floor(voxel+0.5) half-open cells.
 

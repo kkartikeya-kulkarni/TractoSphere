@@ -464,6 +464,7 @@ class ScientificPlanningPage(QWidget):
     inspect_requested = Signal(object)
     roi_import_requested = Signal()
     roi_imported = Signal(object)
+    roi_filter_requested = Signal()
     qc_requested = Signal()
 
     def __init__(

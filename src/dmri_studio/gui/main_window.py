@@ -435,6 +435,7 @@ class MainWindow(QMainWindow):
             page.tracking.run_requested.connect(self.open_saved_run)
             page.roi_import_requested.connect(self.import_tracking_rois)
             page.roi_imported.connect(self._tracking_rois_imported)
+            page.roi_filter_requested.connect(self.open_tracking_atlas_filter)
             page.tracking.guided.highlight_requested.connect(self.highlight_tracking_roi)
             page.csd.qc_requested.connect(self.open_generated_qc)
             page.csd.run_requested.connect(self.open_saved_run)
@@ -1049,6 +1050,20 @@ class MainWindow(QMainWindow):
         self.scientific.status.setText(
             "The original Viewer ROI changed or was removed. Review the imported snapshot before use."
         )
+
+    def open_tracking_atlas_filter(self):
+        """Use the existing full-source atlas filter for exact Include ANY/ALL rules."""
+        viewer = self.scientific_viewer
+        if viewer is None or viewer.reference is None or viewer.current_group() is None:
+            self.scientific.status.setText(
+                "Open the source tractogram, reference image and original label atlas in the Viewer first."
+            )
+            return
+        try:
+            viewer.open_native_roi_filter()
+            self.focus_viewer()
+        except ValueError as exc:
+            self.scientific.status.setText(str(exc))
 
     def open_scientific_selection(self):
         """Opening a saved selection rechecks inputs and never restarts a run."""

@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -102,7 +102,8 @@ class GuidedTracking(QWidget):
         self.output.setAccessibleName("New tractography output directory")
         output_row = QHBoxLayout()
         output_row.addWidget(self.output, 1)
-        output_row.addWidget(button("Choose parent…", self.choose_parent))
+        self.choose_output_button = button("Choose parent…", self.choose_parent)
+        output_row.addWidget(self.choose_output_button)
         output.addRow("New output directory", output_row)
         root.addLayout(output)
 
@@ -256,15 +257,32 @@ class GuidedTracking(QWidget):
         self.ends_only = QCheckBox("Test endpoints only, instead of the full pathway")
         self.ends_only.toggled.connect(self.owner.ends.setChecked)
         self.owner.ends.toggled.connect(self._ends_from_advanced)
+        self.filter_limit = QCheckBox("Limit the number of retained streamlines")
+        self.filter_limit.toggled.connect(self.owner.filter_limit.setChecked)
+        self.owner.filter_limit.toggled.connect(
+            lambda value: self._copy_check(self.filter_limit, value)
+        )
+        self.filter_count = QSpinBox()
+        self.filter_count.setRange(1, 1000000)
+        self.filter_count.setAccessibleName("Maximum retained streamline count")
+        self.filter_count.valueChanged.connect(self.owner.filter_count.setValue)
+        self.owner.filter_count.valueChanged.connect(self._filter_count_from_advanced)
         form.addRow("Existing tractogram", self.filter_tracts)
         form.addRow("Reference image", self.filter_reference)
         form.addRow(self.ends_only)
+        form.addRow(self.filter_limit)
+        form.addRow("Maximum retained streamlines", self.filter_count)
         layout.addWidget(
             label(
                 "Ordered waypoints use the saved streamline vertex direction and cannot be combined with endpoint-only filtering. ROI constraints require explicit, compatible source and space identity.",
                 "caption",
             )
         )
+        self.atlas_filter_button = button(
+            "Filter using original Viewer atlas (Include ANY / ALL)…",
+            self.owner.owner.roi_filter_requested.emit,
+        )
+        layout.addWidget(self.atlas_filter_button)
         layout.addStretch()
         return page
 
@@ -384,7 +402,9 @@ class GuidedTracking(QWidget):
                 item.setToolTip(str(artifact.payload["path"]))
                 color = self.roi_metadata.get(artifact.id, {}).get("color")
                 if color:
-                    item.setForeground(QColor.fromRgbF(*color[:3]))
+                    swatch = QPixmap(14, 14)
+                    swatch.fill(QColor.fromRgbF(*color[:3]))
+                    item.setIcon(QIcon(swatch))
                 self.roi_inventory.addItem(item)
                 if artifact.id == selected:
                     self.roi_inventory.setCurrentItem(item)
@@ -585,6 +605,8 @@ class GuidedTracking(QWidget):
         self._syncing = False
         self._count_from_advanced(self.owner.count.value())
         self._ends_from_advanced(self.owner.ends.isChecked())
+        self._copy_check(self.filter_limit, self.owner.filter_limit.isChecked())
+        self._filter_count_from_advanced(self.owner.filter_count.value())
         self._copy_text(self.tensor_shells, self.owner.shells.text())
         self._copy_text(self.sphere_coords, self.owner.sphere.text())
         self._copy_check(self.backtrack, self.owner.backtrack.isChecked())
@@ -644,6 +666,11 @@ class GuidedTracking(QWidget):
         self.ends_only.blockSignals(True)
         self.ends_only.setChecked(checked)
         self.ends_only.blockSignals(False)
+
+    def _filter_count_from_advanced(self, value):
+        self.filter_count.blockSignals(True)
+        self.filter_count.setValue(value)
+        self.filter_count.blockSignals(False)
 
     def _output_from_advanced(self, value):
         if self.output.text() != value:
@@ -730,6 +757,11 @@ class GuidedTracking(QWidget):
 
     def update_actions(self):
         idle = self.owner.owner.thread is None
+        self.pages.setEnabled(idle)
+        self.output.setEnabled(idle)
+        self.choose_output_button.setEnabled(idle)
+        for choice in self.task_buttons.values():
+            choice.setEnabled(idle)
         self.preview.setEnabled(idle)
         self.approval.setEnabled(idle and self.owner.plan is not None)
         self.run_button.setEnabled(
@@ -739,3 +771,8 @@ class GuidedTracking(QWidget):
         self.qc_button.setEnabled(idle and self.owner.qc_button.isEnabled())
         self.details_button.setEnabled(idle and self.owner.manifest is not None)
         self.roi_section.setEnabled(idle)
+        self.filter_count.setEnabled(
+            idle
+            and self.owner.operation.currentData() == "filter"
+            and self.owner.filter_limit.isChecked()
+        )

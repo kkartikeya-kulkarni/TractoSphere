@@ -99,6 +99,22 @@ def test_task_change_invalidates_approval_but_return_reuses_panel(window):
     assert panel.operation.currentData() == "filter"
 
 
+def test_guided_inputs_cannot_change_while_scientific_worker_is_active(window):
+    window.focus_tracking_plan()
+    page = window.scientific
+    guided = page.tracking.guided
+    page.thread = object()
+    try:
+        guided.update_actions()
+        assert not guided.pages.isEnabled()
+        assert not guided.output.isEnabled()
+        assert not guided.task_buttons["filter"].isEnabled()
+    finally:
+        page.thread = None
+        guided.update_actions()
+    assert guided.pages.isEnabled()
+
+
 def test_advanced_selection_updates_guided_state(window):
     window.focus_tracking_plan()
     panel = window.scientific.tracking
@@ -114,6 +130,45 @@ def test_advanced_selection_updates_guided_state(window):
     task = panel.selected_task()
     assert task.algorithm == "tckedit"
     assert task.parameters["ends_only"] == "on"
+
+
+def test_filter_has_no_implicit_generation_count_or_length_cutoff(window):
+    window.focus_tracking_plan()
+    panel = window.scientific.tracking
+    panel.owner.artifacts = [_artifact("tractogram", "tracks"), _artifact("anatomy", "grid")]
+    panel.refresh()
+    panel.count.setValue(17)
+    panel.minimum.setValue(4)
+    panel.maximum.setValue(25)
+    panel.guided.select_task("filter")
+    _select(panel.guided.filter_tracts, "tracks")
+    _select(panel.guided.filter_reference, "grid")
+    task = panel.selected_task()
+    assert "number" not in task.parameters
+    assert task.parameters["min_length_mm"] == 0
+    assert task.parameters["max_length_mm"] == 1000000
+    assert not panel.guided.filter_count.isEnabled()
+    panel.guided.filter_limit.setChecked(True)
+    panel.guided.filter_count.setValue(9)
+    task = panel.selected_task()
+    assert task.parameters["number"] == 9
+    panel.guided.filter_limit.setChecked(False)
+    assert "number" not in panel.selected_task().parameters
+
+
+def test_legacy_filter_count_edit_remains_explicit(window):
+    window.focus_tracking_plan()
+    panel = window.scientific.tracking
+    panel.owner.artifacts = [_artifact("tractogram", "tracks"), _artifact("anatomy", "grid")]
+    panel.refresh()
+    panel.guided.select_task("filter")
+    _select(panel.tracts, "tracks")
+    _select(panel.reference, "grid")
+    panel.count.setValue(5)
+    panel.maximum.setValue(30)
+    task = panel.selected_task()
+    assert task.parameters["number"] == 5
+    assert task.parameters["max_length_mm"] == 30
 
 
 def test_roi_assignment_search_removal_and_waypoint_order(window):
@@ -300,3 +355,89 @@ def test_guided_preview_summarizes_real_approved_plan(window, qtbot, tmp_path):
     assert not guided.run_button.isEnabled()
     guided.approval.setChecked(True)
     assert guided.run_button.isEnabled()
+    guided.run_button.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=30000)
+    assert page.tracking.manifest is not None, page.status.text()
+    assert page.tracking.manifest["status"] == "validated_pending_qc"
+    assert page.tracking.maps.count() > 0
+    assert guided.open_button.isEnabled()
+    assert "QC" in guided.result.text()
+
+
+@pytest.mark.skipif(
+    not Path("/usr/local/mrtrix3/bin/tckmap").is_file(), reason="Actual MRtrix required"
+)
+def test_guided_density_and_unlimited_filter_prepare_real_commands(window, qtbot, tmp_path):
+    from dmri_studio.core.scientific import ImportRequest, import_artifact
+
+    spec = importlib.util.spec_from_file_location(
+        "roi_fixture", Path(__file__).parents[1] / "core/test_roi_filtering.py"
+    )
+    fixture = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fixture)
+    source, declarations = fixture.roi_case.__wrapped__(tmp_path)
+    tracts = import_artifact(
+        ImportRequest("tractogram", source / "tracks.tck", declarations=declarations)
+    )
+    reference = import_artifact(
+        ImportRequest("anatomy", source / "reference.nii.gz", declarations=declarations)
+    )
+    window.focus_tracking_plan()
+    page = window.scientific
+    page.artifacts = [tracts, reference]
+    page.tool_directory = Path("/usr/local/mrtrix3/bin")
+    page.refresh()
+    guided = page.tracking.guided
+    guided.select_task("filter")
+    _select(guided.filter_tracts, tracts.id)
+    _select(guided.filter_reference, reference.id)
+    guided.output.setText(str(tmp_path / "filter"))
+    guided.preview.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=15000)
+    assert page.tracking.plan is not None, page.status.text()
+    commands = page.tracking.plan.to_dict()["commands"]
+    assert not any("-number" in c["argv"] for c in commands)
+    assert "full pathway" in guided.summary.text()
+    assert "Maximum output streamlines" not in guided.summary.text()
+
+    guided.select_task("density")
+    _select(guided.density_tracts, tracts.id)
+    _select(guided.density_reference, reference.id)
+    guided.output.setText(str(tmp_path / "density"))
+    guided.preview.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=15000)
+    assert page.tracking.plan is not None, page.status.text()
+    assert page.tracking.plan.to_dict()["bindings"][0]["algorithm"] == "tckmap"
+    assert "Reference grid: reference.nii.gz" in guided.summary.text()
+    assert "tckmap" in guided.commands.toPlainText()
+
+
+def test_verified_density_product_is_available_to_open_in_viewer(window, tmp_path):
+    window.focus_tracking_plan()
+    panel = window.scientific.tracking
+    panel.guided.select_task("density")
+    folder = tmp_path / "completed"
+    record = {
+        "status": "validated_pending_qc",
+        "inputs_unchanged": True,
+        "plan": {
+            "output_directory": str(folder),
+            "bindings": [
+                {
+                    "outputs": {"density": "density.nii.gz", "reference": "reference.nii.gz"},
+                    "source": {"declarations": {"subject_id": "synthetic", "space_id": "grid"}},
+                }
+            ],
+        },
+        "outputs": {
+            "density.nii.gz": {"sha256": "density-hash"},
+            "reference.nii.gz": {"sha256": "reference-hash"},
+        },
+        "validation": {"products": []},
+    }
+    panel.result("tracking-run", record)
+    assert panel.maps.count() == 1
+    assert panel.maps.currentData()["kind"] == "scalar"
+    assert panel.maps.currentData()["path"] == str(folder / "density.nii.gz")
+    assert panel.guided.open_button.isEnabled()
+    assert "QC" in panel.guided.result.text()
