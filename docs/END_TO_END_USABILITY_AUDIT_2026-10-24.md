@@ -142,6 +142,13 @@ load/performance acceptance was completed here. A Viewer that remains on
 “Loading” or reports an error has a different defect from a successful load
 that draws 10,000.
 
+Read-only scaling probe on the available 1M-track TCK subset: all 1,000,000
+tracks were indexed in 8.07 s; the 10,000-item display selection spanned
+source IDs 0–999,999; peak process resident memory was about 1.3 GiB; and the
+source size/mtime were unchanged. This was core indexing, not a Cocoa render
+or 10M acceptance test. No 10M TCK/TRK file was located in the accessible
+`dmri-studio2.0` tree (the only tractogram over 1 GiB was this 1M subset).
+
 ## Confirmed root causes and repair order
 
 1. **P0, scientific continuity:** the prior registered atlas has a verified
