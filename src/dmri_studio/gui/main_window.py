@@ -210,6 +210,7 @@ class MainWindow(QMainWindow):
             nav.setMinimumHeight(30)
             sidebar.addWidget(nav)
             self.nav_buttons.append((nav, name))
+        self._selected_navigation = "Project"
         self.sidebar_note = label("Research alpha", "caption")
         sidebar.addWidget(self.sidebar_note)
         shell.addWidget(self.sidebar)
@@ -310,56 +311,11 @@ class MainWindow(QMainWindow):
         self.workspace.addWidget(self.workflow_scroll)
         self.qc = QCPage(theme)
         self.workspace.addWidget(self.qc)
-        self.scientific = ScientificPlanningPage(
-            theme, lambda: self.dataset, lambda: self.workflow.history
-        )
-        self.workspace.addWidget(self.scientific)
-        self.scientific.notification.connect(
-            lambda message, tone: self.toast.show_message(message, tone)
-        )
-        self.scientific.processing_available = lambda: self.workflow.execution.thread is None
-        self.scientific.execution_busy.connect(self.dti_processing_busy)
-        self.scientific.inspect_requested.connect(self.inspect_scientific_input)
-        self.scientific.qc_requested.connect(self.focus_qc)
-        self.scientific.dti.view_requested.connect(self.open_dti_product)
-        self.scientific.csd.view_requested.connect(self.open_scientific_product)
-        self.scientific.tracking.view_requested.connect(self.open_scientific_product)
-        self.scientific.registration.view_requested.connect(self.open_scientific_product)
-        self.scientific.registration.qc_requested.connect(self.open_generated_qc)
-        self.scientific.anatomy.view_requested.connect(self.open_scientific_product)
-        self.scientific.anatomy.qc_requested.connect(self.open_generated_qc)
-        self.scientific.anatomy.run_requested.connect(self.open_saved_run)
-        self.scientific.sift2.view_requested.connect(self.open_scientific_product)
-        self.scientific.sift2.qc_requested.connect(self.open_generated_qc)
-        self.scientific.sift2.run_requested.connect(self.open_saved_run)
-        self.scientific.connectome.view_requested.connect(self.open_scientific_product)
-        self.scientific.connectome.qc_requested.connect(self.open_generated_qc)
-        self.scientific.connectome.run_requested.connect(self.open_saved_run)
-        self.scientific.tracking.qc_requested.connect(self.open_generated_qc)
-        self.scientific.tracking.run_requested.connect(self.open_saved_run)
-        self.scientific.roi_import_requested.connect(self.import_tracking_rois)
-        self.scientific.csd.qc_requested.connect(self.open_generated_qc)
-        self.scientific.csd.run_requested.connect(self.open_saved_run)
-        self.scientific.dti.qc_requested.connect(self.open_generated_qc)
-        self.scientific.dti.run_requested.connect(self.open_saved_run)
-        from .batch import BatchPage
-
-        self.batch = BatchPage(theme, settings=self.settings)
-        self.workspace.addWidget(self.batch)
-        self.batch.product_requested.connect(
-            lambda product: (
-                self.open_dti_product(product)
-                if product["kind"] == "dti_vector"
-                else self.open_scientific_product(product)
-            )
-        )
-        self.batch.busy_changed.connect(self.dti_processing_busy)
-        self.batch.processing_available = lambda: (
-            self.scientific.thread is None and self.workflow.execution.thread is None
-        )
-        self.scientific.processing_available = lambda: (
-            self.workflow.execution.thread is None and self.batch.thread is None
-        )
+        # Scientific and batch panels are substantial optional workspaces. Keep
+        # their public attributes as cached properties, creating each on first use.
+        self._scientific = None
+        self._batch = None
+        self._dependency_defaults = self.dependencies.saved_directories()
         self.results = ResultsPage(self.settings)
         self.results.scientific_requested.connect(self.open_scientific_selection)
         self.workspace.addWidget(self.results)
@@ -379,7 +335,7 @@ class MainWindow(QMainWindow):
             lambda message, tone: self.toast.show_message(message, tone)
         )
         self.dependencies.configuration_applied.connect(self.apply_dependency_locations)
-        self.apply_dependency_locations(self.dependencies.saved_directories())
+        self.apply_dependency_locations(self._dependency_defaults)
         self.workflow.execution.busy_changed.connect(self.processing_busy)
         self.workflow.execution.inspect_requested.connect(self.inspect_processed_mask)
         self.workflow.execution.qc_requested.connect(self.open_generated_qc)
@@ -445,6 +401,81 @@ class MainWindow(QMainWindow):
         self.close_timer.timeout.connect(self.finish_close)
         self.theme.apply(self.theme.preference)
         self.focus_start()
+
+    @property
+    def scientific(self) -> ScientificPlanningPage:
+        """Create and retain scientific panels only when a caller needs them."""
+        if self._scientific is None:
+            page = ScientificPlanningPage(
+                self.theme, lambda: self.dataset, lambda: self.workflow.history
+            )
+            self._scientific = page
+            self.workspace.addWidget(page)
+            page.notification.connect(lambda message, tone: self.toast.show_message(message, tone))
+            page.execution_busy.connect(self.dti_processing_busy)
+            page.inspect_requested.connect(self.inspect_scientific_input)
+            page.qc_requested.connect(self.focus_qc)
+            page.dti.view_requested.connect(self.open_dti_product)
+            page.csd.view_requested.connect(self.open_scientific_product)
+            page.tracking.view_requested.connect(self.open_scientific_product)
+            page.registration.view_requested.connect(self.open_scientific_product)
+            page.registration.qc_requested.connect(self.open_generated_qc)
+            page.anatomy.view_requested.connect(self.open_scientific_product)
+            page.anatomy.qc_requested.connect(self.open_generated_qc)
+            page.anatomy.run_requested.connect(self.open_saved_run)
+            page.sift2.view_requested.connect(self.open_scientific_product)
+            page.sift2.qc_requested.connect(self.open_generated_qc)
+            page.sift2.run_requested.connect(self.open_saved_run)
+            page.connectome.view_requested.connect(self.open_scientific_product)
+            page.connectome.qc_requested.connect(self.open_generated_qc)
+            page.connectome.run_requested.connect(self.open_saved_run)
+            page.tracking.qc_requested.connect(self.open_generated_qc)
+            page.tracking.run_requested.connect(self.open_saved_run)
+            page.roi_import_requested.connect(self.import_tracking_rois)
+            page.csd.qc_requested.connect(self.open_generated_qc)
+            page.csd.run_requested.connect(self.open_saved_run)
+            page.dti.qc_requested.connect(self.open_generated_qc)
+            page.dti.run_requested.connect(self.open_saved_run)
+            page.processing_available = lambda: (
+                self.workflow.execution.thread is None
+                and (self._batch is None or self._batch.thread is None)
+            )
+            mrtrix = self._dependency_defaults.get("MRtrix3")
+            fsl = self._dependency_defaults.get("FSL")
+            page.tool_directory = Path(mrtrix) if mrtrix else None
+            page.fsl_directory = Path(fsl) if fsl else None
+            page.refresh()
+        return self._scientific
+
+    @property
+    def batch(self):
+        """Create and retain the study workspace on first use."""
+        if self._batch is None:
+            from .batch import BatchPage
+
+            page = BatchPage(self.theme, settings=self.settings)
+            self._batch = page
+            self.workspace.addWidget(page)
+            page.product_requested.connect(
+                lambda product: (
+                    self.open_dti_product(product)
+                    if product["kind"] == "dti_vector"
+                    else self.open_scientific_product(product)
+                )
+            )
+            page.busy_changed.connect(self.dti_processing_busy)
+            page.processing_available = lambda: (
+                self.workflow.execution.thread is None
+                and (self._scientific is None or self._scientific.thread is None)
+            )
+            mrtrix = self._dependency_defaults.get("MRtrix3")
+            fsl = self._dependency_defaults.get("FSL")
+            ants = self._dependency_defaults.get("ANTs")
+            page.tool_directory = Path(mrtrix) if mrtrix else None
+            page.fsl_directory = Path(fsl) if fsl else None
+            page.ants_directory = Path(ants) if ants else None
+            page.mrtrix_directory.setText(mrtrix or "")
+        return self._batch
 
     def record(self, message: str, level: str = "INFO") -> None:
         """Record actual GUI transaction events separately from core stages."""
@@ -794,7 +825,11 @@ class MainWindow(QMainWindow):
             self.dataset_label.setText("Processing input · " + self.dataset.paths.dwi.name)
         else:
             self.dataset_label.setText("No processing input loaded")
+        previous = self._selected_navigation
+        self._selected_navigation = selected
         for nav, name in self.nav_buttons:
+            if name not in {previous, selected}:
+                continue
             active = name == selected
             nav.setProperty("selected", active)
             self.theme.bind(
@@ -836,8 +871,12 @@ class MainWindow(QMainWindow):
 
     def focus_batch(self):
         """Open study orchestration without changing existing viewers."""
-        directory = self.scientific.tool_directory
-        if directory and (Path(directory) / "mrconvert").is_file():
+        directory = self._scientific.tool_directory if self._scientific is not None else None
+        if (
+            directory
+            and (Path(directory) / "mrconvert").is_file()
+            and not self.batch.historical_toolchain
+        ):
             self.batch.tool_directory = directory
         self.workspace.setCurrentWidget(self.batch)
         self.select_navigation("Batch Processing")
@@ -1477,55 +1516,62 @@ class MainWindow(QMainWindow):
         """Apply only explicit/saved tool defaults, invalidating command previews."""
         if not self.can_change_dependencies():
             return
+        self._dependency_defaults.update(locations)
         panel = self.workflow.execution
         if "MRtrix3" in locations:
             directory = str(locations["MRtrix3"] or "")
-            self.scientific.tool_directory = Path(directory) if directory else None
+            if self._scientific is not None:
+                self._scientific.tool_directory = Path(directory) if directory else None
             panel.tool_directory.setText(directory)
             # Batch Processing must share the same saved installation instead of
             # prompting for a second MRtrix3 directory on every new batch.
-            self.batch.tool_directory = Path(directory) if directory else None
-            if not self.batch.historical_toolchain:
-                self.batch.mrtrix_directory.setText(directory)
+            if self._batch is not None:
+                self._batch.tool_directory = Path(directory) if directory else None
+                if not self._batch.historical_toolchain:
+                    self._batch.mrtrix_directory.setText(directory)
             if getattr(self, "scientific_viewer", None) is not None:
                 self.scientific_viewer.mrtrix_directory = directory
         if "ANTs" in locations:
             directory = str(locations["ANTs"] or "")
             panel.bias_inputs["ants_directory"].setText(directory)
-            self.batch.ants_directory = Path(directory) if directory else None
+            if self._batch is not None:
+                self._batch.ants_directory = Path(directory) if directory else None
         if "FSL" in locations:
             directory = str(locations["FSL"] or "")
-            self.scientific.fsl_directory = Path(directory) if directory else None
-            self.batch.fsl_directory = Path(directory) if directory else None
+            if self._scientific is not None:
+                self._scientific.fsl_directory = Path(directory) if directory else None
+            if self._batch is not None:
+                self._batch.fsl_directory = Path(directory) if directory else None
             panel.correction_inputs["fsl_directory"].setText(directory)
             panel.anatomy_inputs.fields["fsl_directory"].setText(directory)
             panel.combination_inputs.fields["fsl_directory"].setText(directory)
-        self.scientific.refresh()
+        if self._scientific is not None:
+            self._scientific.refresh()
 
     def can_change_dependencies(self):
         viewer = getattr(self, "scientific_viewer", None)
         roi_dialog = getattr(viewer, "native_roi_dialog", None)
         idle = (
             self.workflow.execution.thread is None
-            and self.scientific.thread is None
-            and self.batch.thread is None
+            and (self._scientific is None or self._scientific.thread is None)
+            and (self._batch is None or self._batch.thread is None)
             and (roi_dialog is None or roi_dialog.thread is None)
         )
-        if not idle or self.batch.approval.isChecked():
+        if not idle or (self._batch is not None and self._batch.approval.isChecked()):
             return False
-        return (
+        return self._scientific is None or (
             not any(
                 panel.approval.isChecked()
                 for panel in (
-                    self.scientific.dti,
-                    self.scientific.csd,
-                    self.scientific.tracking,
-                    self.scientific.registration,
-                    self.scientific.anatomy,
-                    self.scientific.sift2,
+                    self._scientific.dti,
+                    self._scientific.csd,
+                    self._scientific.tracking,
+                    self._scientific.registration,
+                    self._scientific.anatomy,
+                    self._scientific.sift2,
                 )
             )
-            and not self.scientific.connectome.approve.isChecked()
+            and not self._scientific.connectome.approve.isChecked()
         )
 
     def closeEvent(self, event: object) -> None:
@@ -1537,8 +1583,8 @@ class MainWindow(QMainWindow):
         qc_idle = self.qc.shutdown()
         results_idle = self.results.shutdown()
         projects_idle = self.projects.shutdown()
-        scientific_idle = self.scientific.shutdown()
-        batch_idle = self.batch.shutdown()
+        scientific_idle = self._scientific is None or self._scientific.shutdown()
+        batch_idle = self._batch is None or self._batch.shutdown()
         scene_idle = self.scientific_viewer is None or self.scientific_viewer.shutdown()
         if (
             self.load_thread
