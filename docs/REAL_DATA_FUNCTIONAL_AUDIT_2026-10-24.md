@@ -137,3 +137,107 @@ evidence for this audit branch.
 
 This is a **bounded functional checkpoint**, not a claim that every scientific
 workflow or native interaction has been verified.
+
+## Follow-up: current real-data eligibility and propagation
+
+A further read-only check used existing DTI and CSD selection records from the
+bounded validation directories. TractoSphere **reimported the original
+sources and matched the saved artifact IDs** for one DTI fit/metrics selection,
+one response-estimation selection and one multi-tissue CSD selection. Their
+current `build_workflow` proposals contained zero eligibility errors. Each
+remains `review_required`: software identity, acquisition assumptions and
+scientific quality were not established by a proposal. An offscreen scientific
+page populated the DWI, mask and WM/GM/CSF response selectors from the CSD
+selection. This confirms actual derivative-to-workspace propagation, without
+rerunning reconstruction.
+
+A historical connectome plan supplied a tractogram, atlas, reference and FA
+map. The current importer matched all four saved artifact IDs. Offscreen Qt
+populated the tractogram, atlas and FA selectors and displayed the atlas's 23
+node rows. The **current planner blocked the old plan** because the atlas lacks
+a native, hash-bound registration review bundle. The interface displayed the
+missing-QC explanation and directed the researcher to Registration. Prior
+execution records and matching grids do not replace the current registration
+review requirement. No atlas was silently approved.
+
+The reported HCP-style T1 remains technically imported and visible in the
+Registration inventory. The bounded anatomical folder contained the image and
+a standalone matrix, but no sidecar that independently establishes T1 contrast,
+processing history or its relationship to a selected diffusion reference. The
+existing **Review declarations** route can make a documented ACPC structural
+T1 selectable without reimporting its bytes; this is a researcher declaration,
+not anatomical QC or permission to infer a transform. Its subsequent EPI/T1
+plan, structural prerequisites and native visual alignment remain unverified.
+
+### Demonstrated additional defect and correction
+
+The existing six-component tensor derivative imported successfully, yet the
+guided DTI panel only exposed a DWI-fit selector. Researchers had to enter the
+technical Algorithms form to use the already implemented `tensor2metric`
+operation. DTI now offers **Calculate maps from an existing tensor** as a
+separate task. Its selector lists imported tensors; DWI-specific shell and fit
+controls are hidden for this task. Incompatible FSL-order/frame tensors remain
+visible with an explicit explanation and a declaration-review or validated
+conversion path. Configuring a compatible tensor creates the same core
+`tensor2metric` task and retains exact command preview and approval. No tensor
+conversion or fit is inferred. The real derivative reached this selector and
+produced a `review_required` proposal with zero errors; no metric command ran.
+The correction also preserves the optional mask choice when the input
+inventory refreshes. The application/test correction is local commit
+`631bf2d`.
+With the installed MRtrix tools, `prepare_dti` also compiled the real tensor's
+exact metrics and eigenvalue commands under a new private proposed output
+name. It created **no output directory** and ran no MRI command. The private
+record retains the digest and command-step evidence. Exact command compilation
+is not numerical output or scientific QC verification.
+
+The focused offscreen Qt/core suite passed **59 tests, with two native
+Viewer-dependent tests deselected**. After the final visibility adjustment,
+the two directly affected DTI GUI tests passed. The synthetic tensor test
+covers compatible/incompatible declarations and optional-mask preservation.
+Ruff lint and format checks passed. These results supplement, rather
+than replace, the earlier 15 native Cocoa synthetic passes at `8da3091`;
+the new DTI route has not yet been visually checked in Cocoa.
+
+The detailed private register now contains **27 attempted operations**, and
+separate private JSON records hold source-specific current proposal findings.
+These files remain outside the repository. No source or historical run was
+modified.
+
+### Native visual walkthrough still required
+
+The Codex command environment has no Qt screens. Its actual-file checks above
+used read-only services and offscreen Qt, not native desktop clicks. In the
+normal Mac session, launch the committed app with the existing virtual
+environment, `PYTHONPATH=src`, `QT_QPA_PLATFORM=cocoa` and
+`OPENBLAS_NUM_THREADS=1`. Use the already available reference set and existing
+validation derivatives; inspect the exact sources in the private audit. In one
+session:
+
+1. Import the known diffusion image with its b-values and b-vectors through
+   **Import Data**. Confirm that Project/Preprocessing, DTI and CSD offer it;
+   inspect shells and processing-history warnings. Do not start EDDY/TOPUP.
+2. Import the HCP-style T1. Confirm that Registration lists it as imported,
+   explains the missing contrast/space declarations, and offers **Review
+   declarations**. Supply only declarations supported by source documentation;
+   confirm Reference T1 and Anatomy eligibility update without changing the
+   file. Check that EPI/T1 still requests its separate structural evidence.
+3. In DTI, choose **Calculate maps from an existing tensor**. Import the known
+   six-component tensor and confirm its selector, task summary, approval gate
+   and hidden DWI-fit controls. Do not execute metrics during this audit.
+4. Import the known FOD, three response files, tractogram, atlas, mask and FA
+   map. Confirm CSD tissue selectors, Tractography/SIFT2 sources and
+   Connectivity inputs update. In Connectivity inspect the atlas node table
+   and its registration-QC warning; do not approve a blocked plan.
+5. Open the existing verified tractography run through Results and its QC
+   catalog. If the native Viewer opens, inspect image/tract loading and source
+   scene preservation. Keep execution completion distinct from scientific
+   review. Check each screen at a normal and minimum window size in light and
+   dark appearance, including file pickers and keyboard focus.
+
+Record screenshots and any exact rejection text privately. Native real-data
+file-picker, Viewer and layout behavior remain **unverified** until those
+observations are supplied. Missing complete real 5TT, reviewed SIFT2 weights,
+native atlas QC and suitable source documentation still limit downstream
+scientific eligibility. The 38-task scientific backlog and separate Phase 7
+EDDY validation remain open.
