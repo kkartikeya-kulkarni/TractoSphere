@@ -181,6 +181,8 @@ def test_native_atlas_qc_regions_navigation_and_reopen(
 def test_native_batch_registration_approval_qc_table(window, qtbot, tmp_path, monkeypatch):
     import json
 
+    from dmri_studio.core.execution import hash_file
+
     spec = importlib.util.spec_from_file_location(
         "batch_reg", Path(__file__).parents[1] / "core/test_registration_batch.py"
     )
@@ -213,3 +215,48 @@ def test_native_batch_registration_approval_qc_table(window, qtbot, tmp_path, mo
     page.load_batch(folder)
     qtbot.waitUntil(lambda: page.thread is None, timeout=20000)
     assert all(len(r["attempts"]) == 1 for r in page.rows)
+
+    # Follow an actual completed BatchRunner registration QC stage through the
+    # seven-step results page into the native Viewer, preserving acquisition
+    # identity and requiring the saved output hashes before the handoff.
+    qc_row = next(
+        row
+        for row in page.rows
+        if row["node"]["id"] == "qc" and row["acquisition"]["subject_id"] == "synthetic-0"
+    )
+    guided = page.guided
+    guided.set_stage(6)
+    index = guided.result_stage.findData(qc_row["key"])
+    assert index >= 0
+    guided.result_stage.setCurrentIndex(index)
+    guided.inspect_output_button.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=20000)
+    assert len(page.products) == 1 and page.products[0]["kind"] == "registration_qc"
+    guided.products.setCurrentRow(0)
+    guided.open_product_button.click()
+    qtbot.waitUntil(
+        lambda: (
+            window.scientific_viewer is not None
+            and window.scientific_viewer.registration_layer is not None
+            and not window.scientific_viewer.tasks
+        ),
+        timeout=20000,
+    )
+    viewer = window.scientific_viewer
+    bundle = viewer.registration_bundle["bundle"]
+    assert (bundle["subject_id"], bundle["session_id"], bundle["acquisition_id"]) == (
+        "synthetic-0",
+        "01",
+        "diffusion",
+    )
+    assert viewer.reference.path == Path(bundle["reference"]["path"])
+    assert viewer.registration_layer["path"] == bundle["atlas"]["path"]
+    assert bundle["registration"] and viewer.registration_review_state == "NEEDS_REVIEW"
+    assert hash_file(Path(page.products[0]["path"])) == page.products[0]["sha256"]
+
+    from dmri_studio.core.runs import inspect_run
+
+    report = Path(page.products[0]["path"]).parent / "qc-report.html"
+    report.write_text(report.read_text() + "\nsynthetic post-inspection change")
+    with pytest.raises(ValueError, match="changed|evidence"):
+        inspect_run(Path(qc_row["manifest"]))
