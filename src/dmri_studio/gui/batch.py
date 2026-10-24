@@ -74,6 +74,7 @@ class BatchPage(QWidget):
         self.rows = []
         self.products = []
         self.registration_reviews = {}
+        self._journal_signature = None
         root = QVBoxLayout(self)
         root.addWidget(label("Batch Processing", "title"))
         root.addWidget(
@@ -287,7 +288,6 @@ class BatchPage(QWidget):
         self.timer = QTimer(self)
         self.timer.setInterval(600)
         self.timer.timeout.connect(self.refresh)
-        self.timer.start()
         self.approval.toggled.connect(self.update_actions)
         for edit in (
             self.workflow,
@@ -302,6 +302,25 @@ class BatchPage(QWidget):
             spin.valueChanged.connect(self.invalidate)
         self.method.currentIndexChanged.connect(self.invalidate)
         self.update_actions()
+
+    def _update_polling(self):
+        """Poll only a visible saved batch or a live operation."""
+        should_poll = self.thread is not None or (self.isVisible() and self.folder is not None)
+        if should_poll and not self.timer.isActive():
+            self.timer.start()
+        elif not should_poll and self.timer.isActive():
+            self.timer.stop()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if hasattr(self, "timer"):
+            self.refresh()
+            self._update_polling()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        if hasattr(self, "timer"):
+            self._update_polling()
 
     def invalidate(self):
         self.plan = None
@@ -495,6 +514,7 @@ class BatchPage(QWidget):
         )
         self.busy_changed.emit(True)
         self.update_actions()
+        self._update_polling()
         self.thread.start()
 
     def result(self, _, result, error):
@@ -606,6 +626,8 @@ class BatchPage(QWidget):
         self.historical_toolchain = False
         self.historical_plan = None
         self.folder = None
+        self._journal_signature = None
+        self._update_polling()
         self.output.clear()
         self.mrtrix_directory.setReadOnly(False)
         if self.settings:
@@ -629,6 +651,7 @@ class BatchPage(QWidget):
             thread.deleteLater()
         self.busy_changed.emit(False)
         self.update_actions()
+        self._update_polling()
 
     def update_actions(self):
         if not hasattr(self, "plan_button"):
@@ -647,9 +670,20 @@ class BatchPage(QWidget):
         self._retired_workers = [
             (t, w) for t, w in self._retired_workers if shiboken6.isValid(t) or shiboken6.isValid(w)
         ]
-        if not self.folder or not (self.folder / "journal.json").is_file():
+        if not self.folder:
             return
         try:
+            journal_path = self.folder / "journal.json"
+            info = journal_path.stat()
+            signature = (
+                journal_path,
+                info.st_ino,
+                info.st_size,
+                info.st_mtime_ns,
+                info.st_ctime_ns,
+            )
+            if signature == self._journal_signature:
+                return
             journal = read_journal(self.folder)
             self.rows = list(journal["nodes"].values())
             from collections import Counter
@@ -661,6 +695,7 @@ class BatchPage(QWidget):
                 + " · ".join(f"{key}: {value}" for key, value in sorted(counts.items()))
             )
             self.render()
+            self._journal_signature = signature
         except (ValueError, OSError):
             return
 
@@ -690,6 +725,9 @@ class BatchPage(QWidget):
                     item.setData(Qt.ItemDataRole.UserRole, row["key"])
                 self.table.setItem(index, column, item)
         self.table.setSortingEnabled(True)
+        # Reused row indices can still carry selection after sorting or a
+        # journal update. Restore only the selected acquisition identities.
+        self.table.clearSelection()
         for index in range(self.table.rowCount()):
             if self.table.item(index, 0).data(Qt.ItemDataRole.UserRole) in selected:
                 for col in range(self.table.columnCount()):
