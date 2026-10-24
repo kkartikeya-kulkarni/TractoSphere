@@ -94,6 +94,19 @@ def test_trk_conversion_rejects_attributes_and_cancellation(tmp_path):
         convert_verified_trk(source, reference, output, cancelled=lambda: True)
     assert trk.is_file() and not output.exists()
 
+    checks = 0
+
+    def cancel_during_work():
+        nonlocal checks
+        checks += 1
+        return checks >= 9
+
+    with pytest.raises(ProcessingCancelled):
+        convert_verified_trk(source, reference, output, cancelled=cancel_during_work)
+    assert checks >= 9
+    assert trk.is_file() and not output.exists()
+    assert not output.with_suffix(".conversion.json").exists()
+
 
 def test_trk_conversion_never_removes_existing_output_or_symlink(tmp_path):
     _, source, reference, output = _case(tmp_path)
