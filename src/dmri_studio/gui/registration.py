@@ -27,7 +27,7 @@ from dmri_studio.core.scientific.registration import prepare_registration, space
 from dmri_studio.core.scientific.registry import ALGORITHMS
 from dmri_studio.core.spatial import FORMATS, save_transform, transform_record
 
-from .components import button, label
+from .components import Disclosure, button, label
 
 
 class TransformImportDialog(QDialog):
@@ -112,20 +112,23 @@ class RegistrationPanel(QScrollArea):
         self.owner = owner
         self.plan = None
         self.task = None
+        self._guided_task = None
         self.manifest = None
         self.setWidgetResizable(True)
         content = QWidget()
         self.setWidget(content)
         root = QVBoxLayout(content)
-        root.addWidget(
+        advanced_content = QWidget()
+        advanced = QVBoxLayout(advanced_content)
+        advanced.addWidget(
             label(
-                "Register anatomy · transform atlas / ROI · inspect on preprocessed diffusion",
+                "Advanced Registration Tools",
                 "section",
             )
         )
-        root.addWidget(
+        advanced.addWidget(
             label(
-                "Import images with explicit subject, session, acquisition and space. Derive the low-b QC background from matching DWI gradients. No tractogram is needed.",
+                "Exact typed tasks, nonlinear registration, transform inversion/composition/conversion and import remain available here. Unsupported spatial conventions still block.",
                 "caption",
             )
         )
@@ -133,17 +136,17 @@ class RegistrationPanel(QScrollArea):
         for key, spec in ALGORITHMS.items():
             if spec.stage == "registration":
                 self.method.addItem(spec.name, key)
-        root.addWidget(self.method)
+        advanced.addWidget(self.method)
         row = QHBoxLayout()
         self.configure = button("Select inputs and parameters…", self.configure_task)
         row.addWidget(self.configure)
         self.import_transform = button("Import existing transform…", self.import_existing)
         row.addWidget(self.import_transform)
-        root.addLayout(row)
+        advanced.addLayout(row)
         self.selection = QPlainTextEdit()
         self.selection.setReadOnly(True)
         self.selection.setMaximumHeight(160)
-        root.addWidget(self.selection)
+        advanced.addWidget(self.selection)
         form = QFormLayout()
         self.output = QLineEdit()
         self.output.setPlaceholderText("New immutable output directory")
@@ -152,48 +155,61 @@ class RegistrationPanel(QScrollArea):
         self.threads.setValue(2)
         form.addRow("Output", self.output)
         form.addRow("Threads", self.threads)
-        root.addLayout(form)
-        root.addWidget(button("Choose output parent…", self.choose_parent))
+        advanced.addLayout(form)
+        advanced.addWidget(button("Choose output parent…", self.choose_parent))
         self.preview = button("Validate inputs and preview commands", self.prepare)
-        root.addWidget(self.preview)
+        advanced.addWidget(self.preview)
         self.approval = QCheckBox(
             "I reviewed the exact inputs, transform direction, interpolation, resources and commands"
         )
-        root.addWidget(self.approval)
+        advanced.addWidget(self.approval)
         self.execute = button("Run approved operation", self.run)
-        root.addWidget(self.execute)
+        advanced.addWidget(self.execute)
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(3000)
         self.log.setMinimumHeight(160)
-        root.addWidget(self.log)
+        advanced.addWidget(self.log)
         self.summary = label("Scientific acceptance remains separate from processing.", "caption")
-        root.addWidget(self.summary)
+        advanced.addWidget(self.summary)
         row = QHBoxLayout()
         self.open = button("Inspect alignment / atlas QC", self.open_result)
         row.addWidget(self.open)
         row.addWidget(button("Open saved atlas QC…", self.open_saved))
         self.qc = button("Technical QC", self.open_qc)
         row.addWidget(self.qc)
-        root.addLayout(row)
-        root.addStretch()
+        advanced.addLayout(row)
+        advanced.addStretch()
         self.method.currentIndexChanged.connect(self.method_changed)
         self.output.textChanged.connect(self.invalidate)
         self.threads.valueChanged.connect(self.invalidate)
         self.approval.toggled.connect(self.update_actions)
+        from .registration_guided import GuidedRegistration
+
+        self.guided = GuidedRegistration(self)
+        root.addWidget(self.guided)
+        root.addWidget(Disclosure("Advanced Registration Tools", advanced_content))
+        root.addStretch()
         self.update_actions()
 
     def method_changed(self, *_):
         self.task = None
         self.selection.clear()
-        self.invalidate()
+        if hasattr(self, "guided"):
+            self.guided.advanced_selected()
+        else:
+            self.invalidate()
 
     def invalidate(self, *_):
         self.plan = None
         self.approval.setChecked(False)
+        if hasattr(self, "guided"):
+            self.guided.clear_plan()
         self.update_actions()
 
     def refresh(self):
+        if hasattr(self, "guided"):
+            self.guided.refresh_inventory()
         self.invalidate()
 
     def choose_parent(self):
@@ -210,6 +226,7 @@ class RegistrationPanel(QScrollArea):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.task = dialog.task()
             self.selection.setPlainText(json.dumps(self.task.to_dict(), indent=2))
+            self.guided.advanced_selected()
             self.invalidate()
 
     def import_existing(self):
@@ -246,8 +263,21 @@ class RegistrationPanel(QScrollArea):
 
     def prepare(self):
         self.invalidate()
+        # Existing automation and specialist callers may assign a typed task
+        # directly. A new guided task is built only for an untouched draft or
+        # for a task previously created by this form.
+        if self.guided.active and (self.task is None or self.task is self._guided_task):
+            try:
+                self.task = self.guided.build_task()
+                self._guided_task = self.task
+            except ValueError as exc:
+                self.summary.setText(str(exc))
+                self.guided.summary.setText(str(exc))
+                return
+            self.selection.setPlainText(json.dumps(self.task.to_dict(), indent=2))
         if not self.task or not self.output.text().strip():
             self.summary.setText("Select inputs/parameters and a new output directory.")
+            self.guided.summary.setText(self.summary.text())
             return
         task = self.task
         artifacts = tuple(self.owner.artifacts)
@@ -291,6 +321,7 @@ class RegistrationPanel(QScrollArea):
             return
         if kind == "registration-preview":
             self.plan = result
+            self.guided.plan_ready(result)
             self.log.setPlainText(
                 "Approval digest: "
                 + result.digest
@@ -314,6 +345,7 @@ class RegistrationPanel(QScrollArea):
             if good
             else result["status"] + " · " + result.get("error", "")
         )
+        self.guided.result_ready(result, verified=good)
         if good:
             for row in result["validation"]["products"]:
                 if "artifact" in row:
@@ -325,9 +357,14 @@ class RegistrationPanel(QScrollArea):
     def failed(self, message, cancelled=False):
         self.invalidate()
         self.summary.setText("Cancelled; partial evidence retained" if cancelled else message)
+        self.guided.summary.setText(self.summary.text())
 
     def open_result(self):
-        if not self.manifest or self.manifest["status"] != "validated_pending_qc":
+        if (
+            not self.manifest
+            or self.manifest["status"] != "validated_pending_qc"
+            or not self.manifest.get("inputs_unchanged")
+        ):
             return
         p = self.manifest["plan"]
         folder = Path(p["output_directory"])
@@ -340,10 +377,18 @@ class RegistrationPanel(QScrollArea):
         elif "registered.nii.gz" in self.manifest["outputs"]:
             product = dict(
                 kind="registration_alignment",
+                categorical=p.get("bound", {}).get("moving", {}).get("kind")
+                in {"atlas_labels", "roi"},
                 reference=p["reference"]["image"],
                 reference_sha256=p["reference"]["sha256"],
                 path=str(folder / "registered.nii.gz"),
                 sha256=self.manifest["outputs"]["registered.nii.gz"]["sha256"],
+            )
+        elif "mean-b0.nii.gz" in self.manifest["outputs"]:
+            product = dict(
+                kind="scalar",
+                path=str(folder / "mean-b0.nii.gz"),
+                sha256=self.manifest["outputs"]["mean-b0.nii.gz"]["sha256"],
             )
         else:
             self.summary.setText(
@@ -390,5 +435,12 @@ class RegistrationPanel(QScrollArea):
             w.setEnabled(idle)
         self.approval.setEnabled(idle and self.plan is not None)
         self.execute.setEnabled(idle and self.plan is not None and self.approval.isChecked())
-        self.open.setEnabled(idle and self.manifest is not None)
-        self.qc.setEnabled(idle and self.manifest is not None)
+        verified_result = (
+            self.manifest is not None
+            and self.manifest.get("status") == "validated_pending_qc"
+            and self.manifest.get("inputs_unchanged") is True
+        )
+        self.open.setEnabled(idle and verified_result)
+        self.qc.setEnabled(idle and verified_result)
+        if hasattr(self, "guided"):
+            self.guided.update_actions()

@@ -37,9 +37,13 @@ class RegistrationView:
         self.registration_mode.setAccessibleName("Registration display mode")
         self.registration_mode.currentIndexChanged.connect(self.refresh_slices)
         layout.insertWidget(1, self.registration_mode)
-        self.registration_blink = QCheckBox("Blink atlas / reference")
-        self.registration_blink.setAccessibleName("Blink registered atlas overlay")
-        layout.insertWidget(2, self.registration_blink)
+        self.registration_mode_info = label("", "caption")
+        self.registration_mode.currentIndexChanged.connect(self.explain_registration_mode)
+        layout.insertWidget(2, self.registration_mode_info)
+        self.explain_registration_mode()
+        self.registration_blink = QCheckBox("Blink registered result / reference")
+        self.registration_blink.setAccessibleName("Blink registered result and reference")
+        layout.insertWidget(3, self.registration_blink)
         self.registration_timer = QTimer(self)
         self.registration_timer.setInterval(650)
         self.registration_timer.timeout.connect(self.blink_registration)
@@ -50,26 +54,42 @@ class RegistrationView:
             "Registered atlas regions — visibility by original ID"
         )
         self.registration_regions.itemChanged.connect(self.refresh_slices)
-        layout.insertWidget(3, self.registration_regions)
+        layout.insertWidget(4, self.registration_regions)
         reviews = QHBoxLayout()
+        self.registration_review_buttons = []
         for title, decision in (
             ("Approve…", "APPROVED"),
             ("Reject…", "REJECTED"),
             ("Needs review…", "NEEDS_REVIEW"),
         ):
-            reviews.addWidget(
-                button(title, lambda checked=False, d=decision: self.review_registration(d))
-            )
-        layout.insertLayout(4, reviews)
+            control = button(title, lambda checked=False, d=decision: self.review_registration(d))
+            control.setEnabled(False)
+            self.registration_review_buttons.append(control)
+            reviews.addWidget(control)
+        layout.insertLayout(5, reviews)
         exports = QHBoxLayout()
         exports.addWidget(button("Snapshot…", self.registration_snapshot))
-        exports.addWidget(button("QC report", self.registration_report))
-        layout.insertLayout(5, exports)
+        self.registration_report_button = button("QC report", self.registration_report)
+        self.registration_report_button.setEnabled(False)
+        exports.addWidget(self.registration_report_button)
+        layout.insertLayout(6, exports)
         self.image_loaded.connect(self.registration_background_ready)
         self.pending_registration = None
         self.registration_restore = None
         self.theme.changed.connect(self.registration_indicator_style)
         self.registration_indicator_style()
+
+    def explain_registration_mode(self, *_):
+        descriptions = {
+            "Overlay": "Blend the registered result with the fixed reference to inspect gross alignment.",
+            "Outlines": "Show result boundaries over the fixed reference; boundaries alone do not prove anatomical correctness.",
+            "Checkerboard": "Alternate patches of the two images to reveal mismatched boundaries.",
+            "Registered only": "Show only the transformed result on the reference grid.",
+            "Reference only": "Show only the unchanged fixed reference image.",
+        }
+        self.registration_mode_info.setText(
+            descriptions.get(self.registration_mode.currentText(), "")
+        )
 
     def registration_indicator_style(self):
         """Keep checked visibility readable when Cocoa switches appearance."""
@@ -112,7 +132,7 @@ class RegistrationView:
                 reference_hash=product["reference_sha256"],
                 overlay=product["path"],
                 overlay_hash=product["sha256"],
-                categorical=False,
+                categorical=bool(product.get("categorical", False)),
             )
 
         def ready(result):
@@ -156,6 +176,10 @@ class RegistrationView:
             self.registration_layer = layer
             self.registration_bundle = pending
             self.registration_review_state = pending.get("review_state", "NEEDS_REVIEW")
+            review_available = pending["bundle"] is not None
+            for control in self.registration_review_buttons:
+                control.setEnabled(review_available)
+            self.registration_report_button.setEnabled(review_available)
             self.layers.append(layer)
             self.layer_list.addItem(Path(pending["overlay"]).name)
             self.layer_list.setCurrentRow(len(self.layers) - 1)
@@ -181,11 +205,16 @@ class RegistrationView:
                     item.setCheckState(Qt.CheckState.Checked)
                     self.registration_regions.addItem(item)
             self.registration_regions.blockSignals(False)
-            self.registration_info.setText(
-                "Registered atlas on verified preprocessed low-b reference · review required"
-                if pending["categorical"]
-                else "Registered anatomy / fixed reference · review required"
-            )
+            if review_available:
+                self.registration_info.setText(
+                    "Registered atlas QC on verified preprocessed low-b reference · "
+                    + self.registration_review_state.replace("_", " ").title()
+                )
+            else:
+                self.registration_info.setText(
+                    "Registered result on selected reference · inspect in all planes. "
+                    "Formal anatomical review requires a supported atlas QC bundle."
+                )
             self.registration_mode.setCurrentText("Overlay")
             restore = self.registration_restore
             self.registration_restore = None

@@ -126,6 +126,8 @@ def test_native_atlas_qc_regions_navigation_and_reopen(
     viewer = window.scientific_viewer
     assert not viewer.layer_low.isEnabled() and not viewer.layer_cmap.isEnabled()
     assert viewer.registration_regions.count() == 2
+    assert all(control.isEnabled() for control in viewer.registration_review_buttons)
+    assert viewer.registration_report_button.isEnabled()
     assert not viewer.groups
     before = hash_file(atlas)
     for position in ([0, 0, 0], [19, 19, 19], [5, 6, 8]):

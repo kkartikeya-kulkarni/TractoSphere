@@ -129,6 +129,8 @@ def test_native_flirt_apply_convert_and_inverse(fixture):
 
 def test_native_atlas_labels_and_loss(fixture):
     f = fixture
+    from dmri_studio.core.runs import inspect_run
+
     source = nib.load(f["s"].image)
     labels = np.asarray(source.dataobj, dtype="i2") * 7
     labels[19, 0, 0] = 99
@@ -154,6 +156,10 @@ def test_native_atlas_labels_and_loss(fixture):
     stats = result["validation"]["checks"]["registered.nii.gz"]
     assert stats["lost_labels"] == [99]
     assert set(np.unique(nib.load(folder / "registered.nii.gz").get_fdata())) == {0, 7, 21}
+    historical = inspect_run(folder / "manifest.json")
+    assert historical["products"][0]["categorical"] is True
+    assert historical["products"][0]["sha256"] == result["outputs"]["registered.nii.gz"]["sha256"]
+    assert historical["products"][0]["reference_sha256"] == result["plan"]["reference"]["sha256"]
 
 
 def test_wrong_direction_and_missing_space_review(fixture):

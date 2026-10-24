@@ -129,10 +129,22 @@ def inspect_run(path: Path, *, cancelled=lambda: False, progress=lambda _: None)
     if kind == "registration_execution_plan":
         if plan.get("operation") == "atlas_qc":
             from .registration_qc import verify_bundle
+
             verify_bundle(folder / "atlas-qc.json", cancelled)
             result["products"] = record["validation"]["products"]
         elif "registered.nii.gz" in record["outputs"]:
-            result["products"] = [dict(kind="registration_alignment", path=str(folder / "registered.nii.gz"), sha256=record["outputs"]["registered.nii.gz"]["sha256"], reference=plan["reference"]["image"], reference_sha256=plan["reference"]["sha256"], label="Inspect registered anatomy / fixed reference")]
+            result["products"] = [
+                dict(
+                    kind="registration_alignment",
+                    path=str(folder / "registered.nii.gz"),
+                    sha256=record["outputs"]["registered.nii.gz"]["sha256"],
+                    reference=plan["reference"]["image"],
+                    reference_sha256=plan["reference"]["sha256"],
+                    categorical=plan.get("bound", {}).get("moving", {}).get("kind")
+                    in {"atlas_labels", "roi"},
+                    label="Inspect registered result / fixed reference",
+                )
+            ]
         return result
     if kind in {
         "mrtrix_connectome_execution_plan",
