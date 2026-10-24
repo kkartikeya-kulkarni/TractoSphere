@@ -131,3 +131,16 @@ def test_repeated_navigation_does_not_create_more_widgets(window):
         window.focus_batch()
     assert window.scientific is scientific and window.batch is batch
     assert len(QApplication.allWidgets()) == count
+
+
+def test_lazy_signal_connections_are_not_duplicated(window, monkeypatch):
+    opened = []
+    monkeypatch.setattr(window, "open_saved_run", lambda path: opened.append(path))
+    window.focus_models()
+    page = window.scientific
+    for _ in range(10):
+        window.focus_registration()
+        window.focus_tracking_plan()
+        window.focus_models()
+    page.dti.run_requested.emit("synthetic-run")
+    assert opened == ["synthetic-run"]
