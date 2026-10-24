@@ -4,6 +4,8 @@
 
 The [usability audit follow-up](USABILITY_AUDIT_FIXES_2026-10-24.md) records click-driven synthetic imports into Registration, DTI and CSD, explicit non-BIDS Batch file-role mapping through plan review, and a 960×640 offscreen layout capture that exposed compressed sidebar headings. The sidebar now scrolls; DTI again selects an imported DWI by default. **129 selected offscreen GUI/core/CLI tests passed** after these changes. The prior **46 Cocoa passes at `62883c0` predate this follow-up**; actual native pickers, visual layout/focus, and scientific execution remain unverified. A fresh synthetic fixture generator and exact normal-Mac walkthrough are in the follow-up. The 38 scientific-validation tasks and processing approval gates are unchanged. Continued Phase 7 must start from a reviewed integration checkpoint that includes these usability fixes, rather than the older Phase 6 commit `8102df1`.
 
+A direct Cocoa launch check from this Codex command environment at `0b7b1ac` found **zero available Qt screens**. TractoSphere and a minimal Qt widget both failed before a window appeared; VTK was not involved in the minimal failure. Computer Use could not select TractoSphere and barred Terminal; unsandboxed execution approval was automatically unavailable under the active policy. Details and macOS crash-report frames are in the follow-up handoff. This is an execution-environment limit, not a new native GUI pass or a demonstrated TractoSphere defect.
+
 ## 2026-10-24 — Screenshot-led usability audit corrections
 
 The local [usability audit correction record](USABILITY_AUDIT_FIXES_2026-10-24.md)
