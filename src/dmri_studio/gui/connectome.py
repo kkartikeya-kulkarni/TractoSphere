@@ -400,6 +400,18 @@ class ConnectomePanel(QWidget):
             "Select a tractogram, registered atlas and reference image.", "caption"
         )
         setup.addWidget(self.input_help)
+        imports = QHBoxLayout()
+        for title, kind in (
+            ("Import tractogram…", "tractogram"),
+            ("Import atlas…", "atlas_labels"),
+            ("Import reference…", "anatomy"),
+            ("Import weights…", "streamline_weights"),
+        ):
+            imports.addWidget(
+                button(title, lambda _=False, selected=kind: self.owner.browse_import(selected))
+            )
+        imports.addStretch()
+        setup.addLayout(imports)
         setup.addWidget(self.advanced)
         self.preview = button("Preview commands", self.prepare)
         self.approve = QCheckBox(

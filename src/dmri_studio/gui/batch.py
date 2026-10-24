@@ -570,9 +570,20 @@ class BatchPage(QWidget):
 
     def result(self, _, result, error):
         if error:
-            self.status.setText(error)
+            if self.kind == "discover":
+                self.logs.appendPlainText("Discovery detail: " + error)
+            message = (
+                "This folder is not a BIDS root. Choose the folder containing "
+                "dataset_description.json, or use Custom folder mapping (JSON)."
+                if self.kind == "discover"
+                and self.method.currentIndex() == 0
+                and "dataset_description.json" in error
+                and "No such file or directory" in error
+                else error
+            )
+            self.status.setText(message)
             if hasattr(self, "guided"):
-                self.guided.operation_error(error)
+                self.guided.operation_error(message)
             return
         if self.kind in {"discover", "study"}:
             if (

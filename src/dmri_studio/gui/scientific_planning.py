@@ -50,7 +50,7 @@ from dmri_studio.core.workflow import ProcessingHistory
 from .components import Disclosure, button, label
 from .execution import ProcessingWorker
 from .operation_state import OperationState, State
-from .scientific_guidance import input_description, input_label
+from .scientific_guidance import IMPORT_EVIDENCE, input_description, input_label
 from .theme import Theme
 from .workstation import PageHeader
 
@@ -67,7 +67,7 @@ def choice(values: Sequence[str]) -> QComboBox:
 class ImportDialog(QDialog):
     """Explicit input meaning, not a guess based on component count or filename."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, initial_kind: str | None = None) -> None:
         """Build native controls over the shared scientific contracts; start no processing."""
         super().__init__(parent)
         self.setWindowTitle("Import scientific input")
@@ -93,11 +93,15 @@ class ImportDialog(QDialog):
         self.kind.addItem("Choose the kind of data…", None)
         for kind in KINDS:
             self.kind.addItem(input_label(kind), kind)
+        if initial_kind in KINDS:
+            self.kind.setCurrentIndex(self.kind.findData(initial_kind))
         form.addRow("Input type", self.kind)
         self.purpose = label(
             "Choose a scientific input type to see what evidence it needs.", "caption"
         )
         content_layout.addWidget(self.purpose)
+        self.evidence = label("", "caption")
+        content_layout.addWidget(self.evidence)
         self.paths = {}
         self.path_rows = {}
         for name, title in (
@@ -128,6 +132,7 @@ class ImportDialog(QDialog):
             "External input; processing history and scientific acceptance unknown."
         )
         form.addRow("Processing state", self.state)
+        self.state_label = form.labelForField(self.state)
         form.addRow("Subject identity", self.subject)
         form.addRow("Space association", self.space)
         form.addRow("Provenance statement", self.provenance)
@@ -252,8 +257,6 @@ class ImportDialog(QDialog):
                 None,
                 {"atlas_labels"},
             ),
-            ("session_id", "Session identity", None, {"atlas_labels", "anatomy", "dwi"}),
-            ("acquisition_id", "Acquisition identity", None, {"atlas_labels", "anatomy", "dwi"}),
             ("threshold", "Probability threshold (0–1)", None, {"atlas_probability"}),
             ("shells", "Response row b-values (comma-separated)", None, {"response"}),
             ("tractogram_id", "Associated tractogram content ID", None, {"streamline_weights"}),
@@ -303,13 +306,19 @@ class ImportDialog(QDialog):
         for field, title, kinds in self.declaration_rows.values():
             field.setVisible(kind in kinds)
             title.setVisible(kind in kinds)
-        self.state.setEnabled(kind == "dwi")
+        self.state.setVisible(kind == "dwi")
+        self.state_label.setVisible(kind == "dwi")
         self.registration_reviewed.setVisible(kind == "atlas_labels")
         self.purpose.setText(
             input_description(kind)
             + " Technical inspection does not establish scientific acceptance. Open scientific declarations when the selected type requires identity or convention evidence."
             if kind
             else "Choose a scientific input type to see what evidence it needs."
+        )
+        self.evidence.setText(
+            "Before inspection: " + IMPORT_EVIDENCE[kind]
+            if kind
+            else "Select a task-specific input type. Leave identity declarations blank when the evidence is unavailable; later scientific planning may remain blocked."
         )
 
     def request(self) -> ImportRequest:
@@ -584,6 +593,11 @@ class ScientificPlanningPage(QWidget):
         self.inputs.currentRowChanged.connect(self.show_input)
         self.algorithm_page = QWidget()
         layout = QVBoxLayout(self.algorithm_page)
+        self.algorithm_summary = label(
+            "Choose a task to see its required scientific inputs. Import eligible data before planning.",
+            "caption",
+        )
+        layout.addWidget(self.algorithm_summary)
         split = QSplitter()
         self.algorithms = QListWidget()
         self.algorithms.setAccessibleName("Scientific algorithm registry")
@@ -591,11 +605,19 @@ class ScientificPlanningPage(QWidget):
         self.algorithm_details = label("")
         details = QScrollArea()
         details.setWidgetResizable(True)
-        details.setWidget(self.algorithm_details)
+        details_content = QWidget()
+        details_layout = QVBoxLayout(details_content)
+        details_layout.addWidget(
+            Disclosure("Technical adapter roles, versions and QC contract", self.algorithm_details)
+        )
+        details_layout.addStretch()
+        details.setWidget(details_content)
         split.addWidget(details)
         split.setSizes([350, 490])
         layout.addWidget(split, 1)
         self.add_button = button("Configure task…", self.add_task)
+        self.algorithm_import = button("Import required input…", self.import_algorithm_input)
+        layout.addWidget(self.algorithm_import)
         layout.addWidget(self.add_button)
         self.algorithms.currentRowChanged.connect(self.show_algorithm)
         self.tabs.addTab(self.algorithm_page, "Advanced algorithms")
@@ -844,6 +866,25 @@ class ScientificPlanningPage(QWidget):
             self.update_actions()
             return
         spec = self.visible_algorithms[row]
+        requirements = [
+            input_label(kind) if kind in KINDS else kind.replace("_", " ")
+            for kind in spec.required_inputs.values()
+        ]
+        available = {artifact.kind for artifact in self.artifacts}
+        missing = [
+            kind
+            for kind in spec.required_inputs.values()
+            if kind in KINDS and kind not in available
+        ]
+        self.algorithm_summary.setText(
+            f"{spec.name}. Required: {', '.join(requirements) or 'none'}. "
+            + (
+                "Not imported yet: " + ", ".join(input_label(kind) for kind in missing) + ". "
+                if missing
+                else "Select exact imported inputs in Configure task. "
+            )
+            + "Optional inputs and scientific eligibility are checked during planning."
+        )
         self.algorithm_details.setText(
             "\n\n".join(
                 [
@@ -874,9 +915,27 @@ class ScientificPlanningPage(QWidget):
         )
         self.update_actions()
 
-    def browse_import(self) -> None:
+    def import_algorithm_input(self) -> None:
+        """Open the same typed import dialog for the selected task's first missing kind."""
+        row = self.algorithms.currentRow()
+        if not 0 <= row < len(self.visible_algorithms):
+            self.status.setText("Select a scientific task to identify its required inputs.")
+            return
+        spec = self.visible_algorithms[row]
+        imported = {artifact.kind for artifact in self.artifacts}
+        kind = next(
+            (
+                value
+                for value in spec.required_inputs.values()
+                if value in KINDS and value not in imported
+            ),
+            None,
+        )
+        self.browse_import(kind)
+
+    def browse_import(self, kind: str | None = None) -> None:
         """Collect explicit input meaning before beginning read-only inspection."""
-        dialog = ImportDialog(self)
+        dialog = ImportDialog(self, initial_kind=kind if isinstance(kind, str) else None)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.import_request(dialog.request())
 

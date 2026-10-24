@@ -80,6 +80,17 @@ class CSDExecutionPanel(QScrollArea):
         self.threads.setRange(1, 64)
         self.threads.setValue(4)
         self.acquisition = label("Import DWI to review its shells and gradient frame.", "caption")
+        imports = QHBoxLayout()
+        for title, kind in (
+            ("Import DWI…", "dwi"),
+            ("Import mask…", "mask"),
+            ("Import response…", "response"),
+        ):
+            imports.addWidget(
+                button(title, lambda _=False, selected=kind: self.owner.browse_import(selected))
+            )
+        imports.addStretch()
+        setup.addLayout(imports)
         for title, field in [
             ("DWI", self.source),
             ("Binary mask", self.mask),
@@ -204,7 +215,9 @@ class CSDExecutionPanel(QScrollArea):
         ]:
             selected = combo.currentData()
             combo.clear()
-            combo.addItem("Choose…", None)
+            combo.addItem(
+                "Select imported " + (tissue.upper() + " " if tissue else "") + kind + "…", None
+            )
             for a in self.owner.artifacts:
                 if a.kind == kind and (
                     tissue is None or a.payload["declarations"].get("tissue") == tissue
@@ -212,6 +225,14 @@ class CSDExecutionPanel(QScrollArea):
                     combo.addItem(Path(a.payload["path"]).name, a.id)
             if selected is not None:
                 combo.setCurrentIndex(max(0, combo.findData(selected)))
+            if combo.count() == 1:
+                combo.setItemText(
+                    0,
+                    "No imported "
+                    + (tissue.upper() + " " if tissue else "")
+                    + kind
+                    + " — use Import above",
+                )
         self.update_actions()
 
     def source_info(self, *_):

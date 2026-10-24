@@ -45,6 +45,33 @@ STAGES = (
     "Results & QC",
 )
 
+CUSTOM_MAPPING_EXAMPLE = {
+    "subject_pattern": "sub-*",
+    "acquisition_pattern": "scan-*",
+    "files": {"dwi": "dwi.nii.gz", "bval": "dwi.bval", "bvec": "dwi.bvec"},
+}
+
+
+def bids_root_problem(root: Path) -> str | None:
+    """Explain common wrong-root mistakes before asynchronous BIDS discovery."""
+    description = root / "dataset_description.json"
+    if not description.is_file():
+        return (
+            "This folder is not a BIDS root: dataset_description.json is missing. "
+            "Choose the folder containing that file, or use Custom folder mapping (JSON)."
+        )
+    try:
+        data = json.loads(description.read_text())
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return "The BIDS dataset_description.json cannot be read as valid JSON. Correct it or choose another root."
+    if not isinstance(data, dict):
+        return "The BIDS dataset_description.json must contain a JSON object."
+    if data.get("DatasetType", "raw") != "raw":
+        return "This is a derivative BIDS dataset. Use an explicit manifest with processing provenance."
+    if not data.get("Name") or not data.get("BIDSVersion"):
+        return "The BIDS dataset_description.json needs Name and BIDSVersion."
+    return None
+
 
 def explain_issue(issue: str) -> str:
     """Add a next action while preserving the exact scientific diagnostic."""
@@ -124,8 +151,8 @@ class GuidedBatch(QWidget):
         layout.addWidget(label("Select Data", "section"))
         self.source_kind = QComboBox()
         self.source_kind.addItem("Open a BIDS dataset", "bids")
-        self.source_kind.addItem("Use another supported dataset structure", "custom")
-        self.source_kind.addItem("Import a CSV/TSV manifest", "manifest")
+        self.source_kind.addItem("Custom folder mapping (JSON)", "custom")
+        self.source_kind.addItem("Acquisition table (CSV/TSV)", "manifest")
         self.source_kind.addItem("Open a saved study or batch", "saved")
         self.source_kind.setAccessibleName("Dataset source type")
         layout.addWidget(self.source_kind)
@@ -137,14 +164,29 @@ class GuidedBatch(QWidget):
         self.study_id = QLineEdit("study-001")
         self.study_id.setAccessibleName("Study name")
         self.source_file = QLineEdit()
-        self.source_file.setAccessibleName("Mapping or manifest file")
+        self.source_file.setAccessibleName("Custom JSON mapping or CSV/TSV acquisition table")
         form.addRow("Dataset folder", self._picker(self.dataset_root, file=False))
         form.addRow("Study name", self.study_id)
         self.file_row = self._picker(self.source_file, file=True)
-        form.addRow("Mapping / manifest file", self.file_row)
+        form.addRow("Source description file", self.file_row)
         layout.addLayout(form)
         self.source_help = label("Choose a BIDS root containing diffusion acquisitions.", "caption")
         layout.addWidget(self.source_help)
+        self.mapping_help = label(
+            "JSON mapping: subject_pattern and optional session_pattern/acquisition_pattern select folders. "
+            "files maps roles such as dwi, bval, bvec, json, mask and t1 to relative filename patterns. "
+            "Each pattern must match exactly one file per acquisition; zero or multiple matches are reported for review. "
+            "Edit the example to match your folder names. Discovery never guesses scientific identity.",
+            "caption",
+        )
+        layout.addWidget(self.mapping_help)
+        self.mapping_example = QPlainTextEdit(json.dumps(CUSTOM_MAPPING_EXAMPLE, indent=2))
+        self.mapping_example.setReadOnly(True)
+        self.mapping_example.setMaximumHeight(115)
+        self.mapping_example.setAccessibleName("Example custom folder mapping JSON")
+        layout.addWidget(self.mapping_example)
+        self.save_example = button("Save example mapping…", self.save_mapping_example)
+        layout.addWidget(self.save_example)
         self.discover_button = button("Discover Acquisitions", self.discover)
         layout.addWidget(self.discover_button)
         self.open_study_button = button("Open Saved Study…", self.owner.open_study)
@@ -176,7 +218,15 @@ class GuidedBatch(QWidget):
 
         def choose():
             if file:
-                path, _ = QFileDialog.getOpenFileName(self, "Choose mapping or manifest")
+                mode = self.source_kind.currentData()
+                path, _ = QFileDialog.getOpenFileName(
+                    self,
+                    "Choose custom JSON mapping"
+                    if mode == "custom"
+                    else "Choose CSV/TSV acquisition table",
+                    "",
+                    "JSON (*.json)" if mode == "custom" else "Acquisition tables (*.csv *.tsv)",
+                )
             else:
                 path = QFileDialog.getExistingDirectory(self, "Choose dataset folder")
             if path:
@@ -184,6 +234,29 @@ class GuidedBatch(QWidget):
 
         box.addWidget(button("Browse…", choose))
         return row
+
+    def save_mapping_example(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save editable mapping example", "mapping-example.json", "JSON (*.json)"
+        )
+        if not path:
+            return
+        try:
+            with Path(path).open("x") as stream:
+                json.dump(CUSTOM_MAPPING_EXAMPLE, stream, indent=2)
+                stream.write("\n")
+        except FileExistsError:
+            self.notice.setText(
+                "That mapping file already exists. Choose a new filename; existing files are not overwritten."
+            )
+            return
+        except OSError as exc:
+            self.notice.setText(f"Could not save mapping example: {exc}")
+            return
+        self.source_file.setText(path)
+        self.notice.setText(
+            "Example mapping saved. Edit its folder and file patterns to match your dataset before discovery."
+        )
 
     def _source_mode(self):
         mode = self.source_kind.currentData()
@@ -203,6 +276,12 @@ class GuidedBatch(QWidget):
                 "saved": "Open a study to make a new plan, or inspect and resume a previously approved batch.",
             }[mode]
         )
+        for control in (self.mapping_help, self.mapping_example, self.save_example):
+            control.setVisible(mode == "custom")
+        if mode in {"custom", "manifest"}:
+            self.data_form.labelForField(self.file_row).setText(
+                "Custom mapping JSON" if mode == "custom" else "Acquisition table CSV/TSV"
+            )
 
     def _mark_data_dirty(self):
         self._data_dirty = True
@@ -255,9 +334,27 @@ class GuidedBatch(QWidget):
         if not root.is_dir():
             self.notice.setText("Choose an existing dataset folder before discovery.")
             return
-        if mode in {"custom", "manifest"} and not Path(self.source_file.text()).is_file():
-            self.notice.setText("Choose an existing mapping or manifest file.")
+        if mode == "bids" and (problem := bids_root_problem(root)):
+            self.notice.setText(problem)
             return
+        if mode in {"custom", "manifest"} and not Path(self.source_file.text()).is_file():
+            self.notice.setText(
+                "Choose an existing JSON mapping or CSV/TSV acquisition table for this source type."
+            )
+            return
+        if mode == "custom":
+            try:
+                mapping = json.loads(Path(self.source_file.text()).read_text())
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                self.notice.setText(
+                    "The custom mapping must be a readable JSON file. Edit the example and try again."
+                )
+                return
+            if not isinstance(mapping, dict) or not isinstance(mapping.get("files"), dict):
+                self.notice.setText(
+                    "The custom mapping needs a JSON object with a files object that maps each scientific role to a relative pattern."
+                )
+                return
         self.owner.method.setCurrentIndex({"bids": 0, "custom": 1, "manifest": 2}[mode])
         self.owner.source_root.setText(str(root))
         self.owner.study_name.setText(self.study_id.text().strip())
@@ -353,8 +450,13 @@ class GuidedBatch(QWidget):
         self._syncing = False
         self._selection_state()
         self._filter_subjects()
+        if study.acquisitions:
+            self.subject_table.selectRow(0)
+            self._subject_details()
+        findings = sum(bool(acquisition.findings) for acquisition in study.acquisitions)
         self.notice.setText(
-            f"{len(study.acquisitions)} acquisitions found. Review individual inputs before planning."
+            f"{len(study.acquisitions)} acquisitions found; {findings} have discovery findings. "
+            "Review matched files and ambiguities before continuing. Scientific eligibility is checked during planning."
         )
         self.set_stage(1)
 
@@ -420,6 +522,14 @@ class GuidedBatch(QWidget):
         if acquisition:
             self.subject_details.setPlainText(
                 f"{key}\n"
+                + "Matched files (discovery association only):\n"
+                + (
+                    "\n".join(
+                        f"{role}: {Path(path).name}" for role, path in acquisition.paths.items()
+                    )
+                    or "None"
+                )
+                + "\nDiscovery findings:\n"
                 + (
                     "\n".join(acquisition.findings)
                     if acquisition.findings

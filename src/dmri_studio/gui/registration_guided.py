@@ -167,6 +167,20 @@ class GuidedRegistration(QWidget):
         combo.currentIndexChanged.connect(self._input_changed)
         return combo
 
+    def _input_row(self, form, title, combo, kind):
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(combo, 1)
+        action = button(
+            "Import…",
+            lambda _=False, selected=kind: self.owner.owner.browse_import(selected),
+        )
+        action.setAccessibleName(f"Import {title}")
+        layout.addWidget(action)
+        form.addRow(title, row)
+        return action
+
     def _reference_page(self):
         page, _, form = self._page(
             "Create a Diffusion Reference",
@@ -183,7 +197,7 @@ class GuidedRegistration(QWidget):
         self.threshold.setSuffix(" s/mm²")
         self.threshold.setAccessibleName("Maximum low-b threshold")
         self.threshold.valueChanged.connect(self._input_changed)
-        form.addRow("Preprocessed DWI", self.dwi)
+        self._input_row(form, "Preprocessed DWI", self.dwi, "dwi")
         form.addRow("Low-b selection", self.low_b_selection)
         form.addRow("Maximum included b-value", self.threshold)
         return page
@@ -197,10 +211,10 @@ class GuidedRegistration(QWidget):
         self.epi_reference = self._input("Fixed T1 reference image")
         self.t1_brain = self._input("Brain-extracted T1")
         self.wmseg = self._input("White-matter segmentation")
-        form.addRow("Moving EPI / diffusion reference", self.epi_moving)
-        form.addRow("Reference T1 image", self.epi_reference)
-        form.addRow("Brain-extracted T1", self.t1_brain)
-        form.addRow("White-matter segmentation", self.wmseg)
+        self._input_row(form, "Moving EPI / diffusion reference", self.epi_moving, "anatomy")
+        self._input_row(form, "Reference T1 image", self.epi_reference, "anatomy")
+        self._input_row(form, "Brain-extracted T1", self.t1_brain, "anatomy")
+        self._input_row(form, "White-matter segmentation", self.wmseg, "mask")
         return page
 
     def _align_page(self):
@@ -226,8 +240,8 @@ class GuidedRegistration(QWidget):
         ):
             self.cost.addItem(title, key)
         self.cost.currentIndexChanged.connect(self._input_changed)
-        form.addRow("Moving image", self.moving)
-        form.addRow("Reference image", self.reference)
+        self._input_row(form, "Moving image", self.moving, "anatomy")
+        self._input_row(form, "Reference image", self.reference, "anatomy")
         form.addRow("Method", self.alignment_method)
         form.addRow("Similarity measure", self.cost)
         return page
@@ -243,9 +257,9 @@ class GuidedRegistration(QWidget):
         self.transform.setToolTip(
             "The exact source, target, convention and direction are verified during plan preview."
         )
-        form.addRow("Atlas, ROI or image", self.derivative)
-        form.addRow("Reference image in target space", self.target)
-        form.addRow("Source → target transform", self.transform)
+        self._input_row(form, "Atlas, ROI or image", self.derivative, "atlas_labels")
+        self._input_row(form, "Reference image in target space", self.target, "anatomy")
+        self._input_row(form, "Source → target transform", self.transform, "spatial_transform")
         return page
 
     def _inspect_page(self):
@@ -320,7 +334,24 @@ class GuidedRegistration(QWidget):
 
     def refresh_inventory(self):
         self._refreshing = True
-        specs = (
+        specs = self._inventory_specs()
+        for combo, kinds in specs:
+            old = combo.currentData()
+            combo.clear()
+            combo.addItem("Select an eligible imported input…", None)
+            for artifact in self.owner.owner.artifacts:
+                if artifact.kind in kinds and self._candidate(combo, artifact):
+                    name = Path(artifact.payload["path"]).name
+                    combo.addItem(f"{name} · {artifact.id[:8]}", artifact.id)
+            if combo.count() == 1:
+                combo.setItemText(0, "No eligible import — use Import…")
+            combo.setCurrentIndex(max(0, combo.findData(old)))
+        self._refreshing = False
+        self._update_direction()
+        self._explain_inventory()
+
+    def _inventory_specs(self):
+        return (
             (self.dwi, {"dwi"}),
             (self.epi_moving, {"anatomy"}),
             (self.epi_reference, {"anatomy"}),
@@ -332,18 +363,6 @@ class GuidedRegistration(QWidget):
             (self.target, {"anatomy"}),
             (self.transform, {"spatial_transform"}),
         )
-        for combo, kinds in specs:
-            old = combo.currentData()
-            combo.clear()
-            combo.addItem("Choose an imported candidate…", None)
-            for artifact in self.owner.owner.artifacts:
-                if artifact.kind in kinds and self._candidate(combo, artifact):
-                    name = Path(artifact.payload["path"]).name
-                    combo.addItem(f"{name} · {artifact.id[:8]}", artifact.id)
-            combo.setCurrentIndex(max(0, combo.findData(old)))
-        self._refreshing = False
-        self._update_direction()
-        self._explain_inventory()
 
     def _explain_inventory(self):
         if self.goal == "reference":
@@ -391,7 +410,63 @@ class GuidedRegistration(QWidget):
             )
         else:
             message = "Open a verified current result or a saved atlas QC bundle; no new command is required."
+        roles = {
+            "reference": (self.dwi,),
+            "epi_t1": (self.epi_moving, self.epi_reference, self.t1_brain, self.wmseg),
+            "align_two": (self.moving, self.reference),
+            "move": (self.derivative, self.target, self.transform),
+            "inspect": (),
+        }
+        hidden = []
+        for combo in roles[self.goal]:
+            kinds = dict(self._inventory_specs())[combo]
+            for artifact in self.owner.owner.artifacts:
+                if artifact.kind in kinds and not self._candidate(combo, artifact):
+                    hidden.append(
+                        f"{Path(artifact.payload['path']).name} ({combo.accessibleName()}): "
+                        + self._candidate_reason(combo, artifact)
+                    )
+        if hidden:
+            distinct = list(dict.fromkeys(hidden))
+            message += " Imported but not eligible: " + "; ".join(distinct[:4])
+            if len(distinct) > 4:
+                message += (
+                    f"; {len(distinct) - 4} more. Inspect input records for their declarations."
+                )
         self.inventory_notice.setText(message)
+
+    def _candidate_reason(self, combo, artifact):
+        declarations = artifact.payload.get("declarations", {})
+        space = declarations.get("space_kind")
+        contrast = declarations.get("anatomical_modality")
+        if combo is self.dwi:
+            missing = []
+            if declarations.get("processing_state") != "preprocessed":
+                missing.append("declared preprocessed state")
+            if not declarations.get("reference_history"):
+                missing.append("correction history")
+            if not artifact.payload.get("gradients"):
+                missing.append("verified gradients")
+            return "missing " + ", ".join(missing)
+        if combo is self.epi_moving:
+            missing = []
+            if space != "DWI_NATIVE":
+                missing.append("DWI-native space")
+            if contrast not in {"b0", "mean_b0"}:
+                missing.append("b0 contrast")
+            if not declarations.get("reference_history"):
+                missing.append("correction history")
+            return "missing " + ", ".join(missing)
+        if combo in (self.epi_reference, self.t1_brain):
+            return "requires T1w contrast and T1-native space evidence"
+        if combo is self.wmseg:
+            return "requires T1-native space evidence"
+        if combo in (self.moving, self.reference):
+            if contrast not in {"T1w", "T2w", "b0", "mean_b0", "FA", "MD"}:
+                return "requires a supported image contrast declaration"
+            if space == "DWI_NATIVE" and not declarations.get("reference_history"):
+                return "DWI-native images require correction/reference history"
+        return "requires compatible identity and spatial evidence"
 
     def _candidate(self, combo, artifact):
         """Hide clearly ineligible imports; the core still performs exact validation."""

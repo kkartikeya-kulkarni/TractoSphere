@@ -92,6 +92,17 @@ class SIFT2Panel(QScrollArea):
             "Select a source tractogram, WM FOD and reviewed reference.", "caption"
         )
         root.addWidget(self.input_help)
+        imports = QHBoxLayout()
+        for title, kind in (
+            ("Import tractogram…", "tractogram"),
+            ("Import FOD…", "fod"),
+            ("Import reference…", "anatomy"),
+        ):
+            imports.addWidget(
+                button(title, lambda _=False, selected=kind: self.owner.browse_import(selected))
+            )
+        imports.addStretch()
+        root.addLayout(imports)
         advanced = QWidget()
         af = QFormLayout(advanced)
         af.addRow("Threads", self.threads)
@@ -223,10 +234,12 @@ class SIFT2Panel(QScrollArea):
             old = combo.currentData()
             combo.blockSignals(True)
             combo.clear()
-            combo.addItem("Choose…", None)
+            combo.addItem("Select imported " + kind + "…", None)
             for a in self.owner.artifacts:
                 if a.kind == kind:
                     combo.addItem(Path(a.payload["path"]).name + " · " + a.id[:8], a.id)
+            if combo.count() == 1:
+                combo.setItemText(0, "No imported " + kind + " — use Import above")
             combo.setCurrentIndex(max(0, combo.findData(old)))
             combo.blockSignals(False)
         self.invalidate()

@@ -118,6 +118,8 @@ class RegistrationPanel(QScrollArea):
         content = QWidget()
         self.setWidget(content)
         root = QVBoxLayout(content)
+        root.setContentsMargins(12, 16, 12, 12)
+        root.setSpacing(12)
         advanced_content = QWidget()
         advanced = QVBoxLayout(advanced_content)
         advanced.addWidget(

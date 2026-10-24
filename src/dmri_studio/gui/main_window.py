@@ -175,7 +175,7 @@ class MainWindow(QMainWindow):
                     "Tractography": "3D viewer · inspect and edit existing tractograms",
                     "Acquisitions": "Review acquisition associations",
                     "Preprocessing": "Configure supported preprocessing operations",
-                    "Reconstruction": "Import independent inputs and plan diffusion models; execution adapters are not implemented",
+                    "Reconstruction": "Import verified inputs and run supported DTI and FOD reconstruction workflows",
                     "Registration": "Register images and review atlases on preprocessed diffusion",
                     "Batch Processing": "Import studies, review workflows, execute and recover batches",
                     "Connectivity": "Build and inspect connectomes from existing tracts and registered nodes",
@@ -202,6 +202,7 @@ class MainWindow(QMainWindow):
                     "Connectivity",
                     "Batch Processing",
                     "Registration",
+                    "Preprocessing",
                 }
             )
             theme.set_icon(nav, icon, "accent.text" if name == "Project" else "text.disabled")
