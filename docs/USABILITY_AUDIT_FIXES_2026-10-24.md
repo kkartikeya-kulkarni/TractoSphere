@@ -1,0 +1,53 @@
+# Usability audit corrections — 24 October 2026
+
+Source: the local `TractoSphere-usability-audit-2026-10-24.md` under `~/Documents/Codex/2026-10-24/referenced-chatgpt-conversation-this-is-an/outputs/`. The audit was based on screenshots, source inspection and placeholder-file discovery, with **no native interaction verification**. These corrections branch from Phase 7 evidence-audit commit `091bcbb`; scientific algorithms, core validation, exact command approval and processing defaults were not changed.
+
+Application and regression-test changes are committed at `8f1c062` on `development/usability-audit-fixes-2026-10-24`. Documentation may have a later HEAD without changing that tested application code.
+
+## Corrections and verification boundary
+
+| Audit ID | Change | Evidence now available | Still needed |
+| --- | --- | --- | --- |
+| U1 | Fresh-launch Preprocessing navigation is enabled; Data Check remains dependent on loaded data. | Synthetic offscreen GUI test opens the empty preprocessing route and checks focus. | Native Cocoa click and file chooser. |
+| U2 | Registration roles have adjacent import actions and explicit empty candidate text. Filtered imports display role-specific missing evidence. CSD, SIFT2 and Connectivity have direct typed import actions. | Offscreen synthetic anatomy import proves a missing contrast is hidden with a reason, while a declared eligible image appears and is keyboard selectable. Existing registration, CSD, SIFT2 and Connectivity contracts remain in place. | Native Cocoa candidate selection, dialog focus and all role families. |
+| U3 | The import dialog accepts a task-scoped initial type and shows input-specific evidence instructions. Unrelated processing state is hidden. Advanced declarations remain explicit; no subject, processing history, tissue, geometry or scientific acceptance is inferred. | Offscreen dialog tests cover DWI, anatomy, atlas, tractogram, response and weights request construction; synthetic anatomy is inspected through the real import worker. | Researcher-led completion of all import types; native file picker and actionable failure review. |
+| U4 | Duplicate session and acquisition declaration widgets were removed. | Offscreen test counts one form label per field and checks `ImportRequest` values for applicable types. | Native visual check. |
+| U5 | Registration scroll content has an explicit top inset and spacing. | Offscreen geometry tests at 960×640 and 1280×840, light and dark, find the heading inside the viewport without horizontal scrolling. | Native screenshots and display-scaling/focus review; screenshot-only finding is not considered fully closed. |
+| U6 | Guided Batch distinguishes JSON mapping from CSV/TSV acquisition tables. It explains supported folder patterns and roles, provides a saveable example without overwriting existing files, validates malformed JSON before discovery, and shows matched filenames/findings before continuing. | Synthetic discovery covers one and two acquisitions, zero/multiple matches, and guided preview. Existing Batch selection/approval regressions passed. | Native file picker, researcher comprehension review, broader manifest examples. |
+| U7 | Guided BIDS discovery checks `dataset_description.json` and gives a recovery action for missing/invalid/derivative descriptors. A worker race can still surface technical detail in the log while showing a clear missing-root message. | Synthetic missing/invalid/derivative/valid descriptor tests and wrong-root GUI test passed. | Native wrong-folder interaction. This advisory precheck does not replace core BIDS discovery validation. |
+| U8 | Advanced Reconstruction now shows plain required inputs and a task-scoped import action; backend roles, versions and QC remain in a disclosure. | Offscreen test checks DWI prerequisite text, scoped import and retained technical contract. | Native task selection and expert review. |
+| U9 | The stale initial Reconstruction tooltip was corrected; the later sidebar description already accurately named tensor/FOD work. | Offscreen tooltip/accessibility test confirms no unavailable-adapter claim after navigation. | Native hover/VoiceOver review. |
+
+## Scientific safety
+
+The input selector still reads the shared artifact inventory and the existing `_candidate` eligibility rules. It does not mark an import scientifically eligible merely because a file exists. The import dialog still produces the same `ImportRequest`, and actual format/hash inspection occurs in the existing core importer. Registration, CSD and Batch planning still require exact bindings, version checks and explicit approval. The Batch mapping example is a discovery recipe, not scientific validation. The original research files are never edited by these UI changes.
+
+## Executed tests
+
+- Baseline before edits: `PYTHONPATH=src QT_QPA_PLATFORM=offscreen OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/python -m pytest -q tests/gui/test_phase6_scientific_inputs.py tests/gui/test_batch_guided.py tests/gui/test_registration_guided.py --tb=short` — **25 passed in 32.41 s**.
+- After initial edits, the new focused suite had three test expectation/fixture failures, corrected without changing scientific code; then **19 passed in 19.16 s**. After the mapping preview and broader import-kind checks, the combined focused plus Batch suite returned **36 passed in 29.71 s**. A final full focused/regression run is recorded below when complete.
+- Selected surrounding GUI, discovery and subset-selection suite — **57 passed in 56.98 s**. This preceded the final mapping-preview/test additions, which have their separate passing run above.
+- Additional offscreen SIFT2/control and Connectivity/matrix cases — **4 passed in 9.53 s**.
+- Scientific foundation and CLI — **56 passed in 0.75 s**. These verify existing core import/planning/approval and CLI contracts; they do not prove anatomical or processing validity on research data.
+- Final combined selection after the last code changes: `PYTHONPATH=src QT_QPA_PLATFORM=offscreen OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/python -m pytest -q tests/gui/test_usability_audit_fixes.py tests/gui/test_phase6_scientific_inputs.py tests/gui/test_registration_guided.py tests/gui/test_batch_guided.py tests/gui/test_scientific_planning.py::test_actual_import_dialog_declarations_no_inference tests/gui/test_sift2_gui.py::test_sift2_controls_native_defaults_and_state tests/gui/test_connectome_gui.py::test_matrix_display_selection_and_nonfinite_states tests/core/test_batch_discovery.py tests/core/test_batch_selection.py tests/core/test_scientific_foundation.py tests/cli --tb=short` — **121 passed in 71.42 s**.
+- A broad offscreen GUI selection crashed at `QVTKRenderWindowInteractor` in a Viewer test; a dependency GUI selection reached the same offscreen VTK crash. Neither run provides a completed suite result. A single `QT_QPA_PLATFORM=cocoa` test also crashed during MainWindow/QC construction under this restricted session. These reproduce the known sandbox boundary, so they are **not** treated as application regressions or native passes.
+
+One offscreen, empty-state `scripts/benchmark_gui_performance.py` run after changes exited 0: script-to-interactive **937.576 ms**, first/return Registration **64.289/55.582 ms**, Reconstruction **451.425/26.564 ms**, and Batch **104.280/21.258 ms**; 1,000-row Batch initial render **34.227 ms**, unchanged journal refresh **0.030 ms**, inactive timer ticks **0** over 1,800 ms. This is one warm offscreen sample, not a before/after comparison or native performance claim.
+
+## Native verification
+
+**No new GUI interaction in this audit-fix branch has passed native Cocoa verification in the Codex session.** Earlier Phase 1–6 native results are historical evidence on older commits. A normal Mac Terminal run against the final committed HEAD is required for fresh-launch Preprocessing, scoped import, registration candidate/keyboard behavior, Batch source selection, and visual registration layout. Offscreen layout coordinates cannot establish that the heading is visually unclipped at Cocoa display scales. The Phase 1–7 scientific-validation backlog remains unchanged.
+
+## Next native check
+
+From a normal Mac Terminal, after the final commit, run:
+
+```sh
+cd ~/Projects/dmri-studio2.0/TractoSphere-publication
+git status --short --branch
+git rev-parse --short HEAD
+PYTHONPATH=src QT_QPA_PLATFORM=cocoa OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/python -m pytest -q tests/gui/test_usability_audit_fixes.py tests/gui/test_registration_guided.py tests/gui/test_batch_guided.py --tb=short
+echo "Native audit-fix exit code: $?"
+```
+
+The tests use generated NIfTI images and placeholder discovery files; they do not run long MRI processing. A visual researcher check is still needed for the registration heading at 960×640 and 1280×840 in light/dark themes, file chooser opening, focus return and readable mapped-file previews.

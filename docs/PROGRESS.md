@@ -1,5 +1,16 @@
 # Outstanding Scientific Verification and Release Blockers
 
+## 2026-10-24 — Screenshot-led usability audit corrections
+
+The local [usability audit correction record](USABILITY_AUDIT_FIXES_2026-10-24.md)
+tracks U1–U9: fresh Preprocessing access, scoped scientific imports and
+candidate explanations, duplicate identity-field removal, guided Batch source
+instructions/errors, Registration layout inset and Reconstruction guidance.
+Synthetic offscreen GUI/core/CLI results and the restricted Cocoa/VTK failures
+are recorded there. Native interactions on this branch remain pending; the
+permanent 38-task scientific-validation backlog and all approval gates remain
+unchanged.
+
 ## 2026-10-24 — Phase 7 EDDY evidence audit and experiment design
 
 On `development/phase7-eddy-validation` from Phase 6 commit `8102df1`,
