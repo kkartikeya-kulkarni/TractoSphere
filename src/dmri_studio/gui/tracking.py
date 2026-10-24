@@ -154,6 +154,14 @@ class TrackingExecutionPanel(QScrollArea):
         form.addRow(self.backtrack)
         form.addRow(self.crop)
         setup.addLayout(form)
+        setup.addWidget(
+            label(
+                "Quick guide: Seeding is where new tracks start. A tracking mask limits "
+                "where they may travel. Requested streamlines is how many tracks "
+                "to generate. You can leave advanced tracking settings collapsed.",
+                "caption",
+            )
+        )
         self.description = label(
             "Select verified inputs. Source/ROI subject and space declarations must agree; geometry alone cannot establish registration.",
             "caption",
@@ -184,7 +192,11 @@ class TrackingExecutionPanel(QScrollArea):
         self.threads = QSpinBox()
         self.threads.setRange(1, 64)
         self.threads.setValue(2)
-        self.ends = QCheckBox("Test only endpoints against include/exclude ROIs (filtering only)")
+        self.ends = QCheckBox("For existing tracks, check only endpoints (not the full pathway)")
+        self.ends.setToolTip(
+            "For filtering an existing tractogram only: keep or reject streamlines "
+            "based on their start/end points instead of every point along the path."
+        )
         self.directional = QCheckBox("Also use directional RGB density channels (LR, AP, SI)")
         self.rk4 = QCheckBox("Fourth-order integration (deterministic methods only)")
         self.samples = QSpinBox()
@@ -239,25 +251,52 @@ class TrackingExecutionPanel(QScrollArea):
             a.addRow(w)
         setup.addWidget(Disclosure("Advanced tracking and filtering", advanced, expanded=False))
         roi_widget = QWidget()
-        r = QHBoxLayout(roi_widget)
+        region_layout = QVBoxLayout(roi_widget)
+        region_layout.addWidget(
+            label(
+                "Choose the regions a streamline must cross or avoid. These are "
+                "path constraints, not where the seeds are placed. "
+                "Use endpoint-only filtering above if endpoints are your goal.",
+                "caption",
+            )
+        )
+        r = QHBoxLayout()
+        region_layout.addLayout(r)
         self.constraints = {}
-        for role, title in [
-            ("include", "Include all"),
-            ("exclude", "Exclude any"),
-            ("ordered", "Ordered waypoints · drag to reorder"),
-        ]:
+        explanations = {
+            "include": (
+                "Must pass through all selected regions",
+                "Keep a streamline only if its pathway intersects every checked ROI. "
+                "The order does not matter here.",
+            ),
+            "exclude": (
+                "Must avoid every selected region",
+                "Reject a streamline if its pathway intersects any checked ROI.",
+            ),
+            "ordered": (
+                "Pass through in this order",
+                "Require these ROIs as ordered waypoints. Drag regions to reorder "
+                "them. Passing through differs from ending inside a region.",
+            ),
+        }
+        for role in ("include", "exclude", "ordered"):
+            title, explanation = explanations[role]
             col = QVBoxLayout()
             col.addWidget(label(title, "caption"))
             w = QListWidget()
             w.setMaximumHeight(140)
             w.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
             w.setAccessibleName(title)
+            w.setToolTip(explanation)
             col.addWidget(w)
+            col.addWidget(label(explanation, "caption"))
             r.addLayout(col)
             self.constraints[role] = w
             w.itemChanged.connect(self.invalidate)
             w.model().rowsMoved.connect(self.invalidate)
-        setup.addWidget(Disclosure("ROI constraints", roi_widget, expanded=False))
+        setup.addWidget(
+            Disclosure("Where should the tracks travel? (ROI rules)", roi_widget, expanded=False)
+        )
         setup.addWidget(button("Use selected viewer ROIs…", self.owner.roi_import_requested.emit))
         setup.addWidget(
             label(
