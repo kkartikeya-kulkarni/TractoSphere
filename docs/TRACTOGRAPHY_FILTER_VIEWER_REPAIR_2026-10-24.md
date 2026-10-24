@@ -125,10 +125,13 @@ recorded hash. Synthetic regression fixtures now match the real plan shape and
 test source/reference tampering. The corrected targeted native Cocoa walkthrough
 passed at application commit `3f4cbbf`: **1 passed in 2.86 seconds, exit 0**.
 It exercised the Viewer button, two loaded groups, source-specific approved
-filtering, filtered-result loading, and original-source reopening. The full
-seven-test Cocoa suite has not been rerun at this commit. Native file-picker
-layout, atlas selection, broader Viewer preservation, real TRK conversion, and
-real anatomical correspondence remain explicit follow-ups.
+filtering, filtered-result loading, and original-source reopening. The user's
+consolidated Cocoa suite at documentation HEAD `3fade02` (same application
+code `3f4cbbf`) passed **7 tests in 22.36 seconds, exit 0**: all guided native
+cases, legacy tracking execution, full-source ROI dialog filtering and return,
+and real-child cancellation. Native file-picker layout, atlas selection,
+broader Viewer preservation, real TRK conversion, and real anatomical
+correspondence remain explicit follow-ups.
 
 ## Native acceptance on the normal Mac
 

@@ -18,8 +18,9 @@ timed out. A targeted Cocoa diagnostic at `070e555` showed that it sent the
 reference NIfTI as a tractogram. The action now uses the explicit tractogram
 binding and source hash; corrected offscreen handoff tests pass. The targeted
 native Cocoa walkthrough at `3f4cbbf` passed **1 test in 2.86 seconds (exit
-0)**, including verified original-source reopening. The full seven-test Cocoa
-suite has not been rerun at that commit. The 38-task
+0)**, including verified original-source reopening. The consolidated Cocoa
+suite at documentation HEAD `3fade02` (same application code) then passed
+**7 tests in 22.36 seconds, exit 0**. The 38-task
 scientific backlog and separate Phase 7 EDDY work retain their statuses.
 
 ## 2026-10-24 — Native Registration low-b summary follow-up
