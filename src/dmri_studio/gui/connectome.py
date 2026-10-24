@@ -323,15 +323,41 @@ class ConnectomePanel(QWidget):
         self.reference = QComboBox()
         self.fa = QComboBox()
         self.weights = QComboBox()
-        for text, w in [
-            ("Tractogram", self.tracts),
-            ("Registered parcellation", self.atlas),
-            ("Anatomical / FA reference", self.reference),
-            ("FA sampling image", self.fa),
-            ("SIFT2 weight factors", self.weights),
+        self.input_rows = {}
+        self.import_buttons = {}
+        for key, text, w, kind, action_text in [
+            ("tracts", "Tractogram", self.tracts, "tractogram", "Import tractogram…"),
+            ("atlas", "Registered parcellation", self.atlas, "atlas_labels", "Import atlas…"),
+            (
+                "reference",
+                "Anatomical / FA reference",
+                self.reference,
+                "anatomy",
+                "Import reference…",
+            ),
+            ("fa", "FA sampling image", self.fa, "anatomy", "Import FA image…"),
+            (
+                "weights",
+                "SIFT2 weight factors",
+                self.weights,
+                "streamline_weights",
+                "Import weights…",
+            ),
         ]:
-            form.addRow(text, w)
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.addWidget(w, 1)
+            action = button(
+                action_text,
+                lambda _=False, selected=kind: self.owner.browse_import(selected),
+            )
+            action.setAccessibleName(f"Import {text}")
+            row_layout.addWidget(action)
+            form.addRow(text, row)
             w.setAccessibleName(text)
+            self.input_rows[key] = row
+            self.import_buttons[key] = action
         self.metric = QComboBox()
         for key, text in [
             ("all", "Count, mean length and mean FA"),
@@ -400,18 +426,6 @@ class ConnectomePanel(QWidget):
             "Select a tractogram, registered atlas and reference image.", "caption"
         )
         setup.addWidget(self.input_help)
-        imports = QHBoxLayout()
-        for title, kind in (
-            ("Import tractogram…", "tractogram"),
-            ("Import atlas…", "atlas_labels"),
-            ("Import reference…", "anatomy"),
-            ("Import weights…", "streamline_weights"),
-        ):
-            imports.addWidget(
-                button(title, lambda _=False, selected=kind: self.owner.browse_import(selected))
-            )
-        imports.addStretch()
-        setup.addLayout(imports)
         setup.addWidget(self.advanced)
         self.preview = button("Preview commands", self.prepare)
         self.approve = QCheckBox(
@@ -494,6 +508,16 @@ class ConnectomePanel(QWidget):
 
     def update_input_help(self, *_):
         """Describe missing selections without presenting them as verified science."""
+        metric = self.metric.currentData()
+        needs_fa = metric in {"all", "all_sift2", "mean_fa", "sift2_mean_fa"}
+        needs_weights = metric in {
+            "all_sift2",
+            "sift2_weighted",
+            "sift2_mean_length",
+            "sift2_mean_fa",
+        }
+        self.form.setRowVisible(self.input_rows["fa"], needs_fa)
+        self.form.setRowVisible(self.input_rows["weights"], needs_weights)
         missing = [
             name
             for name, control in (
@@ -503,29 +527,37 @@ class ConnectomePanel(QWidget):
             )
             if control.currentData() is None
         ]
+        if needs_fa and self.fa.currentData() is None:
+            missing.append("an identified FA sampling image")
+        if needs_weights and self.weights.currentData() is None:
+            missing.append("exact-source SIFT2 weight factors")
         self.input_help.setText(
-            "Select "
+            "Select or import "
             + ", ".join(missing)
-            + ". Atlas registration, node identity and exact source binding are checked during plan validation."
+            + ". Use the action beside each input. For FA, import an anatomy/scalar image and explicitly declare Metric identity = FA; a filename is not sufficient. SIFT2 factors require their exact tractogram binding. Atlas registration, node identity and source binding are checked during plan validation."
             if missing
             else "Inputs selected. Validate atlas/tractogram correspondence, node IDs, assignment and weighting before approval."
         )
 
     def refresh(self):
-        for combo, kind in [
-            (self.tracts, "tractogram"),
-            (self.atlas, "atlas_labels"),
-            (self.reference, "anatomy"),
-            (self.fa, "anatomy"),
-            (self.weights, "streamline_weights"),
+        for combo, kind, name in [
+            (self.tracts, "tractogram", "tractogram"),
+            (self.atlas, "atlas_labels", "registered parcellation"),
+            (self.reference, "anatomy", "anatomical reference"),
+            (self.fa, "anatomy", "FA image"),
+            (self.weights, "streamline_weights", "SIFT2 factors"),
         ]:
             selected = combo.currentData()
             combo.blockSignals(True)
             combo.clear()
-            combo.addItem("Choose…", None)
+            combo.addItem(f"Select imported {name}…", None)
             for a in self.owner.artifacts:
-                if a.kind == kind:
+                if a.kind == kind and (
+                    combo is not self.fa or a.payload["declarations"].get("metric") == "FA"
+                ):
                     combo.addItem(Path(a.payload["path"]).name + " · " + a.id[:8], a.id)
+            if combo.count() == 1:
+                combo.setItemText(0, f"No imported {name} — use Import beside this field")
             combo.setCurrentIndex(max(0, combo.findData(selected)))
             combo.blockSignals(False)
         self.show_nodes()
