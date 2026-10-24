@@ -73,6 +73,7 @@ def test_native_guided_generate_and_density_open_verified_results(window, qtbot,
     assert panel.manifest["status"] == "validated_pending_qc", page.status.text()
     product = panel.maps.currentData()
     assert product["kind"] == "scalar" and guided.open_button.isEnabled()
+    assert product["path"].endswith(".nii.gz")
     guided.open_button.click()
     qtbot.waitUntil(lambda: page.thread is None, timeout=15000)
     qtbot.waitUntil(
@@ -90,7 +91,10 @@ def test_native_guided_generate_and_density_open_verified_results(window, qtbot,
     or not Path("/usr/local/mrtrix3/bin/tckedit").is_file(),
     reason="Native Cocoa/VTK and an actual MRtrix installation are required",
 )
-def test_native_guided_original_atlas_filter_without_preassigned_roles(window, qtbot, tmp_path):
+@pytest.mark.parametrize("ends_only,expected", [(False, 3), (True, 1)])
+def test_native_guided_original_atlas_filter_without_preassigned_roles(
+    window, qtbot, tmp_path, ends_only, expected
+):
     from dmri_studio.core.execution import hash_file
 
     spec = importlib.util.spec_from_file_location(
@@ -99,6 +103,17 @@ def test_native_guided_original_atlas_filter_without_preassigned_roles(window, q
     fixture = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fixture)
     source, declarations = fixture.roi_case.__wrapped__(tmp_path)
+    if ends_only:
+        import nibabel as nib
+        import numpy as np
+
+        loaded = nib.streamlines.load(source / "tracks.tck")
+        lines = list(loaded.streamlines)
+        lines[0] = lines[0][:2]
+        nib.streamlines.save(
+            nib.streamlines.Tractogram(lines, affine_to_rasmm=np.eye(4)),
+            source / "tracks.tck",
+        )
     original_hash = hash_file(source / "tracks.tck")
     window.focus_scientific_viewer()
     viewer = window.scientific_viewer
@@ -118,9 +133,11 @@ def test_native_guided_original_atlas_filter_without_preassigned_roles(window, q
     dialog = viewer.native_roi_dialog
     assert dialog.includes == []
     dialog.region_list.item(0).setSelected(True)
-    dialog.region_list.item(1).setSelected(True)
+    if not ends_only:
+        dialog.region_list.item(1).setSelected(True)
     dialog.assign_regions("include")
     dialog.mode.setCurrentText("OR")
+    dialog.ends.setChecked(ends_only)
     dialog.subject.setText(declarations["subject_id"])
     dialog.space.setText(declarations["space_id"])
     dialog.evidence.setText(declarations["alignment_evidence"])
@@ -132,16 +149,18 @@ def test_native_guided_original_atlas_filter_without_preassigned_roles(window, q
     dialog.preview_button.click()
     qtbot.waitUntil(lambda: dialog.thread is None, timeout=20000)
     assert dialog.plan is not None, dialog.status.text()
+    argv = next(c["argv"] for c in dialog.plan.to_dict()["commands"] if c["kind"] == "tracts")
+    assert ("-ends_only" in argv) == ends_only
     assert not dialog.run_button.isEnabled()
     dialog.approve.setChecked(True)
     dialog.run_button.click()
     qtbot.waitUntil(lambda: dialog.thread is None, timeout=30000)
     assert dialog.result_record["status"] == "validated_pending_qc", dialog.status.text()
-    assert dialog.result_record["validation"]["measurements"][0]["streamlines"] == 3
+    assert dialog.result_record["validation"]["measurements"][0]["streamlines"] == expected
     assert hash_file(source / "tracks.tck") == original_hash
     dialog.open_result()
     assert dialog.source.visible  # The asynchronous output hash check has not hidden it.
     qtbot.waitUntil(lambda: len(viewer.groups) == 2 and not viewer.tasks, timeout=20000)
-    assert viewer.current_group().total == 3
+    assert viewer.current_group().total == expected
     dialog.return_full()
     assert viewer.current_group().total == 4 and viewer.current_group().visible

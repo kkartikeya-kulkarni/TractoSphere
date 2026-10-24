@@ -254,3 +254,60 @@ def test_guided_atlas_selection_prepares_exact_union_plan(qtbot, tmp_path):
     assert not dialog.run_button.isEnabled()
     dialog.approve.setChecked(True)
     assert dialog.run_button.isEnabled()
+
+
+@pytest.mark.skipif(
+    not Path("/usr/local/mrtrix3/bin/tckedit").is_file(), reason="Actual MRtrix required"
+)
+def test_guided_endpoint_only_filter_executes_exact_endpoint_rule(qtbot, tmp_path):
+    import nibabel as nib
+    import numpy as np
+
+    from dmri_studio.core.execution import hash_file
+
+    spec = importlib.util.spec_from_file_location(
+        "roi_fixture", Path(__file__).parents[1] / "core/test_roi_filtering.py"
+    )
+    fixture = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fixture)
+    source, declarations = fixture.roi_case.__wrapped__(tmp_path)
+    loaded = nib.streamlines.load(source / "tracks.tck")
+    lines = list(loaded.streamlines)
+    lines[0] = lines[0][:2]
+    nib.streamlines.save(
+        nib.streamlines.Tractogram(lines, affine_to_rasmm=np.eye(4)), source / "tracks.tck"
+    )
+    source_hash = hash_file(source / "tracks.tck")
+    viewer = viewer_fixture(qtbot, tmp_path)
+    viewer.reference.path = source / "reference.nii.gz"
+    viewer.current_group = lambda: SimpleNamespace(path=source / "tracks.tck", total=4)
+    for region in viewer.rois:
+        region["atlas_source"] = str(source / "atlas.nii.gz")
+    dialog = RoiFilterDialog(viewer)
+    qtbot.addWidget(dialog)
+    dialog.subject.setText(declarations["subject_id"])
+    dialog.space.setText(declarations["space_id"])
+    dialog.evidence.setText(declarations["alignment_evidence"])
+    dialog.reviewed.setChecked(True)
+    dialog.review_fields["registration_diagnostic"].setText(
+        json.dumps(declarations["registration_diagnostic"])
+    )
+    dialog.parent_dir.setText(str(tmp_path))
+    dialog.region_list.setCurrentRow(0)  # Actual atlas label 3
+    dialog.assign_regions("include")
+    dialog.ends.setChecked(True)
+    assert "only actual endpoints" in dialog.summary.text()
+    dialog.preview_button.click()
+    qtbot.waitUntil(lambda: dialog.thread is None, timeout=20000)
+    assert dialog.plan is not None, dialog.status.text()
+    assert "-ends_only" in next(
+        command["argv"]
+        for command in dialog.plan.to_dict()["commands"]
+        if command["kind"] == "tracts"
+    )
+    dialog.approve.setChecked(True)
+    dialog.run_button.click()
+    qtbot.waitUntil(lambda: dialog.thread is None, timeout=30000)
+    assert dialog.result_record["status"] == "validated_pending_qc", dialog.status.text()
+    assert dialog.result_record["validation"]["measurements"][0]["streamlines"] == 1
+    assert hash_file(source / "tracks.tck") == source_hash

@@ -443,6 +443,13 @@ def test_guided_density_and_unlimited_filter_prepare_real_commands(window, qtbot
     assert page.tracking.manifest["status"] == "validated_pending_qc", page.status.text()
     assert page.tracking.maps.currentData()["kind"] == "scalar"
     assert guided.open_button.isEnabled()
+    import nibabel as nib
+    import numpy as np
+
+    density_image = nib.load(page.tracking.maps.currentData()["path"])
+    reference_image = nib.load(source / "reference.nii.gz")
+    assert density_image.shape[:3] == reference_image.shape[:3]
+    np.testing.assert_allclose(density_image.affine, reference_image.affine)
     assert hash_file(source / "tracks.tck") == original_hash
 
 
@@ -458,12 +465,17 @@ def test_verified_density_product_is_available_to_open_in_viewer(window, tmp_pat
             "output_directory": str(folder),
             "bindings": [
                 {
-                    "outputs": {"density": "density.nii.gz", "reference": "reference.nii.gz"},
+                    "outputs": {
+                        "density": "density.mif",
+                        "density_nifti": "density.nii.gz",
+                        "reference": "reference.nii.gz",
+                    },
                     "source": {"declarations": {"subject_id": "synthetic", "space_id": "grid"}},
                 }
             ],
         },
         "outputs": {
+            "density.mif": {"sha256": "native-density-hash"},
             "density.nii.gz": {"sha256": "density-hash"},
             "reference.nii.gz": {"sha256": "reference-hash"},
         },

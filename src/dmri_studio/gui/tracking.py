@@ -656,7 +656,10 @@ class TrackingExecutionPanel(QScrollArea):
                 folder = Path(result["plan"]["output_directory"])
                 for row in result["plan"]["bindings"]:
                     for role, name in row["outputs"].items():
-                        if role == "reference":
+                        # MRtrix's native density MIF is a verified scientific
+                        # product, but the Viewer accepts its separately verified
+                        # NIfTI export. Keep the MIF in the manifest, not this list.
+                        if role in {"reference", "density"}:
                             continue
                         self.maps.addItem(
                             name,
