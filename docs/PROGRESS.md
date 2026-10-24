@@ -3,8 +3,9 @@
 The permanent, prioritized task register and EDDY experimental protocol are in
 [SCIENTIFIC_VALIDATION_BACKLOG.md](SCIENTIFIC_VALIDATION_BACKLOG.md). It links the
 [Phase 0](PHASE0_AUDIT_AND_HANDOFF.md), [Phase 1](PHASE1_IMPLEMENTATION_AND_HANDOFF.md),
-[Phase 2](PHASE2_IMPLEMENTATION_AND_HANDOFF.md), [Phase 3](PHASE3_IMPLEMENTATION_AND_HANDOFF.md)
-and [Phase 4](PHASE4_IMPLEMENTATION_AND_HANDOFF.md) evidence. This register is the
+[Phase 2](PHASE2_IMPLEMENTATION_AND_HANDOFF.md), [Phase 3](PHASE3_IMPLEMENTATION_AND_HANDOFF.md),
+[Phase 4](PHASE4_IMPLEMENTATION_AND_HANDOFF.md) and
+[Phase 5](PHASE5_IMPLEMENTATION_AND_HANDOFF.md) evidence. This register is the
 current list of open scientific verification and release decisions; historical
 test counts in the handoffs remain dated evidence, not a current full-suite pass.
 It currently records **38 open tasks: 15 P0, 20 P1 and 3 P2**. The six linked
@@ -15,6 +16,21 @@ implementation and verification record is in
 [PHASE5_IMPLEMENTATION_AND_HANDOFF.md](PHASE5_IMPLEMENTATION_AND_HANDOFF.md).
 The open validation tasks do not become verified through a guided interface or
 synthetic GUI walkthrough. The 38-task register and EDDY workstream remain intact.
+
+# 2026-10-23 — Phase 5 guided Registration checkpoint
+
+The task-first Registration interface, exact typed planning/approval, verified
+Viewer inspection, categorical atlas display and advanced transform controls are
+recorded in [the Phase 5 handoff](PHASE5_IMPLEMENTATION_AND_HANDOFF.md). At code
+commit `5c30ded`, a normal Mac Terminal returned **13 native Cocoa/BatchRunner
+tests passed** and measured Registration first/return navigation at **51.971 /
+34.553 ms** without loaded data. At `4e5e4c9`, an expanded native test passed
+for an actual two-subject BatchRunner QC result opened through guided results,
+including acquisition identity and changed-report rejection. The comparable
+offscreen navigation median increased from 32.145/33.367 to 58.175/50.819 ms;
+that tradeoff is tracked under `SV-PERF05`. Real anatomical validation,
+researcher usability review, wider Batch product handoff and true cold start
+remain open. No scientific backlog task was closed by this UX checkpoint.
 
 # 2026-10-23 — Phase 1 scientific software configuration
 

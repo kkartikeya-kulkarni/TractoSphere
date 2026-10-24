@@ -1,6 +1,6 @@
 # Outstanding Scientific Verification and Release Blockers
 
-Updated 2026-10-23 from local Phase 4 checkpoint `3faf38d`. This is a **planning and evidence register**, not a new scientific test run. No preprocessing policy, scientific algorithm, acceptance threshold, or release state changed in this update. The Phase 0–4 records remain the source for their exact commands, dates, environments, and results: [Phase 0](PHASE0_AUDIT_AND_HANDOFF.md), [Phase 1](PHASE1_IMPLEMENTATION_AND_HANDOFF.md), [Phase 2](PHASE2_IMPLEMENTATION_AND_HANDOFF.md), [Phase 3](PHASE3_IMPLEMENTATION_AND_HANDOFF.md), and [Phase 4](PHASE4_IMPLEMENTATION_AND_HANDOFF.md). See also [limitations](limitations.md), [architecture](architecture.md), and the older [release validation record](validation.md).
+Created 2026-10-23 from local Phase 4 checkpoint `3faf38d`; targeted Phase 5 evidence was appended after native testing at `4e5e4c9`. This is a **planning and evidence register**, not a new broad scientific validation. No preprocessing policy, scientific algorithm, acceptance threshold, or release state changed in this update. The phase handoffs remain the source for exact commands, dates, environments, and results: [Phase 0](PHASE0_AUDIT_AND_HANDOFF.md), [Phase 1](PHASE1_IMPLEMENTATION_AND_HANDOFF.md), [Phase 2](PHASE2_IMPLEMENTATION_AND_HANDOFF.md), [Phase 3](PHASE3_IMPLEMENTATION_AND_HANDOFF.md), [Phase 4](PHASE4_IMPLEMENTATION_AND_HANDOFF.md), and [Phase 5](PHASE5_IMPLEMENTATION_AND_HANDOFF.md). See also [limitations](limitations.md), [architecture](architecture.md), and the older [release validation record](validation.md).
 
 ## How to use this register
 
@@ -81,15 +81,15 @@ The owner-reported 13 October 2026 correspondence from Professor Jesper Andersso
 - **Origin / priority / status / subsystem:** Phase 3; P0; Implemented, unverified; Batch results, product loader and Viewer.
 - **Acceptance:** From a verified Batch output, complete native Cocoa/VTK Viewer loading and assert exact product hash, input/source and acquisition identity, NIfTI geometry/affine or tract coordinates, registered-space evidence, provenance and failure behavior for tampered/stale outputs. Opening a product must not imply scientific QC approval.
 - **Environment:** Normal Mac Terminal with Cocoa/VTK and real compatible MRtrix/FSL as needed; synthetic multi-file DWI, image and registration outputs.
-- **Evidence:** Phase 3 had six native Batch GUI passes at `bc3723c`, including verified output inspection and Open signal; MainWindow loader routing was offscreen tested. It explicitly did **not** complete a native Viewer load.
-- **Remaining / dependencies and blockers:** Add native end-to-end assertions for actual Viewer state and failure cases. Depends on supported product route and valid spatial declarations.
+- **Evidence:** Phase 3 had six native Batch GUI passes at `bc3723c`, including verified output inspection and Open signal; MainWindow loader routing was offscreen tested. Phase 5 normal-Terminal Cocoa at `4e5e4c9` followed an actual two-subject BatchRunner registration QC output from the guided results page into the Viewer, checked selected acquisition, product hash, reference/atlas paths, pending review, and rejection of a changed derived QC report. The broader Phase 5 native selection was 13 passed at `5c30ded`.
+- **Remaining / dependencies and blockers:** Extend native integrity/identity and geometry checks to other supported Batch image and tractogram products, including tampered inputs and stale spatial associations. The targeted registration QC route does not satisfy the entire cross-product acceptance matrix. Depends on supported product routes and valid spatial declarations.
 
 ### SV-C01 — Validate currently supported atlas/transform spatial contracts
 
 - **Origin / priority / status / subsystem:** Stage C and Phase 0; P0; Implemented, unverified for broad scientific scope; registration, atlas, transforms, ROI/connectome downstream consumers.
 - **Acceptance:** With ground-truth or expert-reviewed data, verify transform direction, reference/moving identity, affine/warp composition, interpolation for labels versus intensities, round trips, subject/space metadata, stale review invalidation and downstream atlas/ROI/connectome use. Reject unsupported transforms rather than guessing a conversion.
 - **Environment:** Native scientific tools, synthetic phantoms with known mappings and permitted real anatomical/diffusion data; native Viewer QC and CLI/core tests.
-- **Evidence:** Phase 0 records implemented FSL/MRtrix registration and native atlas QC, Stage A review repair, and deliberate blocks on unsupported ANTs/HDF5/nonlinear paths. This is not broad anatomical validation.
+- **Evidence:** Phase 0 records implemented FSL/MRtrix registration and native atlas QC, Stage A review repair, and deliberate blocks on unsupported ANTs/HDF5/nonlinear paths. Phase 5 ran 13 core registration tests and 13 targeted native Cocoa/BatchRunner cases at `5c30ded`; the latter used synthetic images and approved fixture declarations. This is not broad anatomical validation.
 - **Remaining / dependencies and blockers:** Build a supported-format matrix and independent reference comparisons. Stage C expansion is separately `SV-C02`; Phase 5 UX must preserve these gates.
 
 ### SV-MOD01 — Numerically validate DTI and CSD/FOD outputs
@@ -195,8 +195,8 @@ The owner-reported 13 October 2026 correspondence from Professor Jesper Andersso
 - **Origin / priority / status / subsystem:** Phase 2 onward; P1; In progress; lazy workspaces, Batch polling, worker lifecycle.
 - **Acceptance:** Record repeated startup/navigation/idle benchmarks at each major UI checkpoint and guard page reuse, signal counts, zero inactive Batch polling, unchanged journal fast path and source state. Investigate meaningful regressions with identical conditions.
 - **Environment:** Offscreen synthetic benchmark plus periodic normal Mac Cocoa check.
-- **Evidence:** Phase 2 reduced comparable offscreen script-to-interactive median from 1,213.8 to 829.5 ms and unchanged 1,000-row journal refresh to ~0.04 ms; Phase 4 measured a Tractography navigation regression tracked by `SV-TRK03`.
-- **Remaining / dependencies and blockers:** Keep comparisons paired; do not claim native cold-start speedup from warm-cache offscreen samples.
+- **Evidence:** Phase 2 reduced comparable offscreen script-to-interactive median from 1,213.8 to 829.5 ms and unchanged 1,000-row journal refresh to ~0.04 ms; Phase 4 measured a Tractography navigation regression tracked by `SV-TRK03`. Phase 5 comparable offscreen Registration first/return medians increased from 32.145/33.367 to 58.175/50.819 ms with the guided page/header, while remaining below the 200 ms interaction target. Normal-Terminal Cocoa samples at `5c30ded` were 51.971/34.553 ms empty and 51.371/34.762 ms with a small synthetic NIfTI loaded; no native pre-change Phase 5 baseline exists. Inactive Batch polling remained zero in the benchmark.
+- **Remaining / dependencies and blockers:** Keep comparisons paired; profile the added Registration layout/navigation cost if it grows or becomes noticeable with real data. Do not claim native cold-start speedup from warm-cache script samples.
 
 ### SV-BAT03 — Conduct manual seven-step Batch usability review
 
@@ -219,8 +219,8 @@ The owner-reported 13 October 2026 correspondence from Professor Jesper Andersso
 - **Origin / priority / status / subsystem:** Phase 3 and Stage C; P1; Implemented, unverified broadly; Batch registration QC and scientific review.
 - **Acceptance:** Test eligible, rejected, stale and missing registration evidence in guided Batch results/history; confirm no automatic approval, exact transform/source identity and downstream gating across GUI/core/CLI.
 - **Environment:** Synthetic geometry/transform fixtures, compatible FSL/MRtrix, normal Mac Cocoa for Viewer review.
-- **Evidence:** Existing registration QC routes were preserved; Phase 3 targeted synthetic Batch walkthrough did not cover a broad registration QC matrix.
-- **Remaining / dependencies and blockers:** Depends on `SV-C01`; include historical records and changed evidence.
+- **Evidence:** Existing registration QC routes were preserved; Phase 3 targeted synthetic Batch walkthrough did not cover a broad registration QC matrix. Phase 5 normal-Terminal Cocoa at `4e5e4c9` reopened an actual two-subject BatchRunner, inspected one selected QC bundle in the Viewer, verified exact subject/session/acquisition identity and pending human review, and refused a changed derived report. The selected native Registration/BatchRunner suite was 13 passed at `5c30ded`.
+- **Remaining / dependencies and blockers:** Complete the guided Batch matrix for missing/rejected/stale evidence, downstream eligibility and historical transform/source identity across acquisitions. Depends on `SV-C01`; the targeted successful handoff does not close broad QC coverage.
 
 ### SV-BAT06 — Test additional supported Batch scientific workflows
 
