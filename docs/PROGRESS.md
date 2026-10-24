@@ -1,3 +1,17 @@
+# Outstanding Scientific Verification and Release Blockers
+
+The permanent, prioritized task register and EDDY experimental protocol are in
+[SCIENTIFIC_VALIDATION_BACKLOG.md](SCIENTIFIC_VALIDATION_BACKLOG.md). It links the
+[Phase 0](PHASE0_AUDIT_AND_HANDOFF.md), [Phase 1](PHASE1_IMPLEMENTATION_AND_HANDOFF.md),
+[Phase 2](PHASE2_IMPLEMENTATION_AND_HANDOFF.md), [Phase 3](PHASE3_IMPLEMENTATION_AND_HANDOFF.md)
+and [Phase 4](PHASE4_IMPLEMENTATION_AND_HANDOFF.md) evidence. This register is the
+current list of open scientific verification and release decisions; historical
+test counts in the handoffs remain dated evidence, not a current full-suite pass.
+It currently records **38 open tasks: 15 P0, 20 P1 and 3 P2**. The six linked
+EDDY tasks are a Stage B investigation; no preprocessing default has changed.
+Phase 5 Registration UX development may begin from Phase 4 commit `3faf38d`, but
+the open validation tasks do not become verified by starting that phase.
+
 # 2026-10-23 — Phase 1 scientific software configuration
 
 The current Phase 1 implementation, tests, unresolved native/sandbox verification and next action are recorded in [PHASE1_IMPLEMENTATION_AND_HANDOFF.md](PHASE1_IMPLEMENTATION_AND_HANDOFF.md). The work is on `development/phase1-scientific-software-2026-10-23`; public `main`, releases and draft PR #3 remain untouched.
