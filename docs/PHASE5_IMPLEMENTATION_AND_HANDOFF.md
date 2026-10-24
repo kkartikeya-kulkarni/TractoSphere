@@ -2,6 +2,8 @@
 
 Branch `development/phase5-registration-ux-2026-10-23` was created from clean Phase 4 checkpoint `cdc0c71`. This is a development record; do not push, merge, alter public `main`, or release. The 38 open tasks in [the scientific backlog](SCIENTIFIC_VALIDATION_BACKLOG.md) remain open unless a task's own acceptance evidence is completed. Earlier results are in the [Phase 0](PHASE0_AUDIT_AND_HANDOFF.md), [Phase 1](PHASE1_IMPLEMENTATION_AND_HANDOFF.md), [Phase 2](PHASE2_IMPLEMENTATION_AND_HANDOFF.md), [Phase 3](PHASE3_IMPLEMENTATION_AND_HANDOFF.md) and [Phase 4](PHASE4_IMPLEMENTATION_AND_HANDOFF.md) handoffs.
 
+Local commits: `f58366b` audited the original interface and baseline; `1fa1009` implemented the guided task, Viewer and verified historical Batch handoff. Documentation is a separate tracking commit. No GitHub push or PR is part of Phase 5 work so far.
+
 ## Checkpoint 5.0: audit and baseline
 
 The original `RegistrationPanel` puts every registry operation in a single method combo, followed by a generic `TaskDialog`. The default view exposes transform import, raw typed-task JSON, output, threads, exact commands, approval and QC together. It does not lead a researcher from an intended goal to moving/fixed images and a compatible method. `RegistrationView` already offers Overlay, Outlines, Checkerboard, Registered Only, Reference Only, blink, categorical atlas region visibility, immutable review and report export. Batch has registration workflow/QC entry points but its native product-to-Viewer integration is not fully verified.
@@ -10,6 +12,46 @@ Core `prepare_registration` is the authoritative planner and command gate. The r
 
 Baseline in the restricted local session: `PYTHONPATH=src QT_QPA_PLATFORM=offscreen OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/python -m pytest -q tests/test_registration.py tests/gui/test_scientific_planning.py -k 'not scientific_routes_independent_and_preserve_scene' --tb=short` returned **19 passed, 1 deselected in 16.04 s**. `tests/gui/test_registration_gui.py` contains native VTK/installed-tool tests and was not run offscreen as a substitute for Cocoa. Three separate warm-cache offscreen `scripts/benchmark_gui_performance.py` processes on the local Apple ARM64 Mac measured Registration first-open median **32.145 ms (32.014–32.191)** and return median **33.367 ms (33.269–33.989)** in the benchmark's normal navigation sequence. Batch first/return medians were **93.767/19.823 ms**; Tractography first/return medians **46.894/33.041 ms**. These are not native cold-start or loaded-data measurements.
 
-## Implementation state
+## Checkpoints 5.1–5.3: guided tasks and exact planning
 
-Checkpoint 5.0 audited and measured. Checkpoints 5.1–5.6, native Cocoa verification, researcher usability review and real anatomical validation remain pending. Keep the exact core planner, approval and QC/review services authoritative.
+`RegistrationPanel` now starts with five separate researcher goals: create a diffusion reference, align diffusion/EPI with T1, align two images, move an atlas or ROI, and inspect existing evidence. The applicable inputs and method controls are shown on one task page at a time. The form names moving and fixed images, shows the direction, explains each goal and provides missing-input guidance. It selects compatible imported candidates but delegates final eligibility to the core. The low-b form exposes the actual first/mean selection and threshold; EPI/T1 exposes the required T1 brain image and WM segmentation; image alignment exposes rigid/affine and the supported cost choices; derivative movement maps atlas labels, binary ROIs, scalar anatomy and probability maps to the corresponding existing registry operations. No transform inverse or chain is guessed.
+
+The guided form creates the original typed `Task` and invokes the existing asynchronous `prepare_registration`, `execute_plan` and plan digest approval. Exact commands, scientific limitations and approval digest remain visible. A change to the goal, input, method, output or resources invalidates the draft plan. Ordinary navigation does not recreate the Registration panel. The former specialist controls, including FNIRT, inversion, composition, conversion, explicit transform import and typed task configuration, remain under **Advanced Registration Tools**. An explicitly assigned advanced task is preserved by preview; a cross-phase regression test caught and verified that compatibility fix.
+
+## Checkpoints 5.4–5.5: inspection, review and Batch handoff
+
+Direct registration products now open only from a technically validated manifest with unchanged inputs. A generated low-b NIfTI has an image Viewer route. Atlas labels and ROI masks carry categorical display semantics into the existing Viewer, including when a historical Batch attempt is inspected through `inspect_run`; the original source and expected output/reference hashes remain bound to the saved record. The Viewer still verifies the product and reference hashes and overlay grid before display. Overlay, Outlines, Checkerboard, Registered Only, Reference Only and Blink use the existing linked image views; the first five modes now have short explanations. Formal review and QC report controls become available only for a verified registered-atlas QC bundle. A generic alignment can be inspected but is not presented as formally anatomically approved. Batch's existing seven-step results, registration QC table and verified-product route remain in place.
+
+## Changed files
+
+- `src/dmri_studio/gui/registration_guided.py`: task-first forms, candidate inventory, typed task construction, preview/approval/result controls.
+- `src/dmri_studio/gui/registration.py`: guided/advanced integration, typed-task compatibility, verified Viewer product routes.
+- `src/dmri_studio/gui/registration_view.py`: mode explanations, categorical product display, QC-only review/report controls.
+- `src/dmri_studio/core/runs.py`: categorical identity on hash-verified historical registration products.
+- `tests/gui/test_registration_guided.py`, `tests/gui/test_registration_guided_native.py`, `tests/gui/test_registration_gui.py`, `tests/test_registration.py`: task/planner, layout, native walkthrough, QC-control and historical-product regressions.
+- `docs/quickstart.md`, `docs/PROGRESS.md`, this handoff: user instructions and tracking.
+
+## Verification status and boundaries
+
+The 13 tests in `tests/test_registration.py` passed with local FSL/MRtrix3 paths, including real synthetic FLIRT, EPI/T1, transform, resampling, reference and QC operations. The final offscreen cross-phase GUI command was `PYTHONPATH=src QT_QPA_PLATFORM=offscreen OPENBLAS_NUM_THREADS=1 FSLDIR=/Users/kulkarnikartikeya/fsl ../application/.venv/bin/python -m pytest -q tests/gui/test_registration_guided.py tests/gui/test_scientific_planning.py tests/gui/test_batch_guided.py tests/gui/test_tracking_guided.py tests/gui/test_phase2_batch_refresh.py tests/gui/test_dependency_setup.py tests/gui/test_scientific_software_settings.py -k 'not scientific_routes_independent_and_preserve_scene and not first_run_viewer_only_during_scan_and_repeat_suppressed' --tb=short`: **69 passed, 2 deselected in 118.95 s**. The two deselected cases instantiate native VTK. A prior cross-phase run was **66 passed, 1 failed, 2 deselected**: the failure identified the typed-task precedence regression, which was fixed and is included in the passing rerun. The separate guided/saved-path targeted rerun was **11 passed**. `tests/cli` was **34 passed** and `tests/core/test_batch_software_defaults.py` was **2 passed**. These runs establish code behavior on synthetic, identified inputs; they are not anatomical validation of human data. The core BatchRunner registration suite attempted in the Codex sandbox had **2 failures at `psutil.process_iter` → macOS `sysctl` permission denial**, before execution; its other selected core/CLI tests were **4 passed**. Normal-Terminal BatchRunner verification is pending. An offscreen suite accidentally entered native VTK construction and exited 139 at `QVTKRenderWindowInteractor`; the same sandbox limitation is documented in prior phases. No repeated VTK attempt was made in this restricted session.
+
+Native Cocoa/VTK end-to-end tests in `tests/gui/test_registration_guided_native.py` are implemented for rigid alignment and Viewer modes, EPI/T1, categorical atlas resampling, gradient-selected low-b reference, and a saved Batch registration-product handoff. Existing `tests/gui/test_registration_gui.py` tests atlas QC review, stale evidence and Batch QC. **They are not marked passed until run outside this restricted session against a committed HEAD.** Researcher layout/usability review, genuine anatomical correspondence on suitable data, true native cold-start and broader Stage C transform interoperability remain outstanding. The scientific backlog retains its 38 open tasks unchanged; no EDDY policy or preprocessing default was altered.
+
+The normal-Terminal native checkpoint for implementation commit `1fa1009` is:
+
+```sh
+cd ~/Projects/dmri-studio2.0/TractoSphere-publication
+git rev-parse --short HEAD
+PYTHONPATH=src QT_QPA_PLATFORM=cocoa OPENBLAS_NUM_THREADS=1 FSLDIR="$HOME/fsl" ../application/.venv/bin/python -m pytest -q tests/gui/test_registration_guided_native.py tests/gui/test_registration_gui.py tests/core/test_registration_batch.py --tb=short
+echo "Native exit code: $?"
+```
+
+Backlog `SV-BAT02` (verified native Batch output handoff), `SV-BAT05` (broader Batch registration QC), `SV-C01` (real atlas/transform validation) and `SV-PERF05` (cross-phase navigation) are directly relevant. The targeted synthetic checks and offscreen timing add evidence but do not satisfy their full acceptance criteria. All four remain open; so do the other 34 tasks, including EDDY and real ANTs verification.
+
+## Performance
+
+Three comparable warm-cache offscreen post-change processes measured Registration first-open median **49.681 ms (49.658–50.423)** and return median **44.713 ms (44.327–44.913)**. The Phase 5.0 baseline was **32.145 ms (32.014–32.191)** first and **33.367 ms (33.269–33.989)** return. Thus the guided UI adds **17.536 ms first** and **11.346 ms return** in this benchmark. The panel instance is reused; extra widget layout/paint work is the likely cause, not repeated construction, but this causal attribution is not separately profiled. These measured latencies remain below the 200 ms navigation goal. Batch first/return post-change medians were **97.613/20.679 ms**, versus **93.767/19.823 ms** baseline. Tractography post-change was **48.467/34.108 ms**, versus **46.894/33.041 ms** baseline. The same run showed 1,000-row Batch initial render **33.970–34.617 ms** and unchanged journal refresh **0.029–0.057 ms** after first read. One offscreen process with a tiny generated NIfTI loaded measured Registration **52.331/50.256 ms** first/return, loading **794.270 ms**, and no VTK import; there is no Phase 5 loaded-data baseline for a before/after claim. Native Cocoa, actual MRI and cold-start responsiveness remain unmeasured in this phase.
+
+## Handoff
+
+Commit the reviewed implementation, then request normal-Terminal native Cocoa and BatchRunner tests at that exact HEAD. Review native failures on their own evidence before classifying defects. Do not mark broad registration scientific validation, Batch native QC or the 38-task backlog complete from offscreen/synthetic results alone. Keep the Phase 1–4 branches, public `main`, releases and scientific algorithms unchanged.

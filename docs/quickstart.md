@@ -29,6 +29,28 @@
 8. Use **Runs & reports** and **Quality control** to inspect saved outputs, figures,
    metrics and logs. Scientific review decisions are recorded separately.
 
+## Registration and atlas alignment
+
+Open **Registration** and choose the result you need: create a diffusion low-b
+reference, align diffusion and T1, align two images, move an atlas or ROI, or
+inspect existing evidence. The moving image is transformed toward the fixed
+reference image; the arrow in the form shows that direction. A low-b reference
+is preparation, not anatomical alignment. Existing imported images can be
+selected directly. For EPI-to-T1 alignment, provide the associated T1, its
+brain-extracted image and white-matter segmentation.
+
+To move an atlas or ROI, select its original image, a target reference and a
+verified source-to-target transform. TractoSphere checks exact spatial
+association and uses the supported interpolation for the source type. It does
+not guess an inverse or transformation chain. A new output directory is
+required. **Validate and Preview Plan** shows the command and approval digest;
+execution requires explicit approval. Successful processing leaves anatomical
+review pending. **Inspect Result in Viewer** provides overlay, outlines,
+checkerboard, single-image and blink comparisons. Formal approval/rejection
+requires a supported saved atlas QC bundle; a plausible overlay alone does not
+establish scientific acceptance. Specialist transform and resampling operations
+remain under **Advanced Registration Tools**.
+
 ## Public reference data
 
 The repository contains no MRI arrays. An optional script downloads the CC0

@@ -9,8 +9,12 @@ current list of open scientific verification and release decisions; historical
 test counts in the handoffs remain dated evidence, not a current full-suite pass.
 It currently records **38 open tasks: 15 P0, 20 P1 and 3 P2**. The six linked
 EDDY tasks are a Stage B investigation; no preprocessing default has changed.
-Phase 5 Registration UX development may begin from Phase 4 commit `3faf38d`, but
-the open validation tasks do not become verified by starting that phase.
+Phase 5 Registration UX development began from the consolidated Phase 4/backlog
+checkpoint `cdc0c71` on `development/phase5-registration-ux-2026-10-23`; its
+implementation and verification record is in
+[PHASE5_IMPLEMENTATION_AND_HANDOFF.md](PHASE5_IMPLEMENTATION_AND_HANDOFF.md).
+The open validation tasks do not become verified through a guided interface or
+synthetic GUI walkthrough. The 38-task register and EDDY workstream remain intact.
 
 # 2026-10-23 — Phase 1 scientific software configuration
 
