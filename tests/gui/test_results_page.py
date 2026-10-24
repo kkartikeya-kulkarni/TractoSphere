@@ -40,3 +40,25 @@ def test_processing_disables_output_replacement(window, qtbot, tmp_path):
     assert not window.results.load_output.isEnabled()
     window.processing_busy(False)
     assert window.results.load_output.isEnabled()
+
+
+def test_recent_run_requires_explicit_action_and_rechecks_evidence(window, qtbot, tmp_path):
+    """A remembered path is navigation, not an automatic or pre-approved load."""
+    from dmri_studio.gui.results import ResultsPage
+
+    path = fixture_record(tmp_path)
+    window.settings.set("last_run_manifest", str(path))
+    page = ResultsPage(window.settings)
+    qtbot.addWidget(page)
+    assert page.snapshot is None and page.thread is None
+    page.recent.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    assert page.snapshot and page.snapshot["manifest"] == str(path)
+    assert "Scientific review required" in page.status.text()
+    assert "verified output" in page.status.text()
+
+    page.snapshot = None
+    path.unlink()
+    page.recent.click()
+    assert page.snapshot is None
+    assert "unavailable" in page.status.text()

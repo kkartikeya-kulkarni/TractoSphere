@@ -23,6 +23,20 @@ from .components import Disclosure, button, label
 from .execution import ProcessingWorker
 from .workstation import EmptyState
 
+RUN_NAMES = {
+    "mrtrix_execution_plan": "Diffusion preprocessing",
+    "mrtrix_native_execution_plan": "Native diffusion preprocessing",
+    "fsl_correction_plan": "TOPUP / EDDY correction",
+    "mrtrix_ants_bias_plan": "N4 bias correction",
+    "mrtrix_dti_execution_plan": "Diffusion tensor",
+    "mrtrix_csd_execution_plan": "FOD reconstruction",
+    "mrtrix_anatomy_execution_plan": "Anatomy / five-tissue",
+    "mrtrix_sift2_execution_plan": "SIFT2 weights",
+    "mrtrix_connectome_execution_plan": "Structural connectivity",
+    "mrtrix_tracking_execution_plan": "Tractography",
+    "registration_execution_plan": "Registration",
+}
+
 
 class ResultsPage(QWidget):
     """Recover evidence without rerunning analyses or implicitly restarting jobs."""
@@ -52,8 +66,10 @@ class ResultsPage(QWidget):
         )
         actions = QHBoxLayout()
         self.open = button("Open run manifest", self.browse)
+        self.recent = button("Open last inspected run", self.open_recent)
         self.refresh = button("Refresh saved status", self.reload)
         actions.addWidget(self.open)
+        actions.addWidget(self.recent)
         actions.addWidget(self.refresh)
         actions.addWidget(button("Open scientific selection…", self.scientific_requested.emit))
         actions.addStretch()
@@ -115,6 +131,16 @@ class ResultsPage(QWidget):
         if self.path:
             self.load(self.path)
 
+    def open_recent(self):
+        """Load only after a user action; never auto-open private run evidence."""
+        saved = str(self.settings.get("last_run_manifest", "") or "")
+        if not saved or not Path(saved).is_file():
+            self.status.setText(
+                "The last inspected run is unavailable. Choose an existing manifest."
+            )
+            return
+        self.load(Path(saved))
+
     def load(self, path):
         """Verify immutable completed artifacts in a cancellable read-only worker."""
         if self.thread:
@@ -153,7 +179,10 @@ class ResultsPage(QWidget):
         self.snapshot = result
         self.settings.set("last_run_manifest", str(self.path))
         self.status.setText(
-            f"Recorded status: {result['status']} · {result['verified_hashes']} hashes verified · Scientific review required\n{result['notice']}"
+            f"{RUN_NAMES.get(result['kind'], 'Scientific processing')} · Recorded status: {result['status']}"
+            f" · {result['verified_hashes']} hashes verified"
+            f" · {len(result['products'])} verified output(s)"
+            " · Scientific review required\n" + result["notice"]
         )
         for row in result["steps"]:
             timing = "" if row["elapsed_seconds"] is None else f" · {row['elapsed_seconds']:.1f}s"
@@ -197,10 +226,12 @@ class ResultsPage(QWidget):
             widget.setVisible(self.snapshot is not None)
         self.products.setVisible(bool(self.snapshot and self.snapshot["products"]))
         self.open.setVisible(self.snapshot is not None)
+        self.recent.setVisible(bool(self.settings.get("last_run_manifest", "")))
         self.refresh.setVisible(self.path is not None)
         for action in self.empty.actions:
             action.setEnabled(idle)
         self.open.setEnabled(idle)
+        self.recent.setEnabled(idle)
         self.refresh.setEnabled(idle and self.path is not None)
         self.load_output.setEnabled(
             idle and not self.processing_busy and bool(self.snapshot and self.snapshot["products"])
