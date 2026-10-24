@@ -372,10 +372,26 @@ class DependencyWidget(QWidget):
                 "Installation or processing state changed; verify again before saving."
             )
             return
+        if self.controller.error:
+            self.status.setText(
+                f"{family} verification failed: {self.controller.error}. No settings saved."
+            )
+            return
+        if self.controller.report and self.controller.report.get("cancelled"):
+            self.status.setText(f"{family} verification interrupted; no settings saved.")
+            return
         try:
             path = self.controller.apply_verified_family(family)
         except (ValueError, OSError) as exc:
-            self.status.setText(str(exc))
+            if isinstance(exc, OSError):
+                self.status.setText(str(exc))
+                return
+            state = family_state(self.controller.report, family)
+            detail = "; ".join(state["problems"][:2]) or str(exc)
+            self.status.setText(
+                f"{family} {state['state'].replace('_', ' ')}: {detail}. "
+                "Change Location or consult the component details; no settings saved."
+            )
             return
         self.status.setText(
             f"{family} verified and saved at {path}. Scientific command checks still apply."
@@ -455,6 +471,8 @@ class DependencyWidget(QWidget):
                 }[self.controller.software.state(family)]
             else:
                 state = STATE_LABELS[family_state(report, family)["state"]]
+                if family_state(report, family)["state"] == "ready":
+                    state = "Verified installation · commands revalidate before execution"
             versions = (
                 sorted(
                     {
