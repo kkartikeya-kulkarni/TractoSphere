@@ -44,6 +44,20 @@ from .workstation import EmptyState
 
 HCP_INTERPOLATION_SOURCE = "https://github.com/Washington-University/HCPpipelines/blob/6d695803a342f51660a381f703d0e22b2ffe4779/DiffusionPreprocessing/scripts/DiffusionToStructural.sh"
 
+OPERATION_GUIDANCE = {
+    "convert": "Prepare a copy in MRtrix format with the declared gradients; source files stay unchanged.",
+    "denoise": "Estimate and reduce noise with the supported MP-PCA method. Suitability and its position before EDDY remain separate scientific review questions.",
+    "gibbs": "Reduce ringing associated with finite k-space sampling where the input history permits it.",
+    "mask": "Estimate a brain mask. Inspect its coverage before accepting it for later operations.",
+    "correction": "Use associated calibration and acquisition metadata for TOPUP/EDDY motion and distortion correction; inspect diagnostics and replacements.",
+    "bias": "Apply N4 only to a verified direct EDDY derivative with the required fitting mask and evidence.",
+    "anatomy": "Prepare structural anatomy and a white-matter candidate for separate anatomical review.",
+    "alignment": "Estimate low-b to reviewed T1 alignment; successful execution does not establish anatomical correctness.",
+    "combine": "Create a combined AP/PA derivative only from an explicitly matched, verified pair.",
+}
+
+assert set(OPERATION_GUIDANCE) == set(OPERATIONS)
+
 
 class WorkflowPage(QWidget):
     """Keep unconfirmed edits separate from the evidence used by the planner."""
@@ -167,6 +181,7 @@ class WorkflowPage(QWidget):
             operation_layout = QVBoxLayout(detail_page)
             operation_layout.setContentsMargins(16, 4, 4, 4)
             operation_layout.addWidget(label(title, "section"))
+            operation_layout.addWidget(label(OPERATION_GUIDANCE[operation], "caption"))
             operation_layout.addWidget(selection)
             self.operation_pages.addWidget(detail_page)
             status = label("Confirm history to assess eligibility.", "caption")

@@ -26,7 +26,7 @@ from dmri_studio.core.execution import execute_plan, hash_file
 from dmri_studio.core.scientific import OutputRef, Task
 from dmri_studio.core.scientific.dti import prepare_dti
 
-from .components import button, label
+from .components import Disclosure, button, label
 
 
 class DTIExecutionPanel(QScrollArea):
@@ -47,10 +47,10 @@ class DTIExecutionPanel(QScrollArea):
         self.setWidget(content)
         root = QVBoxLayout(content)
         root.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
-        root.addWidget(label("DTI reconstruction", "section"))
+        root.addWidget(label("Fit a diffusion tensor model", "section"))
         root.addWidget(
             label(
-                "Import preprocessed DWI or a declared MRtrix tensor in Inputs. Configure tasks in Algorithms, or use Guided DTI below. No preprocessing is repeated.",
+                "Select a compatible preprocessed DWI and its measured shells. Fitting estimates a tensor; FA, MD, AD and RD maps are derived measurements, not diagnoses. No preprocessing is repeated.",
                 "caption",
             )
         )
@@ -90,15 +90,19 @@ class DTIExecutionPanel(QScrollArea):
             ("DWI", self.source),
             ("Shells (s/mm²)", self.shells),
             ("Fit", self.fit),
-            ("IWLS iterations", self.iterations),
-            ("Optional binary mask", self.mask),
-            ("Threads", self.threads),
         ]:
             field.setMinimumHeight(max(28, field.fontMetrics().height() + 10))
             form.addRow(title, field)
         form.addRow("New output directory", out)
         root.addLayout(form)
         root.addWidget(self.acquisition)
+        advanced = QWidget()
+        advanced_form = QFormLayout(advanced)
+        advanced_form.addRow("IWLS reweightings", self.iterations)
+        advanced_form.addRow("Optional binary mask", self.mask)
+        advanced_form.addRow("Threads", self.threads)
+        self.advanced = Disclosure("Advanced tensor fitting settings", advanced)
+        root.addWidget(self.advanced)
         root.addWidget(
             label(
                 "Guided recommendation: IWLS with two reweightings, following MRtrix 3.0.5. Select shells explicitly after acquisition review. Advanced task parameters remain in Algorithms / Configure task.",
@@ -106,8 +110,8 @@ class DTIExecutionPanel(QScrollArea):
             )
         )
         actions = QHBoxLayout()
-        self.guided = button("Add guided DTI tasks", self.add_guided)
-        self.preview = button("Preview execution", self.prepare)
+        self.guided = button("Configure tensor and metric tasks", self.add_guided)
+        self.preview = button("Validate and review commands", self.prepare)
         actions.addWidget(self.guided)
         actions.addWidget(self.preview)
         actions.addStretch()

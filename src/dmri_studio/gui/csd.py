@@ -42,10 +42,10 @@ class CSDExecutionPanel(QScrollArea):
         content = QWidget()
         self.setWidget(content)
         root = QVBoxLayout(content)
-        root.addWidget(label("CSD / tissue reconstruction", "section"))
+        root.addWidget(label("Estimate fiber orientation distributions", "section"))
         root.addWidget(
             label(
-                "Use imported preprocessed DWI and responses, or estimate responses explicitly. No preprocessing is repeated. Inspect FOD glyphs in the native scientific viewer.",
+                "Select eligible preprocessed DWI, choose a supported single- or multi-tissue method, and supply or explicitly estimate response functions. The planner checks shells and tissue associations; no preprocessing is repeated.",
                 "caption",
             )
         )
@@ -87,8 +87,6 @@ class CSDExecutionPanel(QScrollArea):
             ("Responses", self.response_mode),
             *[(t.upper() + " response", c) for t, c in self.responses.items()],
             ("Shells (s/mm²)", self.shells),
-            ("WM lmax", self.lmax),
-            ("Threads", self.threads),
         ]:
             form.addRow(title, field)
             field.setAccessibleName("CSD " + title)
@@ -98,10 +96,18 @@ class CSDExecutionPanel(QScrollArea):
         form.addRow("New output directory", out)
         setup.addLayout(form)
         setup.addWidget(self.acquisition)
-        setup.addWidget(self.normalize)
+        self.method_info = label("", "caption")
+        setup.addWidget(self.method_info)
+        advanced = QWidget()
+        advanced_form = QFormLayout(advanced)
+        advanced_form.addRow("WM lmax", self.lmax)
+        advanced_form.addRow("Threads", self.threads)
+        advanced_form.addRow(self.normalize)
+        self.advanced = Disclosure("Advanced reconstruction settings", advanced)
+        setup.addWidget(self.advanced)
         actions = QHBoxLayout()
-        self.guided = button("Add CSD tasks", self.add_guided)
-        self.preview = button("Preview execution", self.prepare)
+        self.guided = button("Configure reconstruction tasks", self.add_guided)
+        self.preview = button("Validate and review commands", self.prepare)
         actions.addWidget(self.guided)
         actions.addWidget(self.preview)
         actions.addStretch()
@@ -112,7 +118,7 @@ class CSDExecutionPanel(QScrollArea):
                 "caption",
             )
         )
-        self.setup = Disclosure("Reconstruction setup", config, expanded=True)
+        self.setup = Disclosure("Select inputs and reconstruction", config, expanded=True)
         root.addWidget(self.setup)
         self.approval = QCheckBox(
             "I reviewed the exact commands, responses, shells, provenance and scientific limitations"
@@ -147,6 +153,8 @@ class CSDExecutionPanel(QScrollArea):
         self.source.currentIndexChanged.connect(self.source_info)
         self.response_mode.currentIndexChanged.connect(self.update_actions)
         self.method.currentIndexChanged.connect(self.update_actions)
+        self.method.currentIndexChanged.connect(self.explain_method)
+        self.response_mode.currentIndexChanged.connect(self.explain_method)
         self.output.textChanged.connect(self.invalidate)
         self.threads.valueChanged.connect(self.invalidate)
         for combo in (
@@ -161,6 +169,24 @@ class CSDExecutionPanel(QScrollArea):
         self.lmax.valueChanged.connect(self.invalidate)
         self.normalize.toggled.connect(self.invalidate)
         self.refresh()
+        self.explain_method()
+
+    def explain_method(self, *_):
+        """Describe real adapter requirements without claiming shell eligibility."""
+        multi = self.method.currentData() == "dwi2fod.msmt_csd"
+        self.method_info.setText(
+            (
+                "Three-tissue MSMT-CSD needs compatible shell information and WM, GM and CSF responses. "
+                if multi
+                else "Single-tissue CSD needs a compatible WM response. "
+            )
+            + (
+                "Response estimation will be a separately validated task. "
+                if self.response_mode.currentData() != "import"
+                else "Select the corresponding imported response input. "
+            )
+            + "The exact plan decides eligibility; this choice alone does not."
+        )
 
     def invalidate(self, *_):
         """A changed execution configuration always needs fresh approval."""
