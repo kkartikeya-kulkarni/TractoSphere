@@ -19,6 +19,7 @@ import nibabel as nib
 import numpy as np
 
 from . import execution
+from .dependencies import _fsl_binary
 from .execution import ExecutionPlan, _now, hash_file
 from .process import ProcessingCancelled, check_cancel, run_command
 from .qc import _json, load_catalog
@@ -60,10 +61,17 @@ def save3d(values, reference, path: Path) -> None:
 
 def anatomical_tools(directory: Path | None, names, cancelled: Callable) -> tuple[dict, Path]:
     """Record actual local package/build ownership and binary/script hashes."""
-    candidate = str(directory / "fast") if directory else shutil.which("fast")
+    candidate = (
+        next(
+            (path for path in (directory / "fast", directory / "bin/fast") if path.is_file()),
+            None,
+        )
+        if directory
+        else shutil.which("fast")
+    )
     if not candidate:
         raise ValueError("Select an installed FSL bin directory containing FAST and FLIRT")
-    bindir = Path(candidate).expanduser().resolve(strict=True).parent
+    bindir = _fsl_binary(Path(candidate).expanduser(), "fast").parent
     records = [(p, _json(p)) for p in sorted((bindir.parent / "conda-meta").glob("fsl*.json"))]
     tools = {}
     for name in names:

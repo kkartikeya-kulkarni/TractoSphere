@@ -24,6 +24,7 @@ from .acquisition import phase_encoding_row, validate_epi_reference
 from .acquisition_metadata import entities, inherited_metadata, slice_groups
 from .correction_diagnostics import eddy_shells, finite_statistics, hyperparameter_blocks
 from .dataset import DatasetPaths
+from .dependencies import _fsl_binary
 from .execution import ExecutionPlan, _now, _publish_json, hash_file
 from .loading import DatasetLoader
 from .native_processing import _save_native
@@ -141,10 +142,17 @@ def _fsl_tools(directory: Path | None, cancelled: Callable) -> tuple[dict, Path]
     its build; binary hashes are recorded independently. Unsupported installations
     require an explicit version contract rather than pretending --help is version.
     """
-    candidate = str(directory / "eddy_cpu") if directory else shutil.which("eddy_cpu")
+    candidate = (
+        next(
+            (path for path in (directory / "eddy_cpu", directory / "bin/eddy_cpu") if path.is_file()),
+            None,
+        )
+        if directory
+        else shutil.which("eddy_cpu")
+    )
     if not candidate:
         raise ValueError("Select the installed FSL bin directory containing eddy_cpu")
-    bindir = Path(candidate).expanduser().resolve(strict=True).parent
+    bindir = _fsl_binary(Path(candidate).expanduser(), "eddy_cpu").parent
     records = []
     for path in sorted((bindir.parent / "conda-meta").glob("fsl-*.json")):
         record = _json(path)

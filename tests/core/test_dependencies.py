@@ -111,9 +111,19 @@ def test_fsl_suite_version_cannot_replace_component_records(installation):
 
 
 def test_fsl_launcher_and_explicit_missing_folder(installation, tmp_path):
+    from dmri_studio.core.anatomy import anatomical_tools
+    from dmri_studio.core.correction import _fsl_tools
+
     launchers = installation["FSL"].parent / "share/fsl/bin"
     launchers.mkdir(parents=True)
     executable(launchers / "eddy_cpu", "Not a package version")
+    correction, prefix = _fsl_tools(launchers, lambda: False)
+    assert prefix == installation["FSL"].parent
+    assert correction["eddy_cpu"]["path"] == str(installation["FSL"] / "eddy_cpu")
+    executable(launchers / "fast", "Not a package version")
+    anatomy, prefix = anatomical_tools(launchers, ("fast", "flirt"), lambda: False)
+    assert prefix == installation["FSL"].parent
+    assert anatomy["fast"]["path"] == str(installation["FSL"] / "fast")
     paths = {**installation, "FSL": None}
     report = inspect_dependencies(
         directories=paths, environ={"PATH": str(launchers)}, search_common=False
@@ -128,8 +138,13 @@ def test_fsl_launcher_and_explicit_missing_folder(installation, tmp_path):
 
 
 def test_root_directories_wrapper_layout_and_cancellation(installation):
+    from dmri_studio.core.anatomy import anatomical_tools
+    from dmri_studio.core.correction import _fsl_tools
+
     report = scan({k: p.parent for k, p in installation.items()})
     assert report["features"]["bias"]["state"] == "version_requirements_met"
+    assert _fsl_tools(installation["FSL"].parent, lambda: False)[1] == installation["FSL"].parent
+    assert anatomical_tools(installation["FSL"].parent, ("fast",), lambda: False)[1] == installation["FSL"].parent
     (installation["MRtrix3"].parent / "lib/mrtrix3/dwibiascorrect/ants.py").unlink()
     assert scan(installation)["features"]["bias"]["state"] == "needs_setup"
     cancelled = inspect_dependencies(cancelled=lambda: True)
