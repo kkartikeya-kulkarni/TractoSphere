@@ -521,6 +521,32 @@ class GuidedRegistration(QWidget):
         declarations = artifact.payload.get("declarations", {})
         space = declarations.get("space_kind")
         contrast = declarations.get("anatomical_modality")
+        image_roles = {
+            self.epi_moving, self.epi_reference, self.t1_brain, self.wmseg,
+            self.moving, self.reference, self.derivative, self.target,
+        }
+        if combo in image_roles:
+            missing = [
+                title for key, title in (
+                    ("subject_id", "subject identity"),
+                    ("acquisition_id", "acquisition identity"),
+                    ("space_kind", "coordinate-space kind"),
+                    ("space_id", "specific spatial identity"),
+                ) if not declarations.get(key)
+            ]
+            if missing:
+                if combo in (self.epi_reference, self.t1_brain):
+                    if contrast != "T1w":
+                        missing.append("T1w anatomical contrast declaration")
+                    if space != "T1_NATIVE":
+                        missing.append(
+                            "subject T1 structural-space declaration (T1_NATIVE; ACPC-aligned HCP T1 may qualify when documented)"
+                        )
+                elif combo in (self.moving, self.reference) and contrast not in {
+                    "T1w", "T2w", "b0", "mean_b0", "FA", "MD"
+                }:
+                    missing.append("supported image contrast declaration")
+                return "needs " + ", ".join(missing)
         if combo is self.dwi:
             missing = []
             if declarations.get("processing_state") != "preprocessed":
@@ -564,6 +590,14 @@ class GuidedRegistration(QWidget):
         declarations = artifact.payload.get("declarations", {})
         kind = declarations.get("space_kind")
         contrast = declarations.get("anatomical_modality")
+        if combo in {
+            self.epi_moving, self.epi_reference, self.t1_brain, self.wmseg,
+            self.moving, self.reference, self.derivative, self.target,
+        } and any(
+            not declarations.get(key)
+            for key in ("subject_id", "acquisition_id", "space_kind", "space_id")
+        ):
+            return False
         if combo is self.dwi:
             return (
                 declarations.get("processing_state") == "preprocessed"

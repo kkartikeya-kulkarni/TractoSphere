@@ -156,3 +156,51 @@ def test_anatomy_declaration_review_preserves_previous_record_if_source_changed(
     assert [artifact.id for artifact in page.artifacts] == [original.id]
     assert "previous imported record unchanged" in page.status.text()
     assert "Imported source changed" in page.status.text()
+
+
+def test_fa_image_can_be_declared_for_supported_registration_role(window, qtbot, tmp_path):
+    path = tmp_path / "fa.nii.gz"
+    _image(path)
+    window.focus_registration()
+    page = window.scientific
+    guided = page.registration.guided
+    guided.select_goal("align_two")
+    dialog = ImportDialog(window, initial_kind="anatomy")
+    assert dialog.declarations["anatomical_modality"].findData("FA") >= 0
+    assert dialog.declarations["anatomical_modality"].findData("MD") >= 0
+    assert dialog.declarations["anatomical_modality"].findData("mean_b0") >= 0
+    dialog.paths["path"].setText(str(path))
+    dialog.subject.setText("documented-subject")
+    dialog.space.setText("documented-dwi-space")
+    dialog.declarations["acquisition_id"].setText("documented-dwi-acquisition")
+    dialog.declarations["space_kind"].setCurrentIndex(
+        dialog.declarations["space_kind"].findData("DWI_NATIVE")
+    )
+    dialog.declarations["anatomical_modality"].setCurrentIndex(
+        dialog.declarations["anatomical_modality"].findData("FA")
+    )
+    dialog.declarations["reference_history"].setText("Documented external reference history")
+    page.import_request(dialog.request())
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    artifact = page.artifacts[0]
+    assert artifact.payload["declarations"]["anatomical_modality"] == "FA"
+    assert guided.moving.findData(artifact.id) > 0
+    assert page.connectome.fa.findData(artifact.id) < 0  # metric identity remains separate
+
+
+def test_registration_imported_image_without_spatial_identity_is_not_eligible(
+    window, qtbot, tmp_path
+):
+    path = tmp_path / "fa.nii.gz"
+    _image(path)
+    window.focus_registration()
+    page = window.scientific
+    guided = page.registration.guided
+    guided.select_goal("align_two")
+    page.import_request(ImportRequest("anatomy", path, declarations={"anatomical_modality": "FA"}))
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    artifact = page.artifacts[0]
+    assert guided.imported_anatomy.findData(artifact.id) > 0
+    assert guided.moving.findData(artifact.id) == -1
+    assert "subject identity" in guided.imported_details.text()
+    assert "coordinate-space kind" in guided.imported_details.text()

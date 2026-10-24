@@ -14,6 +14,9 @@ def _artifact(kind, name):
     space_kind = "DWI_NATIVE" if name in {"epi", "dwi"} else "T1_NATIVE"
     modality = "b0" if name == "epi" else "T1w"
     declarations = {
+        "subject_id": "synthetic-subject",
+        "acquisition_id": name,
+        "space_id": f"synthetic-{space_kind.lower()}-{name}",
         "space_kind": space_kind,
         "anatomical_modality": modality,
         "processing_state": "preprocessed" if name == "dwi" else "unknown",

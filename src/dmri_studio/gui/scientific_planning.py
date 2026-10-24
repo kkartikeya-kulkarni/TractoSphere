@@ -235,8 +235,8 @@ class ImportDialog(QDialog):
             ("metric", "Scalar metric identity", ("FA", "other", "unknown"), {"anatomy"}),
             (
                 "anatomical_modality",
-                "Anatomical contrast",
-                ("T1w", "T2w", "b0", "other", "unknown"),
+                "Image contrast or scalar metric",
+                ("T1w", "T2w", "b0", "mean_b0", "FA", "MD", "other", "unknown"),
                 {"anatomy"},
             ),
             (
@@ -299,26 +299,34 @@ class ImportDialog(QDialog):
         actions.rejected.connect(self.reject)
         root.addWidget(actions)
         if initial_artifact is not None:
-            self._populate_imported_anatomy(initial_artifact, actions)
+            self._populate_imported_input(initial_artifact, actions)
 
-    def _populate_imported_anatomy(self, artifact: Artifact, actions: QDialogButtonBox) -> None:
+    def _populate_imported_input(self, artifact: Artifact, actions: QDialogButtonBox) -> None:
         """Review declarations on one original source without choosing its file again."""
-        if artifact.kind != "anatomy":
-            raise ValueError("Only imported anatomical declarations can be revised here")
-        self.setWindowTitle("Review anatomical input declarations")
-        self.kind.setCurrentIndex(self.kind.findData("anatomy"))
+        self.setWindowTitle("Review imported input declarations")
+        self.kind.setCurrentIndex(self.kind.findData(artifact.kind))
         self.kind.setEnabled(False)
-        self.paths["path"].setText(str(artifact.payload["path"]))
-        self.paths["path"].setReadOnly(True)
+        original = artifact.payload["request"]
+        for name, field in self.paths.items():
+            field.setText(original.get(name) or "")
+            field.setReadOnly(True)
         for action in self.findChildren(QPushButton):
-            if action.accessibleName() == "Browse Input file":
+            if action.accessibleName().startswith("Browse "):
                 action.setEnabled(False)
         declarations = artifact.payload.get("declarations", {})
         self.subject.setText(declarations.get("subject_id", ""))
         self.space.setText(declarations.get("space_id", ""))
         self.provenance.setText(artifact.payload["provenance"]["statement"])
+        if artifact.kind == "dwi":
+            self.state.setCurrentIndex(
+                self.state.findData(declarations.get("processing_state", "unknown"))
+            )
+        if artifact.kind == "atlas_labels":
+            self.registration_reviewed.setChecked(
+                bool(declarations.get("registration_reviewed", False))
+            )
         for key, (field, _, kinds) in self.declaration_rows.items():
-            if "anatomy" not in kinds or key not in declarations:
+            if artifact.kind not in kinds or key not in declarations:
                 continue
             value = declarations[key]
             if isinstance(field, QComboBox):
@@ -328,15 +336,15 @@ class ImportDialog(QDialog):
             else:
                 field.setText(str(value))
         self.purpose.setText(
-            "Review the source documentation and declare its actual subject, contrast and spatial identity. "
-            "The original image is unchanged; reinspection checks its current bytes. "
-            "A filename alone cannot establish this evidence."
+            "Review source documentation before changing declarations. The original input is "
+            "unchanged; reinspection checks its current bytes. A filename alone cannot establish identity."
         )
-        self.evidence.setText(
-            "T1_NATIVE means the subject's T1 structural space; an explicitly documented "
-            "ACPC-aligned HCP structural image may belong there. It does not mean raw scanner "
-            "coordinates or MNI template space. Confirm the specific source before selecting it."
-        )
+        if artifact.kind == "anatomy":
+            self.evidence.setText(
+                "T1_NATIVE means the subject's T1 structural space; an explicitly documented "
+                "ACPC-aligned HCP structural image may belong there. It does not mean raw scanner "
+                "coordinates or MNI template space. Confirm the specific source before selecting it."
+            )
         actions.button(QDialogButtonBox.StandardButton.Ok).setText(
             "Reinspect and save declarations"
         )
@@ -660,8 +668,10 @@ class ScientificPlanningPage(QWidget):
         row = QHBoxLayout()
         self.remove_input = button("Remove inventory reference", self.remove_artifact)
         self.inspect = button("Inspect selected input", self.inspect_input)
+        self.review_input = button("Review declarations…", self.review_selected_input)
         row.addWidget(self.remove_input)
         row.addWidget(self.inspect)
+        row.addWidget(self.review_input)
         row.addStretch()
         layout.addLayout(row)
         self.tabs.addTab(self.input_page, "Inputs")
@@ -1014,14 +1024,23 @@ class ScientificPlanningPage(QWidget):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.import_request(dialog.request())
 
+    def review_selected_input(self) -> None:
+        item = self.inputs.currentItem()
+        if item is not None:
+            self.review_input_declarations(item.data(Qt.ItemDataRole.UserRole))
+
     def review_anatomy_declarations(self, artifact_id: str) -> None:
+        """Preserve the Registration entry point for reviewing an anatomical image."""
+        self.review_input_declarations(artifact_id)
+
+    def review_input_declarations(self, artifact_id: str) -> None:
         """Revise one draft inventory record after reinspection of its original source."""
         artifact = next((a for a in self.artifacts if a.id == artifact_id), None)
-        if self.thread is not None or artifact is None or artifact.kind != "anatomy":
+        if self.thread is not None or artifact is None:
             return
         if any(artifact_id in task.inputs.values() for task in self.tasks):
             self.status.setText(
-                "This image is bound to a draft task. Remove that task before revising its declarations; approved or running plans are never changed."
+                "This input is bound to a draft task. Remove that task before revising its declarations; approved or running plans are never changed."
             )
             return
         dialog = ImportDialog(self, initial_artifact=artifact)
@@ -1030,8 +1049,10 @@ class ScientificPlanningPage(QWidget):
         reviewed = dialog.request()
         original_request = artifact.payload["request"]
         request = ImportRequest(
-            "anatomy",
+            artifact.kind,
             Path(original_request["path"]),
+            bval=Path(original_request["bval"]) if original_request.get("bval") else None,
+            bvec=Path(original_request["bvec"]) if original_request.get("bvec") else None,
             sidecar=Path(original_request["sidecar"]) if original_request.get("sidecar") else None,
             declarations=reviewed.declarations,
             provenance=reviewed.provenance,
@@ -1044,7 +1065,7 @@ class ScientificPlanningPage(QWidget):
             return import_artifact(request, cancelled=cancel, progress=progress)
 
         self.start(
-            "revise-anatomy",
+            "revise-input",
             reinspect,
         )
 
@@ -1311,7 +1332,7 @@ class ScientificPlanningPage(QWidget):
     def result(self, _: int, result: Any, error: str) -> None:
         """Display actual inspection/proposal findings without inferring scientific acceptance."""
         if error:
-            if self.pending == "revise-anatomy":
+            if self.pending == "revise-input":
                 error = "Declaration review failed; previous imported record unchanged. " + error
                 self.pending_revision_id = None
             if self.pending.startswith("sift2-"):
@@ -1333,7 +1354,7 @@ class ScientificPlanningPage(QWidget):
             )
             return
         if self.cancel.is_set() and not self.pending.endswith("-run"):
-            if self.pending == "revise-anatomy":
+            if self.pending == "revise-input":
                 self.pending_revision_id = None
             self.operation_state.update(
                 self.operation_token, State.CANCELLED, "Operation cancelled; originals unchanged"
@@ -1384,7 +1405,7 @@ class ScientificPlanningPage(QWidget):
             self.status.setText(
                 "Input inspected and source hashes recorded. Scientific review remains required."
             )
-        elif self.pending == "revise-anatomy":
+        elif self.pending == "revise-input":
             old_id = self.pending_revision_id
             self.pending_revision_id = None
             index = next((i for i, a in enumerate(self.artifacts) if a.id == old_id), None)
@@ -1395,10 +1416,11 @@ class ScientificPlanningPage(QWidget):
                 return
             self.artifacts[index] = result
             self.refresh()
-            selector = self.registration.guided.imported_anatomy
-            selector.setCurrentIndex(max(0, selector.findData(result.id)))
+            if result.kind == "anatomy":
+                selector = self.registration.guided.imported_anatomy
+                selector.setCurrentIndex(max(0, selector.findData(result.id)))
             self.status.setText(
-                "Anatomical declarations updated after source reinspection. Registration eligibility and exact plan validation remain separate."
+                "Input declarations updated after source reinspection. Workflow eligibility and exact plan validation remain separate."
             )
         elif self.pending == "import-tracking-rois":
             imported = result["artifacts"] if isinstance(result, dict) else result
@@ -1506,6 +1528,7 @@ class ScientificPlanningPage(QWidget):
         self.add_button.setEnabled(not busy and self.algorithms.currentRow() >= 0)
         self.remove_input.setEnabled(not busy and self.inputs.currentRow() >= 0)
         row = self.inputs.currentRow()
+        self.review_input.setEnabled(not busy and 0 <= row < len(self.artifacts))
         self.inspect.setEnabled(
             not busy
             and 0 <= row < len(self.artifacts)

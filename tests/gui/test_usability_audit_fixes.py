@@ -101,6 +101,8 @@ def test_registration_explains_filtered_import_and_opens_scoped_dialog(
             image2,
             declarations={
                 "subject_id": "sub-test",
+                "acquisition_id": "structural-01",
+                "space_id": "subject-t1-space",
                 "space_kind": "T1_NATIVE",
                 "anatomical_modality": "T1w",
             },

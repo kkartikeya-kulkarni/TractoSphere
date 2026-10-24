@@ -2,7 +2,8 @@
 
 import nibabel as nib
 import numpy as np
-from PySide6.QtWidgets import QDialog
+from PySide6.QtCore import QTimer, Qt
+from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox
 
 from dmri_studio.core.execution import hash_file
 from dmri_studio.core.scientific import ALGORITHMS, ImportRequest, Task
@@ -73,6 +74,80 @@ def test_actual_import_dialog_declarations_no_inference(window, qtbot, tmp_path)
     window.scientific.import_request(request)
     qtbot.waitUntil(lambda: window.scientific.thread is None, timeout=10000)
     assert window.scientific.artifacts[0].kind == "tensor"
+
+
+def test_revise_imported_atlas_declarations_without_reimport(window, qtbot, tmp_path):
+    path = scalar(tmp_path, "atlas.nii.gz")
+    window.focus_models()
+    page = window.scientific
+    page.import_request(ImportRequest("atlas_labels", path))
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    original = page.artifacts[0]
+    assert page.connectome.atlas.findData(original.id) > 0
+    page.inputs.setCurrentRow(0)
+
+    def declare_space():
+        dialog = QApplication.activeModalWidget()
+        assert isinstance(dialog, ImportDialog)
+        assert dialog.kind.currentData() == "atlas_labels"
+        assert dialog.paths["path"].isReadOnly()
+        dialog.subject.setText("documented-subject")
+        dialog.space.setText("documented-diffusion-space")
+        dialog.declarations["space_kind"].setCurrentIndex(
+            dialog.declarations["space_kind"].findData("DWI_NATIVE")
+        )
+        qtbot.mouseClick(
+            dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Ok),
+            Qt.MouseButton.LeftButton,
+        )
+
+    QTimer.singleShot(0, declare_space)
+    qtbot.mouseClick(page.review_input, Qt.MouseButton.LeftButton)
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    revised = page.artifacts[0]
+    assert revised.id != original.id
+    assert revised.payload["path"] == str(path)
+    assert revised.payload["declarations"]["space_id"] == "documented-diffusion-space"
+    assert page.connectome.atlas.findData(revised.id) > 0
+    assert page.plan is None
+
+
+def test_revise_imported_dwi_preserves_gradient_sources(window, qtbot, dataset_folder):
+    window.focus_models()
+    page = window.scientific
+    page.import_request(
+        ImportRequest(
+            "dwi",
+            dataset_folder / "data.nii",
+            bval=dataset_folder / "bvals",
+            bvec=dataset_folder / "bvecs",
+        )
+    )
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    original = page.artifacts[0]
+    page.inputs.setCurrentRow(0)
+
+    def declare_identity():
+        dialog = QApplication.activeModalWidget()
+        assert isinstance(dialog, ImportDialog)
+        assert dialog.paths["bval"].text() == str(dataset_folder / "bvals")
+        assert dialog.paths["bvec"].text() == str(dataset_folder / "bvecs")
+        assert dialog.paths["bval"].isReadOnly()
+        dialog.subject.setText("documented-subject")
+        qtbot.mouseClick(
+            dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Ok),
+            Qt.MouseButton.LeftButton,
+        )
+
+    QTimer.singleShot(0, declare_identity)
+    qtbot.mouseClick(page.review_input, Qt.MouseButton.LeftButton)
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    revised = page.artifacts[0]
+    assert revised.id != original.id
+    assert revised.payload["request"]["bval"] == str(dataset_folder / "bvals")
+    assert revised.payload["request"]["bvec"] == str(dataset_folder / "bvecs")
+    assert revised.payload["gradients"] == original.payload["gradients"]
+    assert page.dti.source.findData(revised.id) >= 0
     assert window.dataset is None
 
 
