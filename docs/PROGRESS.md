@@ -11,10 +11,13 @@ the execution path. [The Phase 6 handoff](PHASE6_IMPLEMENTATION_AND_HANDOFF.md)
 records local tests and measured offscreen performance. At application/test code
 `03928a2`, the user's normal Mac Terminal returned **6 targeted Cocoa/VTK tests
 passed in 24.41 s, exit 0** for synthetic inputs, five-tissue QC, DTI, CSD,
-SIFT2 and Connectivity. Native performance and researcher usability review remain
-open; the interface work is **targeted-native-verified, not scientifically accepted**.
-The permanent 38-task scientific
-backlog remains open, and no EDDY preprocessing order or scientific acceptance
+SIFT2 and Connectivity. At the same application code commit, two normal-Terminal
+Cocoa benchmarks exited 0: script-to-interactive **909.261 ms empty** and
+**904.160 ms with a small generated NIfTI**; the handoff gives navigation,
+Batch and measurement limits. True cold start, real-data Viewer performance and
+researcher usability review remain open; the interface work is
+**targeted-native-verified, not scientifically accepted**. The permanent
+38-task scientific backlog remains open, and no EDDY preprocessing order or scientific acceptance
 policy changed.
 
 The permanent, prioritized task register and EDDY experimental protocol are in
