@@ -108,6 +108,14 @@ def test_native_guided_execution_results_qc_and_history(qapp, qtbot, tmp_path):
     page.guided.advance()
     assert page.guided.pages.currentIndex() == 6
     assert "COMPLETED" in page.guided.results_summary.text()
+    page.guided.inspect_output_button.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=15000)
+    assert page.guided.products.count() > 0, page.status.text()
+    opened = []
+    page.product_requested.connect(opened.append)
+    page.guided.products.setCurrentRow(0)
+    page.guided.open_product_button.click()
+    assert opened and Path(opened[0]["path"]).is_file()
     page.guided._show_qc()
     assert "unassigned" in page.guided.results_detail.toPlainText()
     historical_folder = page.folder
