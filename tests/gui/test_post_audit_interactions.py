@@ -259,11 +259,7 @@ def test_click_driven_scientific_imports_reach_registration_dti_and_csd(
     assert "Dhollander" in page.csd.response_help.text()
 
     files["Choose input file"] = response
-    import_response = next(
-        action
-        for action in page.csd.findChildren(QPushButton)
-        if action.text() == "Import response…"
-    )
+    import_response = page.csd.import_buttons["WM response"]
     import_by_click(import_response, kind="response", declarations=(("tissue", 1),))
     assert len(page.artifacts) == 3, page.status.text()
     assert page.csd.responses["wm"].count() == 2

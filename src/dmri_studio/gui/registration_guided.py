@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLineEdit,
     QPlainTextEdit,
+    QSizePolicy,
     QSpinBox,
     QStackedWidget,
     QVBoxLayout,
@@ -81,7 +82,26 @@ class GuidedRegistration(QWidget):
         self.explanation = label("", "caption")
         root.addWidget(self.explanation)
         self.inventory_notice = label("", "caption")
+        self.inventory_notice.setMinimumWidth(0)
+        self.inventory_notice.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+        )
         root.addWidget(self.inventory_notice)
+        root.addWidget(label("Imported anatomical images · inspected, not yet approved", "control"))
+        imported_row = QWidget()
+        imported_layout = QHBoxLayout(imported_row)
+        imported_layout.setContentsMargins(0, 0, 0, 0)
+        self.imported_anatomy = QComboBox()
+        self.imported_anatomy.setAccessibleName(
+            "Imported anatomical images for registration review"
+        )
+        imported_layout.addWidget(self.imported_anatomy, 1)
+        self.review_declarations = button("Review declarations…", self._review_selected_anatomy)
+        imported_layout.addWidget(self.review_declarations)
+        root.addWidget(imported_row)
+        self.imported_details = label("", "caption")
+        root.addWidget(self.imported_details)
+        self.imported_anatomy.currentIndexChanged.connect(self._show_imported_details)
         self.advanced_notice = label("", "caption")
         root.addWidget(self.advanced_notice)
 
@@ -281,6 +301,7 @@ class GuidedRegistration(QWidget):
         self.pages.setCurrentIndex([item[0] for item in GOALS].index(key))
         self.explanation.setText(next(row[2] for row in GOALS if row[0] == key))
         self._explain_inventory()
+        self._show_imported_details()
         self.advanced_notice.clear()
         self._update_direction()
         self._set_execution_visible(key != "inspect")
@@ -334,6 +355,23 @@ class GuidedRegistration(QWidget):
 
     def refresh_inventory(self):
         self._refreshing = True
+        selected_import = self.imported_anatomy.currentData()
+        self.imported_anatomy.blockSignals(True)
+        self.imported_anatomy.clear()
+        self.imported_anatomy.addItem("Select an inspected anatomical image…", None)
+        for artifact in self.owner.owner.artifacts:
+            if artifact.kind == "anatomy":
+                self.imported_anatomy.addItem(
+                    "Imported · " + Path(artifact.payload["path"]).name,
+                    artifact.id,
+                )
+        if self.imported_anatomy.count() == 1:
+            self.imported_anatomy.setItemText(0, "No anatomical image imported yet — use Import…")
+        else:
+            self.imported_anatomy.setCurrentIndex(
+                max(1, self.imported_anatomy.findData(selected_import))
+            )
+        self.imported_anatomy.blockSignals(False)
         specs = self._inventory_specs()
         for combo, kinds in specs:
             old = combo.currentData()
@@ -349,6 +387,48 @@ class GuidedRegistration(QWidget):
         self._refreshing = False
         self._update_direction()
         self._explain_inventory()
+        self._show_imported_details()
+
+    def _review_selected_anatomy(self):
+        artifact_id = self.imported_anatomy.currentData()
+        if artifact_id:
+            self.owner.owner.review_anatomy_declarations(artifact_id)
+
+    def _show_imported_details(self, *_):
+        artifact_id = self.imported_anatomy.currentData()
+        artifact = next((a for a in self.owner.owner.artifacts if a.id == artifact_id), None)
+        self.review_declarations.setEnabled(
+            artifact is not None and self.owner.owner.thread is None
+        )
+        if artifact is None:
+            self.imported_details.setText(
+                "Imported images remain listed here even when a registration role needs more evidence."
+            )
+            return
+        if self.goal == "epi_t1":
+            role = self.epi_reference
+            title = "Reference T1"
+        else:
+            role = self.moving
+            title = "generic moving image"
+        missing_identity = [
+            name
+            for key, name in (
+                ("subject_id", "subject identity"),
+                ("acquisition_id", "acquisition identity"),
+                ("space_id", "specific spatial identity"),
+            )
+            if not artifact.payload.get("declarations", {}).get(key)
+        ]
+        message = (
+            f"Imported; eligible for {title} selection. Exact identity and spatial checks follow during plan validation."
+            if self._candidate(role, artifact)
+            else f"Imported; not yet eligible for {title}: {self._candidate_reason(role, artifact)}. "
+            "Review declarations using the source documentation; filename alone is insufficient."
+        )
+        if missing_identity:
+            message += " Plan validation also requires " + ", ".join(missing_identity) + "."
+        self.imported_details.setText(message)
 
     def _inventory_specs(self):
         return (
@@ -428,7 +508,9 @@ class GuidedRegistration(QWidget):
                     )
         if hidden:
             distinct = list(dict.fromkeys(hidden))
-            message += " Imported but not eligible: " + "; ".join(distinct[:4])
+            message += "\n\nImported but not eligible for this goal:\n• " + "\n• ".join(
+                distinct[:4]
+            )
             if len(distinct) > 4:
                 message += (
                     f"; {len(distinct) - 4} more. Inspect input records for their declarations."
@@ -458,7 +540,16 @@ class GuidedRegistration(QWidget):
                 missing.append("correction history")
             return "missing " + ", ".join(missing)
         if combo in (self.epi_reference, self.t1_brain):
-            return "requires T1w contrast and T1-native space evidence"
+            issues = []
+            if contrast != "T1w":
+                issues.append("T1w anatomical contrast declaration")
+            if space != "T1_NATIVE":
+                issues.append(
+                    "subject T1 structural-space declaration (T1_NATIVE; ACPC-aligned HCP T1 may qualify when documented)"
+                    if not space
+                    else f"subject T1 structural space, rather than declared {space}"
+                )
+            return "needs " + "; ".join(issues)
         if combo is self.wmseg:
             return "requires T1-native space evidence"
         if combo in (self.moving, self.reference):
