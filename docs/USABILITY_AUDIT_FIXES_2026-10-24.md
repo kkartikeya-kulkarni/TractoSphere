@@ -41,3 +41,63 @@ The user ran the committed code from a normal Mac Terminal at HEAD **`62883c0`**
 ## Remaining native visual check
 
 A visual researcher check is still needed for the Registration heading at 960×640 and 1280×840 in light/dark themes, file chooser opening, dialog focus return and readable mapped-file previews. Those outcomes were not established by the 46 passing automated Cocoa tests.
+
+## Post-audit interaction follow-up — 24 October 2026
+
+The follow-up was developed on `development/post-audit-usability-verification-2026-10-24` from `abee496`. Application/test commit `e5daf0a` adds an explicit non-BIDS file-role mapping editor, direct DTI DWI import, role-specific picker names, CSD response guidance, and a scrollable sidebar. The DTI empty prompt initially left an imported DWI unselected; a click-driven regression exposed this and the selector now restores its prior artifact or selects the first imported DWI. The scientific core, eligibility rules, processing order, exact approval and provenance were not changed.
+
+### Observations and verification state
+
+| Check | Evidence on the follow-up code | Remaining native check |
+| --- | --- | --- |
+| Registration heading and layout | An **offscreen** 960×640 light-theme capture showed the Registration heading fully below its tabs. The same capture showed compressed sidebar section labels; after moving workspace navigation into a scroll area, a second offscreen capture showed full labels, a visible selected Registration action and a scrollbar. Automated offscreen checks covered Registration geometry at 960×640 and 1280×840 in light/dark, plus scroll/focus visibility. These images are local temporary files, not native Cocoa screenshots. | Visually inspect both native sizes/themes and display scaling. The old pre-fix audit screenshot cannot establish the current appearance. |
+| Import and Browse | Click-driven Qt tests selected synthetic paths through mocked `QFileDialog` returns. The four scientific import roles changed only their matching fields. Registration Moving Image, DTI Import DWI, CSD Import response, Batch dataset root and custom role buttons reached the correct modal/action. | Actual macOS picker appearance, selection, focus return and all role families are **unverified** in this session. |
+| Anatomy and DWI reuse | Through visible modal Browse buttons, declarations and import actions, a synthetic T1 became an eligible Registration moving candidate. A technically inspected synthetic DWI appeared in DTI and CSD; DTI selected it by default after import. | Native picker route and real scientific eligibility with authentic processing history. Merely listing a DWI does not approve it for fitting. |
+| CSD responses | The empty state names missing WM/GM/CSF responses and offers explicit import or supported Dhollander estimation subject to acquisition checks. A synthetic WM response imported through the CSD action appeared only in the WM selector; GM/CSF remained missing. Unsupported method combinations still block. | Native usability of declarations and real response-estimation validation. |
+| Non-BIDS Batch mapping | Clicking **Create mapping from file roles** opened an editor for subject/acquisition folder patterns and explicit DWI/bval/bvec files. It saved a new JSON file without overwriting one, discovered two synthetic acquisitions, preserved one selected acquisition, and produced a subset-bound backend plan requiring approval. A broader DWI glob reported the second acquisition as ambiguous rather than guessing. | Native folder/file/save pickers, researcher comprehension and scientific execution on eligible data. The synthetic conversion proposal was not run. |
+| BIDS errors | Existing click-driven/parameterized tests checked missing, malformed, derivative and valid descriptors and the wrong-root recovery message. A newly generated two-acquisition BIDS fixture produced two acquisitions with no discovery findings. | Native wrong-root and recovery walkthrough; wider BIDS structures and scientific eligibility. |
+| Keyboard, themes, resizing | Offscreen tests used Tab in the mapping dialog at 620×560, checked Save remained visible, and checked sidebar selected-workspace visibility at 960×640 in light/dark. Existing Registration geometry tests covered both requested window sizes and themes. | Native focus order, VoiceOver, dialog visual clipping, dark appearance and picker focus return. |
+
+The new `scripts/create_post_audit_fixture.py` creates a fresh temporary directory of **constant-valued, non-scientific** NIfTI files: two BIDS acquisitions, two mapped custom acquisitions, a T1 image and a WM response text file. It never overwrites an existing path. Core discovery returned **2 BIDS and 2 custom acquisitions, all with no discovery findings** for that fixture. The core importer also technically inspected its T1, DWI and WM response without error. The generated data are for interface checks only; do not execute or scientifically interpret diffusion modeling on them.
+
+### Test evidence
+
+- Focused click/keyboard/layout suite: `PYTHONPATH=src QT_QPA_PLATFORM=offscreen OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/python -m pytest -q tests/gui/test_post_audit_interactions.py --tb=short` — **9 passed in 8.83 s**.
+- Selected GUI, core-discovery, scientific-foundation and CLI regression command (`test_post_audit_interactions.py`, `test_usability_audit_fixes.py`, `test_phase6_scientific_inputs.py`, `test_registration_guided.py`, `test_batch_guided.py`, two safe Desktop redesign tests, scoped scientific/DTI tests, Batch discovery/selection, scientific foundation and `tests/cli`) — **129 passed in 76.03 s**, offscreen. The identical selected suite before the sidebar follow-up passed **129 in 77.12 s**; neither result is a full GUI suite.
+- Ruff format/check and `git diff --check` passed on the changed source/test/fixture files.
+- One warm **offscreen** empty-state benchmark exited 0: script-to-interactive **923.682 ms**, first/return Registration **61.066/48.959 ms**, first/return Batch **111.976/23.460 ms**, unchanged 1,000-row journal refresh **0.057/0.027 ms** after initial parse and **0** inactive timer ticks over 1.8 s. Conditions vary from the older one-sample audit benchmark, so these values are not a measured speedup or native performance claim.
+- The user's earlier normal-Terminal **46 Cocoa passes at `62883c0` remain historical evidence for the previous application code**. No post-`e5daf0a` Cocoa test or live picker walkthrough has been performed. Computer Use could not select a TractoSphere app and explicitly disallowed Terminal; the restricted session's known Cocoa/VTK construction crash was not rerun.
+
+### Exact native manual walkthrough
+
+Use only the generated fixture and a normal Mac Terminal. Do not enter research data paths into this verification record. The fixture is unsuitable for scientific execution.
+
+```sh
+cd ~/Projects/dmri-studio2.0/TractoSphere-publication
+git status --short --branch
+git rev-parse --short HEAD
+PYTHONPATH=src ../application/.venv/bin/python scripts/create_post_audit_fixture.py
+PYTHONPATH=src QT_QPA_PLATFORM=cocoa OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/dmri-studio gui
+```
+
+Record the printed temporary `root` path from the fixture command. In the GUI:
+
+1. Resize to **960×640**, then **1280×840**. In both light and dark themes open Registration, inspect the entire heading, goal buttons and scrollbars. Navigate to Preferences using the sidebar and keyboard; the sidebar should scroll the selected action into view. Capture screenshots only of the generated fixture state.
+2. In Registration choose **Align Two Images → Import Moving image**. In the import dialog use **Browse** for `root/T1.nii.gz`, expand **Scientific identity and format declarations**, explicitly choose `T1_NATIVE` and `T1w`, then **Inspect input**. Confirm the T1 appears as a moving candidate. Repeat the Reference Image action with the same synthetic image for picker/focus routing only; do not validate an actual self-registration. Test the EPI/T1 and atlas/ROI role import actions for correct input type and returned field without claiming those inputs are scientifically eligible.
+3. Open **Diffusion models → Fit diffusion tensor → Import DWI**. Browse to `root/bids/sub-01/dwi/sub-01_dwi.nii.gz` and select its `.bval`, `.bvec`, and optional `.json` in their own Browse rows. Leave processing history **unknown** because the fixture has no correction record. Inspect input; confirm the DWI appears in DTI's selector. Open **Estimate FOD** and confirm the same DWI is listed. Do not treat selector presence as plan eligibility.
+4. In FOD inspect the missing WM/GM/CSF explanation. Click **Import response**, browse `root/wm-response.txt`, declare tissue `wm`, and inspect. It should appear only in the WM selector. GM and CSF should remain missing; inspect the Dhollander option but do not claim the fixture supports scientific estimation.
+5. Open **Batch Processing → Custom folder mapping**. Browse `root/custom`, click **Create mapping from file roles**, enter subject `person-*` and acquisition `scan-*`, browse one example `person-01/scan-01` folder, assign its `dwi.nii.gz`, `dwi.bval`, `dwi.bvec` to their named roles, and save the mapping under the temporary `root` with a new filename. Discover: expect two acquisitions and exact role filenames. Deselect one, move through workflow/configuration, and validate a plan; confirm one acquisition is recorded and Run remains gated. Do **not** approve or execute the constant-image fixture.
+6. Switch Batch source to BIDS and deliberately choose `root/custom`: verify the missing-BIDS-description error explains choosing a BIDS root or custom mapping. Then choose `root/bids`, discover two acquisitions, review subjects and recover without restarting the application.
+7. For each modal/picker above, confirm an actual native macOS chooser appears, chosen paths populate only the intended field, Cancel leaves that field unchanged, Tab advances sensibly, controls stay reachable when resizing, and focus returns to the initiating dialog. Inspect both themes. Report any clipping, focus trap, misleading message or wrong selector, with the exact step and HEAD.
+
+An optional committed-code native regression command is:
+
+```sh
+PYTHONPATH=src QT_QPA_PLATFORM=cocoa OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/python -m pytest -q tests/gui/test_post_audit_interactions.py tests/gui/test_usability_audit_fixes.py --tb=short
+```
+
+This pytest command still mocks OS picker returns for deterministic field-routing checks; the seven manual steps above are required to verify the **actual** native picker.
+
+### Branch integration and Phase 7 checkpoint
+
+`development/phase7-eddy-validation` currently points to `091bcbb`. The post-audit branch descends from that commit through `8f1c062`, `62883c0`, `abee496` and `e5daf0a`; the Phase 7 branch is an ancestor, so a reviewed fast-forward can carry these usability fixes into continued Phase 7 work. **Do not start Phase 7 from `8102df1`**, which predates both the Phase 7 audit/protocol and this usability work. Use the final clean post-audit documentation HEAD as the proposed Phase 7 starting checkpoint after native review and explicit branch-integration decision. No branch was merged or pushed here. The 38 scientific-validation tasks, EDDY hypotheses, original data restrictions and all approval gates remain open and unchanged.
