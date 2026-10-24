@@ -447,6 +447,7 @@ class MainWindow(QMainWindow):
             page.connectome.view_requested.connect(self.open_scientific_product)
             page.connectome.qc_requested.connect(self.open_generated_qc)
             page.connectome.run_requested.connect(self.open_saved_run)
+            page.connectome.atlas_review_requested.connect(self.review_connectome_atlas)
             page.tracking.qc_requested.connect(self.open_generated_qc)
             page.tracking.run_requested.connect(self.open_saved_run)
             page.tracking.viewer_source_requested.connect(self.import_viewer_filter_source)
@@ -908,6 +909,19 @@ class MainWindow(QMainWindow):
         self.scientific.set_stage("connectivity")
         self.workspace.setCurrentWidget(self.scientific)
         self.select_navigation("Connectivity")
+
+    def review_connectome_atlas(self, atlas_id, reference_id):
+        """Carry selected inputs into QC planning without declaring them registered."""
+        self.focus_registration()
+        guided = self.scientific.registration.guided
+        guided.select_goal("existing_atlas_qc")
+        for combo, artifact_id in (
+            (guided.existing_atlas, atlas_id),
+            (guided.existing_reference, reference_id),
+        ):
+            index = combo.findData(artifact_id)
+            if artifact_id is not None and index >= 0:
+                combo.setCurrentIndex(index)
 
     def focus_tracking_plan(self):
         """Keep generation planning distinct from working tract visualization/editing."""

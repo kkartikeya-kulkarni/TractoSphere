@@ -46,6 +46,11 @@ GOALS = (
         "Apply an imported transform to a compatible atlas, ROI, scalar image or probability map. Its exact identity and direction are checked during plan validation.",
     ),
     (
+        "existing_atlas_qc",
+        "Review an Existing Registered Atlas",
+        "Generate image-only QC from an already registered atlas and its verified diffusion reference. Existing registration provenance is required; no registration is rerun.",
+    ),
+    (
         "inspect",
         "Inspect a Registration",
         "Open verified registration evidence in the existing Viewer and record a separate anatomical review.",
@@ -113,6 +118,7 @@ class GuidedRegistration(QWidget):
         self.pages.addWidget(self._epi_page())
         self.pages.addWidget(self._align_page())
         self.pages.addWidget(self._move_page())
+        self.pages.addWidget(self._existing_atlas_qc_page())
         self.pages.addWidget(self._inspect_page())
         root.addWidget(self.pages)
 
@@ -322,6 +328,17 @@ class GuidedRegistration(QWidget):
         layout.addWidget(button("Open Saved Atlas QC…", self.owner.open_saved))
         return page
 
+    def _existing_atlas_qc_page(self):
+        page, _, form = self._page(
+            "Review an Existing Registered Atlas",
+            "Select the original registered atlas and its exact verified low-b reference. The atlas needs a reviewed, hash-bound QC association or a verified registration manifest. This creates image-only evidence for anatomical review without estimating a new transform.",
+        )
+        self.existing_atlas = self._input("Existing registered atlas")
+        self.existing_reference = self._input("Verified diffusion reference for atlas QC")
+        self._input_row(form, "Registered atlas", self.existing_atlas, "atlas_labels")
+        self._input_row(form, "Verified low-b reference", self.existing_reference, "anatomy")
+        return page
+
     def select_goal(self, key, *, initial=False):
         if key not in self.goal_buttons:
             raise ValueError("Unsupported guided registration goal")
@@ -336,6 +353,11 @@ class GuidedRegistration(QWidget):
         self.advanced_notice.clear()
         self._update_direction()
         self._set_execution_visible(key != "inspect")
+        self.approval.setText(
+            "I reviewed the exact atlas, reference, provenance and QC-only evidence plan"
+            if key == "existing_atlas_qc"
+            else "I reviewed these exact inputs, direction, interpolation and commands"
+        )
         if changed and not initial:
             self.owner.task = None
             self.owner.selection.clear()
@@ -375,6 +397,10 @@ class GuidedRegistration(QWidget):
         if self.goal == "reference":
             self.direction.setText(
                 "One DWI → a new low-b reference. No anatomical registration is estimated."
+            )
+        elif self.goal == "existing_atlas_qc":
+            self.direction.setText(
+                "Existing registered atlas + exact verified diffusion reference → new QC evidence. No transform is estimated or applied."
             )
         elif self.goal in names:
             moving, fixed = names[self.goal]
@@ -484,6 +510,10 @@ class GuidedRegistration(QWidget):
                 (self.target, "target reference"),
                 (self.transform, "source-to-target transform"),
             ),
+            "existing_atlas_qc": (
+                (self.existing_atlas, "existing registered atlas"),
+                (self.existing_reference, "verified diffusion reference"),
+            ),
             "inspect": (),
         }
         applicable = [
@@ -509,11 +539,23 @@ class GuidedRegistration(QWidget):
         ]
         lines = [f"Imported and inspected: {name} ({artifact.kind.replace('_', ' ')})."]
         for role, title in applicable:
-            lines.append(
-                f"• {title}: eligible for selection; exact planning checks still apply."
-                if self._candidate(role, artifact)
-                else f"• {title}: {self._candidate_reason(role, artifact)}."
-            )
+            declarations = artifact.payload.get("declarations", {})
+            if role is self.existing_atlas and not (
+                declarations.get("qc_association") or declarations.get("registration_manifest")
+            ):
+                lines.append(
+                    "• existing registered atlas: selectable for inspection; needs a hash-bound QC association or verified registration manifest before QC preview."
+                )
+            elif role is self.existing_reference and not declarations.get("reference_record"):
+                lines.append(
+                    "• verified diffusion reference: selectable for inspection; needs an exact generated low-b reference record before QC preview."
+                )
+            else:
+                lines.append(
+                    f"• {title}: eligible for selection; exact planning checks still apply."
+                    if self._candidate(role, artifact)
+                    else f"• {title}: {self._candidate_reason(role, artifact)}."
+                )
         if missing_identity:
             lines.append("Plan validation also requires " + ", ".join(missing_identity) + ".")
         lines.append(
@@ -533,6 +575,8 @@ class GuidedRegistration(QWidget):
             (self.derivative, {"anatomy", "atlas_labels", "roi", "atlas_probability"}),
             (self.target, {"anatomy"}),
             (self.transform, {"spatial_transform"}),
+            (self.existing_atlas, {"atlas_labels"}),
+            (self.existing_reference, {"anatomy"}),
         )
 
     def _explain_inventory(self):
@@ -584,6 +628,8 @@ class GuidedRegistration(QWidget):
                 if missing
                 else "Select the exact source, target and transform; matching image dimensions are insufficient."
             )
+        elif self.goal == "existing_atlas_qc":
+            message = "Import the registered atlas and its verified low-b reference. Review the atlas's existing registration provenance and exact reference association before preview. The QC bundle still requires a separate human anatomical decision."
         else:
             message = "Open a verified current result or a saved atlas QC bundle; no new command is required."
         roles = {
@@ -591,6 +637,7 @@ class GuidedRegistration(QWidget):
             "epi_t1": (self.epi_moving, self.epi_reference, self.t1_brain, self.wmseg),
             "align_two": (self.moving, self.reference),
             "move": (self.derivative, self.target, self.transform),
+            "existing_atlas_qc": (self.existing_atlas, self.existing_reference),
             "inspect": (),
         }
         hidden = {}
@@ -837,6 +884,18 @@ class GuidedRegistration(QWidget):
                 },
                 {},
             )
+        if self.goal == "existing_atlas_qc":
+            return Task(
+                "registration-guided",
+                "registration.qc",
+                {
+                    "atlas": self._required(self.existing_atlas, "the existing registered atlas"),
+                    "reference": self._required(
+                        self.existing_reference, "its verified low-b diffusion reference"
+                    ),
+                },
+                {},
+            )
         raise ValueError("Choose a processing goal; inspection does not create a command plan")
 
     def clear_plan(self):
@@ -850,7 +909,7 @@ class GuidedRegistration(QWidget):
 
     def _show_plan(self, payload, digest, heading):
         """Render the exact preview or recorded execution without restoring approval."""
-        source = payload.get("source", payload.get("dwi", {}))
+        source = payload.get("atlas", payload.get("source", payload.get("dwi", {})))
         target = payload.get("reference", {})
         source_name = Path(source.get("image", source.get("path", ""))).name
         target_name = Path(target.get("image", target.get("path", ""))).name
@@ -862,6 +921,8 @@ class GuidedRegistration(QWidget):
                 f"\nLow-b threshold: ≤ {payload['threshold']} s/mm²; "
                 f"selected volume indices ({len(indices)}): {', '.join(map(str, indices))}."
             )
+        elif payload.get("operation") == "atlas_qc":
+            low_b = "\nImage-only QC; no transform is estimated or applied. Anatomical review is separate."
         self.summary.setText(
             f"{heading}\n"
             f"{task['algorithm']} · {source_name or 'selected DWI'} → {target_name or 'new low-b reference'}"

@@ -149,6 +149,11 @@ def test_theme_preserves_state(window: object, qtbot: object, dataset_folder: Pa
     window.page.preview.slider.setValue(2)
     qtbot.waitUntil(lambda: window.page.preview.canvas.image is not None)
     count = len(window.logs.records)
+    navigation_help = {
+        name: nav.toolTip()
+        for nav, name in window.nav_buttons
+        if name in {"Reconstruction", "Connectivity"}
+    }
     window.toggle_theme()
     assert window.theme.name == "light"
     assert window.dataset is dataset
@@ -159,7 +164,7 @@ def test_theme_preserves_state(window: object, qtbot: object, dataset_folder: Pa
     assert window.theme.name == "dark"
     assert window.nav_buttons[2][0].isEnabled()  # History/planning is implemented.
     assert all(
-        nav.isEnabled() and "not implemented" in nav.toolTip()
+        nav.isEnabled() and nav.toolTip() == navigation_help[name]
         for nav, name in window.nav_buttons[1:]
         if name in {"Reconstruction", "Connectivity"}
     )

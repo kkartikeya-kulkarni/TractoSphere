@@ -26,6 +26,7 @@ def fixture(tmp_path):
         aff[:3, 3] = [32, -18, -20]
         for name, data in [
             ("atlas.nii.gz", labels),
+            ("b0.nii.gz", (labels + 1).astype("f4")),
             (
                 "dwi.nii.gz",
                 np.stack([labels + 1, labels + 2, labels + 3, labels + 4], axis=-1).astype("f4"),
@@ -49,6 +50,7 @@ def fixture(tmp_path):
                     bvec=str(directory / "bvec"),
                     t1=str(directory / "atlas.nii.gz"),
                     atlas=str(directory / "atlas.nii.gz"),
+                    reference=str(directory / "b0.nii.gz"),
                 ),
                 dict(synthetic=True),
                 dict(
@@ -173,7 +175,9 @@ def test_registration_missing_input_isolation_and_cross_subject_transform(tmp_pa
     matrix = image.parent / "known.mat"
     np.savetxt(matrix, np.eye(4))
     source = ImageSpace.create(image, "T1_NATIVE", "t1", "synthetic-1", "diffusion", "01")
-    target = ImageSpace.create(image, "DWI_NATIVE", "dwi", "synthetic-1", "diffusion", "01")
+    target = ImageSpace.create(
+        image.parent / "b0.nii.gz", "DWI_NATIVE", "dwi", "synthetic-1", "diffusion", "01"
+    )
     path = image.parent / "transform.json"
     save_transform(
         path,
@@ -227,7 +231,12 @@ def test_actual_empty_atlas_failure_isolated(tmp_path, monkeypatch):
             path, "T1_NATIVE", "t1", a.subject_id, a.acquisition_id, a.session_id
         )
         target = ImageSpace.create(
-            path, "DWI_NATIVE", "dwi", a.subject_id, a.acquisition_id, a.session_id
+            path.parent / "b0.nii.gz",
+            "DWI_NATIVE",
+            "dwi",
+            a.subject_id,
+            a.acquisition_id,
+            a.session_id,
         )
         m = np.eye(4)
         m[0, 3] = 1000 if i == 0 else 2
@@ -269,7 +278,7 @@ def test_actual_empty_atlas_failure_isolated(tmp_path, monkeypatch):
                         declarations=dict(space_kind="T1_NATIVE", space_id="t1"),
                     ),
                     b=dict(
-                        role="t1",
+                        role="reference",
                         kind="anatomy",
                         declarations=dict(space_kind="DWI_NATIVE", space_id="dwi"),
                     ),

@@ -135,5 +135,20 @@ def test_imported_atlas_without_registration_qc_is_inspectable_but_explained(
     panel.atlas.setCurrentIndex(panel.atlas.findData(item.id))
     assert panel.node_list.rowCount() == 1
     assert "no native registration QC bundle declared" in panel.input_help.text()
-    assert "Open Registration" in panel.input_help.text()
+    assert "Review atlas registration" in panel.input_help.text()
     assert panel.plan is None and not panel.run_button.isEnabled()
+    reference = tmp_path / "reference.nii.gz"
+    reference_image = nib.Nifti1Image(np.ones((5, 6, 7), dtype="f4"), np.eye(4))
+    reference_image.header.set_xyzt_units("mm")
+    nib.save(reference_image, reference)
+    page.import_request(ImportRequest("anatomy", reference))
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    reference_item = page.artifacts[-1]
+    panel.reference.setCurrentIndex(panel.reference.findData(reference_item.id))
+    qtbot.mouseClick(panel.review_atlas, Qt.MouseButton.LeftButton)
+    guided = page.registration.guided
+    assert page.stage == "registration"
+    assert guided.goal == "existing_atlas_qc"
+    assert guided.existing_atlas.currentData() == item.id
+    assert guided.existing_reference.currentData() == reference_item.id
+    assert guided.owner.plan is None

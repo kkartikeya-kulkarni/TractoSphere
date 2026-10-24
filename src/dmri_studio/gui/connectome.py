@@ -285,6 +285,7 @@ class ConnectomePanel(QWidget):
     view_requested = Signal(dict)
     qc_requested = Signal(object)
     run_requested = Signal(object)
+    atlas_review_requested = Signal(object, object)
 
     def __init__(self, owner):
         super().__init__(owner)
@@ -426,6 +427,14 @@ class ConnectomePanel(QWidget):
             "Select a tractogram, registered atlas and reference image.", "caption"
         )
         setup.addWidget(self.input_help)
+        self.review_atlas = button(
+            "Review atlas registration…",
+            lambda: self.atlas_review_requested.emit(
+                self.atlas.currentData(), self.reference.currentData()
+            ),
+        )
+        self.review_atlas.setAccessibleName("Review selected atlas and reference in Registration")
+        setup.addWidget(self.review_atlas)
         setup.addWidget(self.advanced)
         self.preview = button("Preview commands", self.prepare)
         self.approve = QCheckBox(
@@ -547,8 +556,9 @@ class ConnectomePanel(QWidget):
             message += (
                 " This imported parcellation has no native registration QC bundle declared. "
                 "Selection is for inspection only until the exact atlas/reference review is "
-                "checked during plan validation. Open Registration to inspect the alignment "
-                "and record supported evidence; matching filenames or image grids are insufficient."
+                "checked during plan validation. Use Review atlas registration… to carry these "
+                "inputs into a QC-only evidence plan; a historical assertion or matching image "
+                "grid alone is insufficient."
             )
         self.input_help.setText(message)
 

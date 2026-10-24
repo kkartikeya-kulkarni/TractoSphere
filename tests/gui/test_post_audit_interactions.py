@@ -27,12 +27,19 @@ def test_import_browse_buttons_update_only_the_requested_field(
 ):
     files = {
         "Choose input file": tmp_path / "dwi.nii.gz",
-        "Choose b-values": tmp_path / "dwi.bval",
-        "Choose b-vectors": tmp_path / "dwi.bvec",
-        "Choose acquisition or provenance JSON": tmp_path / "dwi.json",
+        "Choose b-values": tmp_path / "reviewed.bval",
+        "Choose b-vectors": tmp_path / "reviewed.bvec",
+        "Choose acquisition or provenance JSON": tmp_path / "reviewed.json",
     }
     for file in files.values():
         file.write_text("synthetic picker return")
+    companions = {
+        "bval": tmp_path / "dwi.bval",
+        "bvec": tmp_path / "dwi.bvec",
+        "sidecar": tmp_path / "dwi.json",
+    }
+    for file in companions.values():
+        file.write_text("synthetic companion")
     called = []
 
     def pick(_parent, title):
@@ -57,6 +64,8 @@ def test_import_browse_buttons_update_only_the_requested_field(
         )
         qtbot.mouseClick(browse, Qt.MouseButton.LeftButton)
         expected_paths[name] = str(files[called[-1]])
+        if name == "path":
+            expected_paths.update({key: str(value) for key, value in companions.items()})
         assert {key: field.text() for key, field in dialog.paths.items()} == expected_paths
     assert called == list(files)
 
@@ -215,7 +224,10 @@ def test_click_driven_scientific_imports_reach_registration_dti_and_csd(
                 )
                 qtbot.mouseClick(disclosure.toggle, Qt.MouseButton.LeftButton)
                 for name, value in declarations:
-                    control = dialog.declarations[name]
+                    control = {
+                        "subject_id": dialog.subject,
+                        "space_id": dialog.space,
+                    }.get(name) or dialog.declarations[name]
                     control.setFocus()
                     if name in {"space_kind", "anatomical_modality", "tissue"}:
                         for _ in range(value):
@@ -241,7 +253,15 @@ def test_click_driven_scientific_imports_reach_registration_dti_and_csd(
         if action.accessibleName() == "Import Moving image"
     )
     import_by_click(
-        import_anatomy, kind="anatomy", declarations=(("space_kind", 2), ("anatomical_modality", 1))
+        import_anatomy,
+        kind="anatomy",
+        declarations=(
+            ("subject_id", "synthetic"),
+            ("acquisition_id", "acq1"),
+            ("space_id", "subject-t1"),
+            ("space_kind", 2),
+            ("anatomical_modality", 1),
+        ),
     )
     assert len(page.artifacts) == 1, page.status.text()
     assert guided.moving.count() == 2

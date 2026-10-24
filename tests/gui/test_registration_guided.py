@@ -61,7 +61,7 @@ def test_guided_registration_goals_are_separate_and_reused(window):
     assert "does not align it with anatomy" in guided.explanation.text()
     assert "documented preprocessed DWI" in guided.inventory_notice.text()
     guided.select_goal("inspect")
-    assert guided.pages.currentIndex() == 4
+    assert guided.pages.currentIndex() == 5
     assert not guided.preview.isVisibleTo(guided)
     window.focus_tracking_plan()
     window.focus_registration()
@@ -153,6 +153,18 @@ def test_guided_tasks_map_to_supported_registry_operations(window):
         task = guided.build_task()
         assert task.algorithm == "registration.apply." + expected
         assert task.inputs == {"moving": kind, "reference": "epi", "transform": "transform"}
+
+    guided.select_goal("existing_atlas_qc")
+    _select(guided.imported_anatomy, "atlas")
+    assert "needs a hash-bound QC association" in guided.imported_details.text()
+    _select(guided.imported_anatomy, "epi")
+    assert "needs an exact generated low-b reference record" in guided.imported_details.text()
+    _select(guided.existing_atlas, "atlas")
+    _select(guided.existing_reference, "epi")
+    task = guided.build_task()
+    assert task.algorithm == "registration.qc"
+    assert task.inputs == {"atlas": "atlas", "reference": "epi"}
+    assert "No transform is estimated or applied" in guided.direction.text()
 
 
 def test_guided_hides_clearly_ineligible_dwi_and_epi_candidates(window):
