@@ -7,6 +7,8 @@ Date: 2026-10-23. Phase 0 baseline: [PHASE0_AUDIT_AND_HANDOFF.md](PHASE0_AUDIT_A
 - Public scientific base: `development/scientific-toolbox-2026-10` at `9c7a3112ba13d5b1c608cbeb7866ef536de4e893`.
 - Phase 0 audit branch: `audit/phase0-baseline-2026-10-23` at `d96ab4f`.
 - Phase 1 working branch: `development/phase1-scientific-software-2026-10-23`, based on the Phase 0 audit commit. Commit `58f3a6b` carried forward only PR #3's dependency-path and busy-state changes. Commit `4577428` implemented the central configuration, workflow propagation, pinned batch defaults and regression tests.
+- Local documentation commit: `f411990`. Draft Phase 1 PR: [#4](https://github.com/kkartikeya-kulkarni/TractoSphere/pull/4), targeting `development/scientific-toolbox-2026-10`.
+- The shell cannot resolve `github.com` for `git push`. The GitHub connector published four equivalent focused commits instead; the remote PR head before this final tracking update is `541bfeadfbe958e26a67252c03d83c4dbba4f6cc`. Its tree SHA `dbc1add5c12bb9486b52ea665634afd7230c291b` exactly matches local `f411990^{tree}`. Remote commit hashes differ because GitHub authored the equivalent commits. Preserve this equivalence when continuing work; do not assume a normal fast-forward push from the local branch.
 - PR #3 remains draft at `1cf75fe8667d3164724bad12c48ef2a601d1fd9f`, base `9c7a311`. Its eight changed files were reproduced byte-for-byte from the GitHub patch in `/private/tmp/tractosphere-pr3-review`; `git apply --check` and `git diff --check` passed. The three dependency-path production files and corresponding test hunks were incorporated here. PR #3's tractography/registration wording changes were left on PR #3.
 - PR #3 GitHub Actions run `40043535129` currently fails on all five matrix jobs at the core test step. The macOS arm64 log reports 31 failed, 801 passed, 126 skipped; several failures involve absent external FSL/MRtrix paths. This is not a passing CI baseline.
 
@@ -58,6 +60,6 @@ The combined post-change dependency/core/CLI suite in `/private/tmp/phase1-final
 - [ ] Native GUI verification of the complete per-family setup and all workflow tabs on macOS Cocoa; this sandbox cannot initialize native VTK reliably.
 - [ ] Full BatchRunner execution and historical resume/retry against pinned MRtrix/FSL/ANTs paths outside the `psutil` sandbox restriction.
 - [ ] Physical Linux and Windows/WSL2 validation of the expanded scientific workflows. Native FSL execution on Windows remains unsupported.
-- [ ] GitHub draft PR and CI results for this Phase 1 branch must be recorded after publication.
+- [x] Draft PR #4 opened against the scientific development branch. CI for its new head is not yet verified.
 
 Do not call Phase 1 fully verified until the unchecked native and BatchRunner checks are run in a suitable environment. Do not weaken version or provenance gates to make a scan look successful. The specific next verification task is to run the full GUI and batch tests on a native macOS host with process enumeration and VTK access, then resolve only residual application failures. Phase 2 startup/navigation optimization follows only after this gate.
