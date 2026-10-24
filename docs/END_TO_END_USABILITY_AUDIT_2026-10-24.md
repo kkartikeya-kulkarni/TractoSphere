@@ -31,10 +31,11 @@ Handoffs consulted: [Phase 0](PHASE0_AUDIT_AND_HANDOFF.md),
 - The HCP-style DWI is now recognized with same-folder gradients, but a new
   reference/registration plan still needs documented correction history and
   appropriate structural inputs.
-- The old atlas review and node display are real evidence, yet Connectivity
-  needs a current exact-reference QC bundle and human review. The new guided
-  QC-only route exposes that recovery without rerunning registration; the
-  Connectivity action carries the selected atlas and reference into it.
+- The old atlas review and node display are real evidence. A later Stage 8a
+  run also produced an exact-reference, image-only native QC bundle for that
+  atlas. The saved Connectivity selection did not link to this bundle, and
+  its human anatomical decision is still pending. The guided route can open
+  the existing bundle or prepare QC-only evidence without rerunning registration.
 - Processing tools may be installed while an operation remains blocked by
   evidence; cloud-backed inputs also require verified local staging. The UI
   should state each missing item at the action, not leave a disabled button
@@ -58,8 +59,12 @@ T1/DWI/FOD selection was reimported read-only with matching content IDs. The
 current companion suggester selected the same-folder `bvals` and `bvecs` for
 the real `data.nii.gz`, without claiming acquisition or scientific acceptance. The
 old 23-node atlas review is present and its ten evidence-file hashes currently
-match. It is a legacy review assertion, not the current native QC bundle or an
-automatic approval. The [38-item scientific backlog](SCIENTIFIC_VALIDATION_BACKLOG.md)
+match. A later Stage 8a output contains a generated mean low-b reference record,
+a hash-bound atlas/reference association and a native atlas QC bundle. On this
+checkpoint, `verify_bundle` validated all 46 evidence files, and `review_status`
+returned `NEEDS_REVIEW`. The bundle has zero registration commands. Neither
+the legacy review nor the native bundle is automatic anatomical approval. The
+[38-item scientific backlog](SCIENTIFIC_VALIDATION_BACKLOG.md)
 remains open (15 P0, 20 P1, 3 P2); Phase 7 EDDY experiments are separate.
 
 A fresh read-only replay of that saved real connectome selection returned
@@ -68,12 +73,15 @@ A fresh read-only replay of that saved real connectome selection returned
 It created a proposal only, in the private audit workspace. Compatible MRtrix3
 and FSL tools were found by the local dependency doctor; ANTs/N4 was missing.
 That software result does not resolve the atlas evidence block.
-The saved historical selection declares a legacy `registration_record`, but
-neither the atlas nor b0 reference declares `registration_qc`, `qc_association`
-or `reference_record`. The legacy review says `spatial_review=reviewed`, notes
-no transform applied or header rewrite in that inspection, and leaves
-scientific acceptance unassigned. It supports targeted provenance recovery;
-it cannot be recast as a new human decision or generated reference record.
+The saved historical Connectivity selection declares a legacy
+`registration_record`, but neither its atlas nor its original b0 reference
+points to the later Stage 8a `registration_qc`, `qc_association` or
+`reference_record`. This is an inventory/evidence-linking gap. The separate
+Stage 8a bundle binds the same atlas SHA-256 to a newer generated mean low-b
+reference and preserves its relation to the original b0 with a reviewed,
+hash-bound association. Its anatomical decision is still pending. The legacy
+review says `spatial_review=reviewed`, notes no transform applied or header
+rewrite in that inspection, and leaves scientific acceptance unassigned.
 
 ## Operation acceptance matrix
 
@@ -99,12 +107,12 @@ passes only cover the particular test, not all controls or real anatomy.
 | Registration: move atlas/ROI | Source, target and transform convention/direction bound to images | Interpolation and command preview; approve | Label preservation, transform/output QC, human review | Existing standalone matrix lacks complete direction and source binding; real plan **BLOCKED**. |
 | Registration: advanced nonlinear/BBR | Required fixed/moving anatomy, masks and tool-specific warp/segmentation contracts | FNIRT/BBR parameters, exact native commands and approval | Jacobian/coverage checks plus visual registration review | Controlled synthetic/core routes pass; real HCP prerequisites and native result inspection **UNTESTED**. |
 | Registration: advanced transform import/invert/compose/convert | Exact source/target images, direction, convention, software/version and evidence | Typed plan; reject same-image or ambiguous transforms | Immutable transform record, reverse/chain direction and output checks | Core distinct-image guard retained; historical matrix alone remains **BLOCKED**. Native advanced-dialog and real interoperability **UNTESTED**. |
-| Registration: existing registered atlas QC | Exact atlas plus verified low-b reference and hash-bound producer or association | QC-only plan has **zero registration commands**; approval yields new immutable bundle | Full-slice overlay, reviewer decision, current hashes; review can become stale | Guided route added on this branch. Historical 23-node review is supporting evidence but native bundle/reference record still missing; real approval **BLOCKED**. |
+| Registration: existing registered atlas QC | Exact atlas plus verified low-b reference and hash-bound producer or association | QC-only plan has **zero registration commands**; approval yields new immutable bundle | Full-slice overlay, reviewer decision, current hashes; review can become stale | Guided route added on this branch. Existing Stage 8a native bundle and reference record verified (46 evidence files); anatomical decision **NEEDS_REVIEW**. Reuse the saved bundle. |
 | Tractography generate | FOD, mask/ACT/GMWMI, geometry and source identity | Exact `tckgen` plan; bounded approval and async execution | Tract count, geometry, QC, Viewer | Synthetic and targeted native prior coverage; real generation and 10M scale **UNTESTED**. |
 | Tractography filter and ROI constraints | Selected Viewer group maps to full original TCK/TRK source; compatible ROIs | TRK conversion explicit; exact `tckedit` preview/approval | Filtered/original Viewer, QC, hashes and cancellation | **PASS** current bounded real 1,000-source-track/5-output-track technical run and verified reopen; targeted Cocoa Viewer suite passed. Real anatomical ROI review remains **UNTESTED**. |
 | Tract density/statistics | Compatible full tractogram/reference | Exact density/stat plan and approval | Density Viewer scene preservation, QC | Synthetic coverage; native scene preservation and real mapping **UNTESTED**. |
 | SIFT2 | Exact tractogram and FOD, mask/ACT evidence | `tcksift2` preview, approval and new weights | Weight distribution, hash-bound source, QC | No reviewed real weights in bounded set; scientific test **BLOCKED**. |
-| Connectivity count/length/FA/weighted metrics | Tracts, atlas, reference, optional FA and exact weights; nodes inspectable | Plan requires current atlas registration eligibility; separate approval and execution | Matrix, occupancy, edge extraction, QC, provenance | Real atlas's 23 nodes visible **PRIOR**; plan **BLOCKED** by missing native QC/review. No real connectome run in this audit. |
+| Connectivity count/length/FA/weighted metrics | Tracts, atlas, reference, optional FA and exact weights; nodes inspectable | Plan requires current atlas registration eligibility; separate approval and execution | Matrix, occupancy, edge extraction, QC, provenance | Real atlas's 23 nodes visible **PRIOR**; saved selection is **BLOCKED** because it does not link to the existing native QC bundle, whose human decision remains **NEEDS_REVIEW**. No real connectome run in this audit. |
 | Batch BIDS/custom discovery and mapping | One HCP-style custom acquisition found **PRIOR**; incomplete roles surfaced | Per-subject plan, pinned tool paths and consent | Journal, pause/cancel/retry/resume, Viewer/QC handoff | Synthetic/core coverage; real discovery only, native seven-step walkthrough **UNTESTED**. |
 | Runs, reports and QC reopen | Saved manifests/products verified by hashes | No new computation for inspection | Review status persists; report and export checked | Existing tract run and 11 hashes/QC **PRIOR**; current native end-to-end reopen **UNTESTED**. |
 | Settings and scientific software | Executables and versions explicitly detected; saved paths do not confer eligibility | Each plan revalidates exact tools | Missing tool path stated at relevant operation | Existing profile had no saved paths **PRIOR**; current native settings workflow and real ANTs **UNTESTED**. |
@@ -122,12 +130,12 @@ passes only cover the particular test, not all controls or real anatomy.
 
 ## Confirmed root causes and repair order
 
-1. **P0, scientific continuity:** a prior registered atlas can be inspected,
-   but current Connectivity correctly lacks a native, exact-reference review.
-   Recover original transform/reference provenance, create a QC-only bundle and
-   review actual anatomy. The guided QC-only goal is now reachable directly
-   from Connectivity without registration rerun. Do not promote the legacy
-   assertion directly.
+1. **P0, scientific continuity:** the prior registered atlas has a verified
+   Stage 8a native QC bundle, but the saved Connectivity selection does not
+   reference it. Open that bundle, review actual anatomy, record the human
+   decision, and attach the reviewed bundle to an exact atlas/reference
+   selection. The guided route is reachable from Connectivity; do not rerun
+   registration or repeat QC merely because the older selection omitted a link.
 2. **P0, workflow completion:** current full native Registration, Viewer and
    Batch handoffs plus real-file picker checks are needed. Automated Cocoa
    tests and a researcher-led visual/anatomical decision are distinct.
@@ -154,10 +162,11 @@ buttons, keyboard focus, cancellation feedback and result reopening.
    DTI/CSD inventory. Preview only; do not start EDDY/TOPUP.
 2. Import the T1 and atlas. Review only documented identity declarations.
    Confirm T1 eligibility messages, separate EPI/T1 prerequisites and atlas
-   node inspection. For the historical atlas, inspect the original registration
-   reference/transform evidence and create a QC-only plan. A missing evidence
-   item must remain a visible block. Review all three planes before any
-   anatomical decision; rerun Connectivity preview only after a current review.
+   node inspection. For the historical atlas, open the saved Stage 8a native QC
+   bundle, inspect the original registration reference/transform evidence and
+   all three planes, then record an actual anatomical decision. Link the bundle
+   through Data Import → Review declarations and select its exact generated
+   low-b reference. Rerun Connectivity preview only after a current review.
 3. Open two tract groups in Viewer. Filter the selected full source with
    documented ROIs, preview exact commands and a small derivative, then reopen
    filtered tracks, original tracks, QC and run details. Test cancellation once.
@@ -214,6 +223,14 @@ scientific identity. The assertions and fixture were updated; the four affected
 GUI files then passed **44/44 on Cocoa in 88.46 s**. This is targeted regression
 closure, not a second full 351-test pass. These are automated checks, not human
 anatomical acceptance.
+
+A subsequent read-only search located the separate Stage 8a atlas QC bundle.
+The current core verified its 46 evidence files, confirmed an exact match to
+the legacy 23-node atlas hash, and returned `NEEDS_REVIEW`. Its manifest is
+`validated_pending_qc`, with `human_qc=pending` and zero registration commands.
+The saved Connectivity selection lacks a link to this bundle. This corrects
+the earlier checkpoint's claim that a native bundle/reference record was
+missing altogether. No decision record was created or changed in this audit.
 
 A read-only preview of a saved real tract-filter selection compiled four exact
 MRtrix commands (`tckedit`, `mrconvert`, `tckinfo`, `tckstats`) for a new local

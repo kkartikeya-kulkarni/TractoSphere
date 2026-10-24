@@ -550,15 +550,24 @@ class ConnectomePanel(QWidget):
         selected_atlas = next(
             (a for a in self.owner.artifacts if a.id == self.atlas.currentData()), None
         )
-        if selected_atlas and not selected_atlas.payload.get("declarations", {}).get(
-            "registration_qc"
-        ):
+        qc_path = (
+            selected_atlas.payload.get("declarations", {}).get("registration_qc")
+            if selected_atlas
+            else None
+        )
+        if selected_atlas and not qc_path:
             message += (
                 " This imported parcellation has no native registration QC bundle declared. "
                 "Selection is for inspection only until the exact atlas/reference review is "
-                "checked during plan validation. Use Review atlas registration… to carry these "
-                "inputs into a QC-only evidence plan; a historical assertion or matching image "
-                "grid alone is insufficient."
+                "checked during plan validation. Use Review atlas registration… to open an "
+                "existing QC bundle or prepare a QC-only evidence plan. After human review, "
+                "attach the saved bundle through Data Import → Review declarations. A historical "
+                "assertion or matching image grid alone is insufficient."
+            )
+        elif qc_path:
+            message += (
+                " A native atlas QC bundle is declared. Preview will verify its exact evidence "
+                "and human decision; open the saved bundle in Registration if review is pending."
             )
         self.input_help.setText(message)
 
