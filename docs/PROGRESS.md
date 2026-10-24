@@ -8,9 +8,14 @@ execution record, but the guided summary was cleared by the resulting artifact
 refresh. [The Registration repair handoff](REGISTRATION_WORKFLOW_REPAIR_2026-10-24.md#native-low-b-summary-failure-and-repair)
 records the offscreen reproduction and code repair at `f4733b4`. Preview and
 execution identity remain exact; publishing a derivative still invalidates the
-old runnable plan. Focused offscreen GUI/core checks passed, but corrected
-native Cocoa verification is pending. The 38-task scientific backlog is
-unchanged.
+old runnable plan. Focused offscreen GUI/core checks passed. At documentation
+HEAD `89ec120` (application fix `f4733b4`), the user reran the specific low-b
+Cocoa test twice: **1 passed in 2.26 s, exit 0**, then **1 passed in 1.87 s,
+exit 0**. That targeted regression is verified; the corrected full
+Registration suite, real anatomical review and native visual walkthrough
+remain pending. Next P1 functional priority after the suite is the reported
+Viewer-loaded-tractogram → Tractography filter selector handoff. The 38-task
+scientific backlog is unchanged.
 
 ## 2026-10-24 — Registration input-role repair on the latest real-data checkpoint
 

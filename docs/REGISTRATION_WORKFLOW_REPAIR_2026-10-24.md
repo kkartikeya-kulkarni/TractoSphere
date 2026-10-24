@@ -132,9 +132,10 @@ PYTHONPATH=src QT_QPA_PLATFORM=cocoa OPENBLAS_NUM_THREADS=1 FSLDIR="$HOME/fsl" \
 echo "Native Registration exit code: $?"
 ```
 
-This command is a proposed native check, not a recorded pass. Real-file
-picker, visual Viewer and human anatomical review must be recorded separately
-using the private guide.
+The complete command remains pending on the corrected application code. The
+single low-b regression case has the separate native result recorded below.
+Real-file picker, visual Viewer and human anatomical review must be recorded
+separately using the private guide.
 
 ## Native low-b summary failure and repair
 
@@ -172,8 +173,18 @@ checks passed. An additional attempt to run all of
 `tests/gui/test_registration_gui.py` offscreen entered a native VTK Viewer
 case and segfaulted during `QVTKRenderWindowInteractor` construction. This is
 not a valid offscreen test of that native Viewer route; it must be rerun with
-Cocoa on a Mac desktop. The corrected `f4733b4` code has **not** yet received
-a native Cocoa pass, so the Registration native suite remains open.
+Cocoa on a Mac desktop.
+
+**Targeted native regression verified:** the user ran
+`tests/gui/test_registration_guided_native.py::test_native_guided_low_b_reference_uses_gradients`
+twice in a normal Cocoa Terminal at HEAD `89ec120` (application fix
+`f4733b4`). The first run was **1 passed in 2.26 s, exit 0**; the second was
+**1 passed in 1.87 s, exit 0**. This verifies the corrected synthetic low-b
+preview, execution, selected-index summary and result handoff exercised by
+that test. The earlier full suite's other 19 passes predate the fix, and the
+full Registration suite has not yet been rerun at the corrected checkpoint.
+Native real-file picker behavior, all Registration goals, real anatomical
+alignment and scientific QC review remain open.
 
 ## Branch integration and next verification
 
@@ -184,3 +195,10 @@ it must not restart from `8102df1`. Do not merge this branch into Phase 7 or
 public `main` without a reviewed integration decision. Native Cocoa tests
 should run only against the final committed application HEAD, followed by a
 researcher walkthrough using the exact private guide outside the repository.
+
+After the corrected full Registration suite is checked, the next P1 usability
+investigation is **Viewer-loaded tractograms not becoming selectable in the
+Tractography filtering workflow**. Trace the Viewer handoff, shared artifact
+inventory, identity and eligibility checks, and filter-source selector before
+altering scientific gates. This is a reported functional defect, not a
+scientific validation result, and is not addressed by this Registration fix.
