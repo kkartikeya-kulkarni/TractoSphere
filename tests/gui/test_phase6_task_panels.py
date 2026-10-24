@@ -21,12 +21,12 @@ def test_remaining_task_panels_show_only_relevant_policy_controls(window):
 
     sift2 = page.sift2
     sift2.policy.setCurrentIndex(sift2.policy.findData("mask"))
-    assert sift2.form.isRowVisible(sift2.proc_mask)
-    assert not sift2.form.isRowVisible(sift2.five_tt)
+    assert sift2.form.isRowVisible(sift2.input_rows["proc_mask"])
+    assert not sift2.form.isRowVisible(sift2.input_rows["five_tt"])
     assert "processing mask" in sift2.input_help.text()
     sift2.policy.setCurrentIndex(sift2.policy.findData("act"))
-    assert sift2.form.isRowVisible(sift2.five_tt)
-    assert not sift2.form.isRowVisible(sift2.proc_mask)
+    assert sift2.form.isRowVisible(sift2.input_rows["five_tt"])
+    assert not sift2.form.isRowVisible(sift2.input_rows["proc_mask"])
     assert sift2.plan is None and not sift2.approval.isChecked()
 
     window.focus_connectivity()

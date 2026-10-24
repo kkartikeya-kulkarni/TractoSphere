@@ -70,3 +70,36 @@ def test_anatomy_role_import_routes_follow_the_selected_operation(
     assert panel.source.count() == 2, page.status.text()
     assert panel.source.itemText(1) == anatomy.name
     assert panel.plan is None and not panel.approval.isChecked()
+
+
+def test_sift2_required_and_policy_specific_inputs_have_scoped_import(window, qtbot):
+    window.focus_models()
+    panel = window.scientific.sift2
+    window.scientific.tabs.setCurrentWidget(panel)
+
+    def cancel(kind):
+        dialog = QApplication.activeModalWidget()
+        assert isinstance(dialog, ImportDialog)
+        assert dialog.kind.currentData() == kind
+        qtbot.mouseClick(
+            dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Cancel),
+            Qt.MouseButton.LeftButton,
+        )
+
+    for key, kind in (
+        ("tracts", "tractogram"),
+        ("fod", "fod"),
+        ("reference", "anatomy"),
+    ):
+        assert "Import beside this field" in getattr(panel, key).itemText(0)
+        QTimer.singleShot(0, lambda selected=kind: cancel(selected))
+        qtbot.mouseClick(panel.import_buttons[key], Qt.MouseButton.LeftButton)
+    panel.policy.setCurrentIndex(panel.policy.findData("act"))
+    assert panel.form.isRowVisible(panel.input_rows["five_tt"])
+    QTimer.singleShot(0, lambda: cancel("5tt"))
+    qtbot.mouseClick(panel.import_buttons["five_tt"], Qt.MouseButton.LeftButton)
+    panel.policy.setCurrentIndex(panel.policy.findData("mask"))
+    assert panel.form.isRowVisible(panel.input_rows["proc_mask"])
+    QTimer.singleShot(0, lambda: cancel("mask"))
+    qtbot.mouseClick(panel.import_buttons["proc_mask"], Qt.MouseButton.LeftButton)
+    assert panel.plan is None and not panel.approval.isChecked()

@@ -69,16 +69,30 @@ class SIFT2Panel(QScrollArea):
             ("Native whole-FOD model", "none"),
         ]:
             self.policy.addItem(name, value)
-        for text, w in [
-            ("Source tractogram", self.tracts),
-            ("Compatible WM FOD", self.fod),
-            ("Reviewed reference", self.reference),
-            ("Processing mask policy", self.policy),
-            ("ACT five-tissue image", self.five_tt),
-            ("Processing mask", self.proc_mask),
+        self.input_rows = {}
+        self.import_buttons = {}
+        for key, text, w, kind in [
+            ("tracts", "Source tractogram", self.tracts, "tractogram"),
+            ("fod", "Compatible WM FOD", self.fod, "fod"),
+            ("reference", "Reviewed reference", self.reference, "anatomy"),
+            ("five_tt", "ACT five-tissue image", self.five_tt, "5tt"),
+            ("proc_mask", "Processing mask", self.proc_mask, "mask"),
         ]:
-            form.addRow(text, w)
+            row = QWidget()
+            line = QHBoxLayout(row)
+            line.setContentsMargins(0, 0, 0, 0)
+            line.addWidget(w, 1)
+            action = button(
+                "Import…", lambda _=False, selected=kind: self.owner.browse_import(selected)
+            )
+            action.setAccessibleName(f"Import {text}")
+            line.addWidget(action)
+            form.addRow(text, row)
             w.setAccessibleName(text)
+            self.input_rows[key] = row
+            self.import_buttons[key] = action
+        form.addRow("Processing mask policy", self.policy)
+        self.policy.setAccessibleName("Processing mask policy")
         self.threads = QSpinBox()
         self.threads.setRange(1, 8)
         self.threads.setValue(2)
@@ -92,17 +106,6 @@ class SIFT2Panel(QScrollArea):
             "Select a source tractogram, WM FOD and reviewed reference.", "caption"
         )
         root.addWidget(self.input_help)
-        imports = QHBoxLayout()
-        for title, kind in (
-            ("Import tractogram…", "tractogram"),
-            ("Import FOD…", "fod"),
-            ("Import reference…", "anatomy"),
-        ):
-            imports.addWidget(
-                button(title, lambda _=False, selected=kind: self.owner.browse_import(selected))
-            )
-        imports.addStretch()
-        root.addLayout(imports)
         advanced = QWidget()
         af = QFormLayout(advanced)
         af.addRow("Threads", self.threads)
@@ -186,8 +189,8 @@ class SIFT2Panel(QScrollArea):
     def update_policy_fields(self, *_):
         """Only request the tissue or mask evidence used by the selected policy."""
         policy = self.policy.currentData()
-        self.form.setRowVisible(self.five_tt, policy == "act")
-        self.form.setRowVisible(self.proc_mask, policy == "mask")
+        self.form.setRowVisible(self.input_rows["five_tt"], policy == "act")
+        self.form.setRowVisible(self.input_rows["proc_mask"], policy == "mask")
         missing = [
             name
             for name, control in (
@@ -200,9 +203,9 @@ class SIFT2Panel(QScrollArea):
             if control is not None and control.currentData() is None
         ]
         self.input_help.setText(
-            "Select "
+            "Select or import "
             + ", ".join(missing)
-            + ". Exact spatial and provenance checks follow during plan validation."
+            + ". Use Import beside the missing field. Exact spatial and provenance checks follow during plan validation."
             if missing
             else "Inputs selected. Validate exact tractogram/FOD association, mask policy and commands before approval."
         )
@@ -224,22 +227,22 @@ class SIFT2Panel(QScrollArea):
     def refresh(self, *_):
         self.task_source.refresh_tasks()
         """Keep valid inventory selection without copying images or weight vectors."""
-        for combo, kind in (
-            (self.tracts, "tractogram"),
-            (self.fod, "fod"),
-            (self.reference, "anatomy"),
-            (self.five_tt, "5tt"),
-            (self.proc_mask, "mask"),
+        for combo, kind, name in (
+            (self.tracts, "tractogram", "tractogram"),
+            (self.fod, "fod", "WM FOD"),
+            (self.reference, "anatomy", "reference image"),
+            (self.five_tt, "5tt", "five-tissue image"),
+            (self.proc_mask, "mask", "processing mask"),
         ):
             old = combo.currentData()
             combo.blockSignals(True)
             combo.clear()
-            combo.addItem("Select imported " + kind + "…", None)
+            combo.addItem("Select imported " + name + "…", None)
             for a in self.owner.artifacts:
                 if a.kind == kind:
                     combo.addItem(Path(a.payload["path"]).name + " · " + a.id[:8], a.id)
             if combo.count() == 1:
-                combo.setItemText(0, "No imported " + kind + " — use Import above")
+                combo.setItemText(0, "No imported " + name + " — use Import beside this field")
             combo.setCurrentIndex(max(0, combo.findData(old)))
             combo.blockSignals(False)
         self.invalidate()
