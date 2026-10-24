@@ -81,16 +81,30 @@ class AnatomyPanel(QScrollArea):
         out = QHBoxLayout()
         out.addWidget(self.output)
         out.addWidget(button("Choose parent…", self.choose_parent))
-        for title, w in (
-            ("Operation", self.operation),
-            ("Anatomy / five-tissue input", self.source),
-            ("Reviewed diffusion reference", self.reference),
-            ("Brain extraction", self.extraction),
-            ("Brain mask", self.mask),
-            ("Threads", self.threads),
+        self.import_buttons = {}
+        self.input_rows = {}
+        form.addRow("Operation", self.operation)
+        self.operation.setAccessibleName("Operation")
+        for key, title, combo in (
+            ("source", "Anatomy / five-tissue input", self.source),
+            ("reference", "Reviewed diffusion reference", self.reference),
+            ("mask", "Brain mask", self.mask),
         ):
-            form.addRow(title, w)
-            w.setAccessibleName(title)
+            row = QWidget()
+            line = QHBoxLayout(row)
+            line.setContentsMargins(0, 0, 0, 0)
+            line.addWidget(combo, 1)
+            action = button("Import…", lambda _=False, selected=key: self.import_input(selected))
+            action.setAccessibleName(f"Import {title}")
+            line.addWidget(action)
+            form.addRow(title, row)
+            combo.setAccessibleName(title)
+            self.import_buttons[key] = action
+            self.input_rows[key] = row
+        form.addRow("Brain extraction", self.extraction)
+        self.extraction.setAccessibleName("Brain extraction")
+        form.addRow("Threads", self.threads)
+        self.threads.setAccessibleName("Threads")
         form.addRow(self.amygdala)
         form.addRow("Output directory", out)
         self.form = form
@@ -146,26 +160,42 @@ class AnatomyPanel(QScrollArea):
         self.approval.setChecked(False)
         self.update_actions()
 
+    def import_input(self, selected: str):
+        kind = (
+            ("anatomy" if self.operation.currentData() == "5ttgen.fsl" else "5tt")
+            if selected == "source"
+            else "mask"
+            if selected == "mask"
+            else "anatomy"
+        )
+        self.owner.browse_import(kind)
+
     def refresh(self, *_):
         """Only compatible typed inventory entries are offered."""
         self.invalidate()
         generate = self.operation.currentData() == "5ttgen.fsl"
         self.task_help.setText(TISSUE_TASKS[self.operation.currentData()])
-        for combo, kinds in (
-            (self.source, {"anatomy"} if generate else {"5tt"}),
-            (self.reference, {"anatomy"}),
-            (self.mask, {"mask"}),
+        for combo, kinds, name in (
+            (
+                self.source,
+                {"anatomy"} if generate else {"5tt"},
+                "anatomy" if generate else "five-tissue image",
+            ),
+            (self.reference, {"anatomy"}, "anatomical reference"),
+            (self.mask, {"mask"}, "brain mask"),
         ):
             old = combo.currentData()
             combo.blockSignals(True)
             combo.clear()
-            combo.addItem("Choose…", None)
+            combo.addItem(f"Select imported {name}…", None)
             for a in self.owner.artifacts:
                 if a.kind in kinds:
                     combo.addItem(Path(a.payload["path"]).name, a.id)
+            if combo.count() == 1:
+                combo.setItemText(0, f"No imported {name} — use Import beside this field")
             combo.setCurrentIndex(max(0, combo.findData(old)))
             combo.blockSignals(False)
-        for w in (self.extraction, self.mask, self.amygdala):
+        for w in (self.extraction, self.input_rows["mask"], self.amygdala):
             self.form.setRowVisible(w, generate)
         self.update_input_help()
         self.update_actions()
@@ -188,7 +218,7 @@ class AnatomyPanel(QScrollArea):
         self.input_help.setText(
             "Select "
             + ", ".join(missing)
-            + ". The exact planner checks spatial identity and anatomical review evidence."
+            + ". Use Import beside the missing field; 5TT import requires exact channel and anatomical review evidence. The planner checks spatial identity and review evidence."
             if missing
             else "Inputs selected. Validate tissue order, registration evidence and exact commands before approval."
         )
