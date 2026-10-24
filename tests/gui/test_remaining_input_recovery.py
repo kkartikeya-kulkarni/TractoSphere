@@ -135,6 +135,13 @@ def test_dti_optional_mask_and_csd_input_rows_have_scoped_import(window, qtbot):
     ):
         QTimer.singleShot(0, lambda selected=kind: cancel(selected))
         qtbot.mouseClick(csd.import_buttons[title], Qt.MouseButton.LeftButton)
+    csd.response_mode.setCurrentIndex(csd.response_mode.findData("dhollander"))
+    assert not csd.form.isRowVisible(csd.input_rows["WM response"])
+    assert not csd.form.isRowVisible(csd.input_rows["GM response"])
+    csd.response_mode.setCurrentIndex(csd.response_mode.findData("import"))
+    csd.method.setCurrentIndex(csd.method.findData("dwi2fod.csd"))
+    assert csd.form.isRowVisible(csd.input_rows["WM response"])
+    assert not csd.form.isRowVisible(csd.input_rows["GM response"])
     assert "Import beside" in csd.source.itemText(0)
     assert csd.plan is None and not csd.approval.isChecked()
 
@@ -174,3 +181,12 @@ def test_guided_tracking_imports_follow_task_and_algorithm(window, qtbot):
     import_cancel("Density existing tractogram", "tractogram")
     import_cancel("Density reference image / grid", "anatomy")
     assert panel.plan is None and not panel.approval.isChecked()
+
+
+def test_preprocessing_can_open_input_import_without_replacing_existing_state(window, qtbot):
+    window.focus_workflow()
+    workflow = window.workflow
+    assert workflow.empty.isVisibleTo(workflow)
+    qtbot.mouseClick(workflow.change_input, Qt.MouseButton.LeftButton)
+    assert window._selected_navigation == "Project"
+    assert workflow.dataset is None

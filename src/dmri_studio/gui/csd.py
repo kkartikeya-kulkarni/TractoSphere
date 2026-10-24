@@ -53,6 +53,7 @@ class CSDExecutionPanel(QScrollArea):
         setup = QVBoxLayout(config)
         setup.setContentsMargins(0, 0, 0, 0)
         form = QFormLayout()
+        self.form = form
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         self.source, self.mask, self.method, self.response_mode = (QComboBox() for _ in range(4))
         self.method.addItem("Three-tissue MSMT-CSD", "dwi2fod.msmt_csd")
@@ -81,6 +82,7 @@ class CSDExecutionPanel(QScrollArea):
         self.threads.setValue(4)
         self.acquisition = label("Import DWI to review its shells and gradient frame.", "caption")
         self.import_buttons = {}
+        self.input_rows = {}
         for title, field in [
             ("DWI", self.source),
             ("Binary mask", self.mask),
@@ -110,6 +112,7 @@ class CSDExecutionPanel(QScrollArea):
                 line.addWidget(action)
                 form.addRow(title, row)
                 self.import_buttons[title] = action
+                self.input_rows[title] = row
             else:
                 form.addRow(title, field)
             field.setAccessibleName("CSD " + title)
@@ -199,6 +202,12 @@ class CSDExecutionPanel(QScrollArea):
     def explain_method(self, *_):
         """Describe real adapter requirements without claiming shell eligibility."""
         multi = self.method.currentData() == "dwi2fod.msmt_csd"
+        imported_responses = self.response_mode.currentData() == "import"
+        for tissue in ("wm", "gm", "csf"):
+            self.form.setRowVisible(
+                self.input_rows[tissue.upper() + " response"],
+                imported_responses and (multi or tissue == "wm"),
+            )
         self.method_info.setText(
             (
                 "Three-tissue MSMT-CSD needs compatible shell information and WM, GM and CSF responses. "
