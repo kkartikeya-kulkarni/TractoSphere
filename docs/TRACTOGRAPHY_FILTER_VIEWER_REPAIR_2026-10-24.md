@@ -94,6 +94,7 @@ Focused verification at application commit `4bcb813`:
 |---|---|
 | Offscreen guided GUI | `PYTHONPATH=src QT_QPA_PLATFORM=offscreen OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/python -m pytest -q tests/gui/test_viewer_filter_handoff.py tests/gui/test_tracking_guided.py tests/gui/test_roi_filter_guided.py tests/gui/test_registration_guided.py tests/gui/test_batch_guided.py --tb=short` — **60 passed** in 94.50 s. |
 | Focused handoff and conversion after final edits | `PYTHONPATH=src QT_QPA_PLATFORM=offscreen OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/python -m pytest -q tests/gui/test_viewer_filter_handoff.py tests/core/test_tract_filter_conversion.py --tb=short` — **11 passed** in 13.89 s. |
+| Cancellation follow-up | `PYTHONPATH=src OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/python -m pytest -q tests/core/test_tract_filter_conversion.py --tb=short` — **4 passed** in 0.31 s at `ad09f14`, including cancellation after work has begun and absence of a partial derivative. |
 | Core tracking/ROI/scene | `PYTHONPATH=src OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/python -m pytest -q tests/core/test_tract_filter_conversion.py tests/core/test_tracking.py tests/core/test_roi_filtering.py tests/test_scene.py tests/test_scene_operations.py -k 'not cancellation_real_child' --tb=short` — **51 passed, 1 deselected** in 14.14 s. |
 | CLI | `PYTHONPATH=src OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/python -m pytest -q tests/cli --tb=short` — **34 passed**. |
 | Native test collection under offscreen Qt | `... pytest -q tests/gui/test_tracking_guided_native.py --tb=short` — **4 skipped** because Cocoa/VTK is required. |
@@ -134,8 +135,8 @@ and any native failure outside the repository with private data.
 
 ## Commits and remaining work
 
-Application/test commit: `4bcb813`. Documentation commit: this handoff's
-subsequent commit.
+Application/test commit: `4bcb813`; focused cancellation-test commit:
+`ad09f14`; initial documentation commit: `336b6f6`.
 The native Cocoa walkthrough and researcher-led anatomical review are pending;
 the Registration full native suite remains independently pending. The 38-task
 scientific-validation backlog is unchanged. Phase 7 must integrate this branch
