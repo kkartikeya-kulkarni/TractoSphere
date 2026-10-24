@@ -23,6 +23,13 @@ from dmri_studio.core.scientific.anatomy import prepare_anatomy
 
 from .components import Disclosure, button, label
 
+TISSUE_TASKS = {
+    "5ttgen.fsl": "Prepare a five-tissue derivative from reviewed structural anatomy. This does not prove the tissue boundaries are anatomically correct.",
+    "5ttcheck": "Validate the declared five-tissue channel and geometry contract of an imported 5TT image.",
+    "5tt2vis": "Create supported tissue-compartment images for visual inspection of an existing 5TT.",
+    "5tt2gmwmi": "Derive a gray–white interface seed image from the exact reviewed 5TT source.",
+}
+
 
 class AnatomyPanel(QScrollArea):
     """Generate/import-check tissue derivatives separately from ACT tracking."""
@@ -44,6 +51,8 @@ class AnatomyPanel(QScrollArea):
                 "caption",
             )
         )
+        self.task_help = label("", "caption")
+        root.addWidget(self.task_help)
         form = QFormLayout()
         self.operation = QComboBox()
         for title, key in (
@@ -86,6 +95,10 @@ class AnatomyPanel(QScrollArea):
         form.addRow("Output directory", out)
         self.form = form
         root.addLayout(form)
+        self.input_help = label(
+            "Select the anatomy or five-tissue input and reviewed reference.", "caption"
+        )
+        root.addWidget(self.input_help)
         root.addWidget(
             label(
                 "Import existing 5TT as type 5tt with the exact channel order. Anatomy/5TT must include a hash-bound anatomical_review JSON identifying the source, diffusion reference, registration evidence and axial/sagittal/coronal review. Matching filenames or grids are insufficient. The current adapter requires an already aligned common grid; it never applies registration.",
@@ -120,6 +133,7 @@ class AnatomyPanel(QScrollArea):
         self.operation.currentIndexChanged.connect(self.refresh)
         for w in (self.source, self.reference, self.mask, self.extraction):
             w.currentIndexChanged.connect(self.invalidate)
+            w.currentIndexChanged.connect(self.update_input_help)
         self.amygdala.toggled.connect(self.invalidate)
         self.output.textChanged.connect(self.invalidate)
         self.threads.valueChanged.connect(self.invalidate)
@@ -136,6 +150,7 @@ class AnatomyPanel(QScrollArea):
         """Only compatible typed inventory entries are offered."""
         self.invalidate()
         generate = self.operation.currentData() == "5ttgen.fsl"
+        self.task_help.setText(TISSUE_TASKS[self.operation.currentData()])
         for combo, kinds in (
             (self.source, {"anatomy"} if generate else {"5tt"}),
             (self.reference, {"anatomy"}),
@@ -152,7 +167,31 @@ class AnatomyPanel(QScrollArea):
             combo.blockSignals(False)
         for w in (self.extraction, self.mask, self.amygdala):
             self.form.setRowVisible(w, generate)
+        self.update_input_help()
         self.update_actions()
+
+    def update_input_help(self, *_):
+        """Display required selections while the core remains the eligibility authority."""
+        generate = self.operation.currentData() == "5ttgen.fsl"
+        missing = [
+            name
+            for name, control in (
+                ("structural anatomy" if generate else "five-tissue image", self.source),
+                ("reviewed diffusion reference", self.reference),
+                (
+                    "brain mask",
+                    self.mask if generate and self.extraction.currentData() == "mask" else None,
+                ),
+            )
+            if control is not None and control.currentData() is None
+        ]
+        self.input_help.setText(
+            "Select "
+            + ", ".join(missing)
+            + ". The exact planner checks spatial identity and anatomical review evidence."
+            if missing
+            else "Inputs selected. Validate tissue order, registration evidence and exact commands before approval."
+        )
 
     def choose_parent(self):
         """Choose only a parent; exclusive attempt creation occurs in the engine."""

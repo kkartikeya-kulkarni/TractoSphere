@@ -50,11 +50,12 @@ class SIFT2Panel(QScrollArea):
         root.addWidget(self.task_source)
         root.addWidget(
             label(
-                "SIFT2 · weight existing streamlines against their WM FOD. Geometry stays unchanged; scientific acceptance remains separate.",
+                "Calculate SIFT2 weights for existing streamlines using a compatible WM FOD. Weights are model-derived factors, not literal axon counts. Geometry stays unchanged and scientific review remains separate.",
                 "caption",
             )
         )
         form = QFormLayout()
+        self.form = form
         root.addLayout(form)
         self.tracts = QComboBox()
         self.fod = QComboBox()
@@ -81,15 +82,19 @@ class SIFT2Panel(QScrollArea):
         self.threads = QSpinBox()
         self.threads.setRange(1, 8)
         self.threads.setValue(2)
-        form.addRow("Threads", self.threads)
         self.output = QLineEdit()
         self.output.setPlaceholderText("New immutable SIFT2 derivative directory")
         out = QHBoxLayout()
         out.addWidget(self.output)
         out.addWidget(button("Choose parent…", self.choose_parent))
         form.addRow("Output", out)
+        self.input_help = label(
+            "Select a source tractogram, WM FOD and reviewed reference.", "caption"
+        )
+        root.addWidget(self.input_help)
         advanced = QWidget()
         af = QFormLayout(advanced)
+        af.addRow("Threads", self.threads)
         self.settings = {}
         for key, title in [
             ("reg_tikhonov", "Tikhonov coefficient"),
@@ -158,11 +163,38 @@ class SIFT2Panel(QScrollArea):
         root.addLayout(selection)
         for w in (self.tracts, self.fod, self.reference, self.five_tt, self.proc_mask, self.policy):
             w.currentIndexChanged.connect(self.invalidate)
+            w.currentIndexChanged.connect(self.update_policy_fields)
         self.output.textChanged.connect(self.invalidate)
         self.threads.valueChanged.connect(self.invalidate)
         self.approval.toggled.connect(self.update_actions)
+        self.policy.currentIndexChanged.connect(self.update_policy_fields)
         self.index.valueChanged.connect(self.inspect_index)
         self.refresh()
+        self.update_policy_fields()
+
+    def update_policy_fields(self, *_):
+        """Only request the tissue or mask evidence used by the selected policy."""
+        policy = self.policy.currentData()
+        self.form.setRowVisible(self.five_tt, policy == "act")
+        self.form.setRowVisible(self.proc_mask, policy == "mask")
+        missing = [
+            name
+            for name, control in (
+                ("tractogram", self.tracts),
+                ("WM FOD", self.fod),
+                ("reviewed reference", self.reference),
+                ("five-tissue image", self.five_tt if policy == "act" else None),
+                ("processing mask", self.proc_mask if policy == "mask" else None),
+            )
+            if control is not None and control.currentData() is None
+        ]
+        self.input_help.setText(
+            "Select "
+            + ", ".join(missing)
+            + ". Exact spatial and provenance checks follow during plan validation."
+            if missing
+            else "Inputs selected. Validate exact tractogram/FOD association, mask policy and commands before approval."
+        )
 
     def invalidate(self, *_):
         """Configuration changes revoke approval and stale result association."""
@@ -198,6 +230,7 @@ class SIFT2Panel(QScrollArea):
             combo.setCurrentIndex(max(0, combo.findData(old)))
             combo.blockSignals(False)
         self.invalidate()
+        self.update_policy_fields()
 
     def selected_task(self):
         """Use one exact typed task for editing, preview, execution and persistence."""

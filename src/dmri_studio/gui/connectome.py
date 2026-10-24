@@ -311,11 +311,12 @@ class ConnectomePanel(QWidget):
         setup = QVBoxLayout(content)
         setup.addWidget(
             label(
-                "Existing tractography + registered discrete atlas. Preview-scale non-ACT tracks require scientific review. Optional exact-source SIFT2 factors remain distinct from raw counts.",
+                "Build a structural connectivity matrix from an existing tractogram and a verified registered atlas. Nodes are atlas regions; edges are measurements under the selected streamline assignment, not literal biological fiber counts. Preview-scale non-ACT tracks require scientific review.",
                 "caption",
             )
         )
         form = QFormLayout()
+        self.form = form
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         self.tracts = QComboBox()
         self.atlas = QComboBox()
@@ -395,6 +396,10 @@ class ConnectomePanel(QWidget):
         ol.addWidget(button("Choose…", self.choose_output))
         form.addRow("Output", out)
         setup.addLayout(form)
+        self.input_help = label(
+            "Select a tractogram, registered atlas and reference image.", "caption"
+        )
+        setup.addWidget(self.input_help)
         setup.addWidget(self.advanced)
         self.preview = button("Preview commands", self.prepare)
         self.approve = QCheckBox(
@@ -453,7 +458,9 @@ class ConnectomePanel(QWidget):
             self.assignment,
         ):
             w.currentIndexChanged.connect(self.invalidate)
+            w.currentIndexChanged.connect(self.update_input_help)
         self.atlas.currentIndexChanged.connect(self.show_nodes)
+        self.assignment.currentIndexChanged.connect(self.update_assignment_fields)
         for w in (self.radius, self.search, self.threads):
             w.valueChanged.connect(self.invalidate)
         for w in (self.symmetric, self.diagonal):
@@ -463,7 +470,34 @@ class ConnectomePanel(QWidget):
         self.display_metric.currentIndexChanged.connect(self.show_matrix)
         self.logscale.toggled.connect(self.show_matrix)
         self.matrix.selected.connect(self.update_actions)
+        self.update_assignment_fields()
+        self.update_input_help()
         self.update_actions()
+
+    def update_assignment_fields(self, *_):
+        """Keep only the distance setting used by the selected real adapter."""
+        assignment = self.assignment.currentData()
+        self.form.setRowVisible(self.radius, assignment == "radial_search")
+        self.form.setRowVisible(self.search, assignment in {"reverse_search", "forward_search"})
+
+    def update_input_help(self, *_):
+        """Describe missing selections without presenting them as verified science."""
+        missing = [
+            name
+            for name, control in (
+                ("tractogram", self.tracts),
+                ("registered atlas", self.atlas),
+                ("reference image", self.reference),
+            )
+            if control.currentData() is None
+        ]
+        self.input_help.setText(
+            "Select "
+            + ", ".join(missing)
+            + ". Atlas registration, node identity and exact source binding are checked during plan validation."
+            if missing
+            else "Inputs selected. Validate atlas/tractogram correspondence, node IDs, assignment and weighting before approval."
+        )
 
     def refresh(self):
         for combo, kind in [
@@ -484,6 +518,7 @@ class ConnectomePanel(QWidget):
             combo.blockSignals(False)
         self.show_nodes()
         self.invalidate()
+        self.update_input_help()
 
     def invalidate(self, *_):
         self.plan = None
