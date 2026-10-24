@@ -80,17 +80,7 @@ class CSDExecutionPanel(QScrollArea):
         self.threads.setRange(1, 64)
         self.threads.setValue(4)
         self.acquisition = label("Import DWI to review its shells and gradient frame.", "caption")
-        imports = QHBoxLayout()
-        for title, kind in (
-            ("Import DWI…", "dwi"),
-            ("Import mask…", "mask"),
-            ("Import response…", "response"),
-        ):
-            imports.addWidget(
-                button(title, lambda _=False, selected=kind: self.owner.browse_import(selected))
-            )
-        imports.addStretch()
-        setup.addLayout(imports)
+        self.import_buttons = {}
         for title, field in [
             ("DWI", self.source),
             ("Binary mask", self.mask),
@@ -99,7 +89,29 @@ class CSDExecutionPanel(QScrollArea):
             *[(t.upper() + " response", c) for t, c in self.responses.items()],
             ("Shells (s/mm²)", self.shells),
         ]:
-            form.addRow(title, field)
+            kind = (
+                "dwi"
+                if field is self.source
+                else "mask"
+                if field is self.mask
+                else "response"
+                if field in self.responses.values()
+                else None
+            )
+            if kind:
+                row = QWidget()
+                line = QHBoxLayout(row)
+                line.setContentsMargins(0, 0, 0, 0)
+                line.addWidget(field, 1)
+                action = button(
+                    "Import…", lambda _=False, selected=kind: self.owner.browse_import(selected)
+                )
+                action.setAccessibleName(f"Import CSD {title}")
+                line.addWidget(action)
+                form.addRow(title, row)
+                self.import_buttons[title] = action
+            else:
+                form.addRow(title, field)
             field.setAccessibleName("CSD " + title)
         out = QHBoxLayout()
         out.addWidget(self.output, 1)
@@ -207,7 +219,7 @@ class CSDExecutionPanel(QScrollArea):
             self.response_help.setText(
                 "Missing imported response functions: "
                 + ", ".join(missing)
-                + ". Use Import response above and declare its tissue/shell evidence, "
+                + ". Use Import beside the relevant response and declare its tissue/shell evidence, "
                 + (
                     "or choose Dhollander three-tissue estimation when the acquisition meets its requirements."
                     if multi
@@ -264,7 +276,7 @@ class CSDExecutionPanel(QScrollArea):
                     "No imported "
                     + (tissue.upper() + " " if tissue else "")
                     + kind
-                    + " — use Import above",
+                    + " — use Import beside this field",
                 )
         self.update_actions()
         self.explain_method()

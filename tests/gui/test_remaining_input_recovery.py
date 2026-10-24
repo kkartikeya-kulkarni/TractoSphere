@@ -103,3 +103,37 @@ def test_sift2_required_and_policy_specific_inputs_have_scoped_import(window, qt
     QTimer.singleShot(0, lambda: cancel("mask"))
     qtbot.mouseClick(panel.import_buttons["proc_mask"], Qt.MouseButton.LeftButton)
     assert panel.plan is None and not panel.approval.isChecked()
+
+
+def test_dti_optional_mask_and_csd_input_rows_have_scoped_import(window, qtbot):
+    window.focus_models()
+    page = window.scientific
+
+    def cancel(kind):
+        dialog = QApplication.activeModalWidget()
+        assert isinstance(dialog, ImportDialog)
+        assert dialog.kind.currentData() == kind
+        qtbot.mouseClick(
+            dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Cancel),
+            Qt.MouseButton.LeftButton,
+        )
+
+    dti = page.dti
+    page.tabs.setCurrentWidget(dti)
+    QTimer.singleShot(0, lambda: cancel("mask"))
+    qtbot.mouseClick(dti.import_mask, Qt.MouseButton.LeftButton)
+    assert dti.mask.itemData(0) is None
+
+    csd = page.csd
+    page.tabs.setCurrentWidget(csd)
+    for title, kind in (
+        ("DWI", "dwi"),
+        ("Binary mask", "mask"),
+        ("WM response", "response"),
+        ("GM response", "response"),
+        ("CSF response", "response"),
+    ):
+        QTimer.singleShot(0, lambda selected=kind: cancel(selected))
+        qtbot.mouseClick(csd.import_buttons[title], Qt.MouseButton.LeftButton)
+    assert "Import beside" in csd.source.itemText(0)
+    assert csd.plan is None and not csd.approval.isChecked()
