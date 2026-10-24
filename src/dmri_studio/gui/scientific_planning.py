@@ -402,6 +402,12 @@ class TaskDialog(QDialog):
                 "caption",
             )
         )
+        root.addWidget(
+            label(
+                "Missing a required input? Close this dialog, use Import required input in Advanced algorithms, then reopen Configure task. Optional inputs may remain unbound.",
+                "caption",
+            )
+        )
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
@@ -418,7 +424,12 @@ class TaskDialog(QDialog):
         for role, kind in {**spec.required_inputs, **spec.optional_inputs}.items():
             combo = QComboBox()
             combo.setAccessibleName(role)
-            combo.addItem("Choose input…" if role in spec.required_inputs else "Not bound", None)
+            combo.addItem(
+                f"Select imported {kind}…"
+                if role in spec.required_inputs
+                else "Not bound (optional)",
+                None,
+            )
             for artifact in artifacts:
                 if artifact.kind == kind:
                     combo.addItem(
