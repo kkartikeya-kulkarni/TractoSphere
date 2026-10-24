@@ -28,15 +28,35 @@ Missing, unrecognized and unvalidated tools remain distinct. The FSL suite label
 is recorded in the exported report separately from executable component versions.
 
 Auto-detection checks FSLDIR, ANTSPATH, PATH and, optionally, a small set of common
-installation folders. It does not search your MRI directories. Use Browse to
-choose an existing installation root or bin directory, then Check installed
-tools. An explicit folder is authoritative; an incomplete installation does not
-silently fall back to another copy. Use checked tool locations explicitly saves
-application preferences and fills the existing preprocessing tool fields. It does
-not alter system PATH, shell configuration or scientific algorithm settings.
-Changing a folder requires rechecking. Active preprocessing prevents applying
-new locations. Each new command preview still validates the actual inputs,
-executables, hashes and provenance independently.
+installation folders. It does not search your MRI directories. Open **Settings →
+Open Software Dependencies**, select an existing root or `bin` folder beside the software
+name, then choose **Verify and Save**. The check runs on the existing background
+worker. A complete, compatible family is saved only after verification and a
+successful application-settings write. **Remove Saved Location** clears one family;
+select another folder and Verify and Save to change it. The component table and
+official installation links remain available. An explicit folder is authoritative:
+an incomplete or moved installation does not silently fall back to another copy.
+
+The three existing `dependencies/MRtrix3`, `dependencies/FSL` and
+`dependencies/ANTs` keys in the user's platform QSettings store are the single
+application-level source. Previously saved keys are read without migration. On
+restart a remembered folder appears immediately as **Configured, awaiting
+verification**; this is not a fresh version check. A missing folder or missing
+expected executable is shown without launching subprocesses. A new scan can show
+verified version evidence, an incomplete family, unsupported version, or an
+interrupted/failed check. The Viewer remains usable when software is missing.
+
+New preprocessing, reconstruction, tractography, registration, anatomy, SIFT2,
+connectivity, ROI filtering and batch configurations receive the saved defaults
+where the operation uses those tools. New batch plans freeze the selected MRtrix3,
+FSL and ANTs directories in the plan. Reopened historical batches keep their
+approved toolchain; **New batch with current software** starts a separate plan.
+Changing saved software is blocked while scientific processing or an approved
+scientific plan is active. A change invalidates affected unexecuted previews.
+Exact commands still revalidate the required binaries, compatible versions,
+input geometry, hashes and processing provenance before execution. A saved
+location alone never approves a scientific command. TractoSphere does not alter
+system PATH, shell configuration or scientific algorithm settings.
 
 ## Adapter compatibility
 
@@ -98,7 +118,7 @@ tested environment and remaining platform limitations.
 
 ## Guided Install / Setup
 
-The existing Software Dependencies section has per-package **Install / Setup**,
+The Scientific Software section has per-package **Install / Setup**,
 **Official Installation Guide**, **Locate Existing Installation**, **Scan Again**
 and **Test Installation**. The guided detail sheet uses the same scanner; it is
 not another dependency manager. It detects OS/process architecture and, on Linux,
@@ -148,7 +168,7 @@ This decision does not delay release to implement unsafe automatic installation.
    completes. Unrelated scientific tool paths are retained. Unchecking the option
    performs verification only. A plain rescan does not save settings.
 4. Missing/unsupported/incomplete versions, an interrupted test, changed choices,
-   closed dialog, active preprocessing or a preferences write error prevent
+   closed dialog, active scientific processing or a preferences write error prevent
    automatic configuration. Do not use partially downloaded/extracted files.
 5. The existing per-operation availability summary and preprocessing tool fields
    refresh. Future processing still independently validates versions, binaries,
