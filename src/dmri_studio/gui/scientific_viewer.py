@@ -588,6 +588,11 @@ class ScientificViewer(RegistrationView, FODTools, AtlasTools, ViewerTools, QWid
         self.density.setRange(1, 1000000)
         self.density.setKeyboardTracking(False)
         self.density.setValue(10000)
+        self.density.setToolTip(
+            "Number of fibers drawn per group, not a file or processing limit. "
+            "The complete source remains indexed for filtering and export. "
+            "Drawing more fibers can make the 3D view slow or exhaust graphics memory."
+        )
         for name, control in [
             ("Render", self.mode),
             ("Color", self.coloring),
@@ -655,7 +660,9 @@ class ScientificViewer(RegistrationView, FODTools, AtlasTools, ViewerTools, QWid
         layout.addWidget(self.stats)
         layout.addWidget(
             label(
-                "All source fibers are indexed without loading all coordinates into RAM. Display cap affects rendering only. Export preserves undeleted fibers. Originals are unchanged.",
+                "The whole source file is indexed without loading all coordinates into RAM. "
+                "Display cap controls only how many fibers are drawn; full-source filtering "
+                "and export keep the remaining fibers. Originals are unchanged.",
                 "caption",
             )
         )
@@ -1371,8 +1378,12 @@ class ScientificViewer(RegistrationView, FODTools, AtlasTools, ViewerTools, QWid
             )
             vox = ref.voxels(points)
             inside = np.all((vox >= -0.5) & (vox < np.array(ref.shape[:3]) - 0.5), axis=1)
+            displayed = ScientificViewer.displayed_tract_count(group, self.density.value())
             self.status.setText(
-                f"{group.path.name}: {len(group.streamlines):,}/{group.total:,} loaded · {inside.mean() * 100 if len(inside) else 0:.2f}% sampled points inside image FOV. Bounds do not prove anatomical correspondence."
+                f"{group.path.name}: {group.total:,} source fibers indexed · "
+                f"{displayed:,} drawn (cap {self.density.value():,}) · "
+                f"{inside.mean() * 100 if len(inside) else 0:.2f}% sampled points inside image FOV. "
+                "Bounds do not prove anatomical correspondence."
             )
 
         def read():
@@ -1501,10 +1512,7 @@ class ScientificViewer(RegistrationView, FODTools, AtlasTools, ViewerTools, QWid
                 "Reference image changed after loading; reopen it before filtering."
             )
             return
-        displayed = min(
-            self.density.value(),
-            max(0, len(group.streamlines) - len(group.hidden | group.deleted)),
-        )
+        displayed = ScientificViewer.displayed_tract_count(group, self.density.value())
         self.filter_tracks_requested.emit(
             dict(
                 source=str(group.path),
@@ -1515,6 +1523,15 @@ class ScientificViewer(RegistrationView, FODTools, AtlasTools, ViewerTools, QWid
                 expected_hash=getattr(group, "expected_hash", None),
                 source_signature=group.streamlines.signature,
             )
+        )
+
+    @staticmethod
+    def displayed_tract_count(group, cap):
+        """Count rendered fibers separately from indexed source fibers."""
+        return (
+            min(cap, max(0, len(group.streamlines) - len(group.hidden | group.deleted)))
+            if group.visible
+            else 0
         )
 
     def refresh_tracts(self, *_):
@@ -1583,8 +1600,10 @@ class ScientificViewer(RegistrationView, FODTools, AtlasTools, ViewerTools, QWid
             self.weight_legend.setText(text)
         stats = group.statistics()
         mean = stats["mean_length_mm"]
+        displayed = ScientificViewer.displayed_tract_count(group, self.density.value())
         self.stats.setText(
             f"{stats['source_count']:,} source fibers · {stats['retained_loaded_count']:,} retained\n"
+            f"{displayed:,} drawn in 3D (cap {self.density.value():,}); full source remains available\n"
             f"{len(group.selected - group.deleted):,} selected · {len(group.hidden - group.deleted):,} hidden\n"
             + (
                 f"Length: {stats['min_length_mm']:.1f}–{stats['max_length_mm']:.1f} mm · mean {mean:.1f} mm"

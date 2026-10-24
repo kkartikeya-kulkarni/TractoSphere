@@ -94,7 +94,7 @@ passes only cover the particular test, not all controls or real anatomy.
 | T1/scalar/mask/ROI/atlas import | Type and declarations visible even when a role is ineligible | No inferred contrast, transform, correction or acceptance | Review declarations reinspects unchanged source | **PRIOR** real T1/atlas and offscreen routes. Exact native T1 review, atlas/ROI spatial association **UNTESTED**. |
 | Project load and save/restore | Source and gradients propagate to Project/Preprocessing; selection restores exact IDs | No plan until task chosen | Source hashes checked on restore | **PASS** T1/DWI/FOD real restore; Project DWI live handoff **PRIOR**. |
 | Data Validation | Header, affine, dimensions, gradients, acquisition metadata, warnings | Failed checks prohibit dependent plans | QC findings retained without auto-repair | Core tests pass; complete real acquisition review and native warning recovery **UNTESTED**. |
-| Viewer MRI/tract/atlas | Display selection stays distinct from scientific import; full tract source and reference retained | Viewer actions cannot approve a scientific plan | Scene preservation, edits/undo, source hashes, native rendering | Targeted Cocoa Viewer filtering passed (26-test combined suite); manual 2-group/large-file review **UNTESTED**. |
+| Viewer MRI/tract/atlas | Display selection stays distinct from scientific import; full tract source and reference retained | Viewer actions cannot approve a scientific plan | Scene preservation, edits/undo, source hashes, native rendering | Default 10,000-fiber drawing cap is separate from source indexing and full-source filtering. Targeted Cocoa Viewer filtering passed (26-test combined suite); actual 10M-file load/render performance and manual 2-group review **UNTESTED**. |
 | Preprocessing conversion, denoise, Gibbs, mask | DWI and gradient/history order validated | Exact MRtrix plan and new local derivative; approve and run asynchronously | Output hashes, stage QC and cancellation | Synthetic/core coverage; real processing **UNTESTED**. No EDDY/TOPUP started. |
 | TOPUP and EDDY | PE/readout, calibration and source history required | Bounded plan and explicit approval only; no expensive real run here | Residual/CNR and `eddy_quad` evidence; interrupted EDDY recovery | **BLOCKED** pending Phase 7 scientific controls, metadata and authorized bounded experiment. |
 | N4/bias and correction QC | Correct pre-N4 image and mask/history required | Exact plan; reject repeat correction | Field, mask, numerical and anatomical review | Synthetic coverage; real scientific acceptance **UNTESTED**. |
@@ -127,6 +127,20 @@ passes only cover the particular test, not all controls or real anatomy.
 | Performance | Measure true cold start, HCP hydration/import, native file pickers, MRI/large tractogram Viewer and bounded memory; display actual progress | Warm prior samples exist; current real saved-selection restore and small filter succeeded. Cold/native scale numbers **UNTESTED**. |
 | UX and accessibility | Every blocked action names the missing role/evidence and a direct recovery action; mouse, keyboard, focus, 960×640, light/dark, error retention and result return | Focused Cocoa automation passed; complete human navigation and screenshots **UNTESTED**. |
 | Provenance | Source/sidecar hashes, tool versions, plan digest, exact decision, output hashes and QC survive reopen; stale evidence invalidates reuse | Core/CLI suite and bounded real filter reopen passed; real native atlas decision and downstream connectome provenance **BLOCKED**. |
+
+### Why a 10M-track source shows 10,000 fibers
+
+Viewer's **Display cap / group** defaults to 10,000 and has an upper control
+limit of 1,000,000. It restricts the number of fibers drawn in the VTK scene,
+not the number accepted from a TCK/TRK file. The full source is indexed with
+read-only mapped access, and the Viewer-to-filter handoff uses the original
+tractogram path rather than the displayed subset. Rendering millions of lines
+or tubes at once can overwhelm graphics memory and interaction speed. The UI
+now labels source, retained and drawn counts separately. Indexing a true 10M
+file still scans its records and may be slow or resource-intensive; no 10M
+load/performance acceptance was completed here. A Viewer that remains on
+“Loading” or reports an error has a different defect from a successful load
+that draws 10,000.
 
 ## Confirmed root causes and repair order
 
