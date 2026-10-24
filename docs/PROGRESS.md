@@ -1,5 +1,23 @@
 # Outstanding Scientific Verification and Release Blockers
 
+## 2026-10-24 — Registration input-role repair on the latest real-data checkpoint
+
+The [Registration repair handoff](REGISTRATION_WORKFLOW_REPAIR_2026-10-24.md)
+records read-only import and selector checks on seven representative real
+inputs, plus a timed 1.3 GB DWI inspection and cooperative cancellation probe.
+The focused branch fixes unambiguous DWI companion suggestions, stale gradient
+field clearing, visible imported-but-ineligible Registration inputs, role-based
+evidence review, explicit activation of an imported DWI in Project, atlas/ROI
+import routing and previous-run navigation. New EPI/T1 plans also require a
+distinct declared brain-extracted T1 and explicitly identified white-matter
+segmentation; a generic mask no longer satisfies that role. Real anatomical
+alignment, transform direction, registration QC and native Viewer behavior
+remain unverified where documentary evidence or this session's Cocoa screen is
+unavailable. The code/test checkpoint is `7161865`; selected offscreen/core/CLI
+regressions passed as recorded in the handoff. The 38-task scientific backlog
+retains its statuses, and Phase 7 must incorporate the intervening usability
+and real-data commits through a reviewed integration step.
+
 ## 2026-10-24 — bounded real-data import and selection audit
 
 The [real-data functional audit](REAL_DATA_FUNCTIONAL_AUDIT_2026-10-24.md)
