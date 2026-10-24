@@ -3,7 +3,7 @@
 from pathlib import Path
 from threading import Event
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import QSettings, Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -134,9 +134,10 @@ class ProjectPage(QWidget):
     project_changed = Signal(str)
     notification = Signal(str, str)
 
-    def __init__(self, current_context):
+    def __init__(self, current_context, settings=None):
         super().__init__()
         self.current_context = current_context
+        self.settings = settings
         self.project = None
         self.path = None
         self.snapshot_sha256 = None
@@ -156,9 +157,10 @@ class ProjectPage(QWidget):
         row = QHBoxLayout()
         self.new = button("New project", self.create)
         self.open = button("Open project", self.browse)
+        self.recent = button("Open last project", self.open_recent)
         self.scan = button("Import BIDS acquisitions", self.scan_bids)
         self.add = button("Add loaded input", self.add_current)
-        for control in (self.new, self.open, self.scan, self.add):
+        for control in (self.new, self.open, self.recent, self.scan, self.add):
             row.addWidget(control)
         root.addLayout(row)
         self.status = label(
@@ -168,7 +170,11 @@ class ProjectPage(QWidget):
         self.empty = EmptyState(
             "No project open",
             "Create a project or open an existing one.",
-            [("Open project…", self.browse), ("New project…", self.create)],
+            [
+                ("Open project…", self.browse),
+                ("Open last project", self.open_recent),
+                ("New project…", self.create),
+            ],
         )
         root.addWidget(self.empty, 1)
         self.search = QLineEdit()
@@ -217,6 +223,14 @@ class ProjectPage(QWidget):
         )
         if filename:
             self.open_path(Path(filename))
+
+    def open_recent(self):
+        """Recheck a remembered snapshot only after the researcher requests it."""
+        saved = str(self.settings.get("last_project_snapshot", "") or "") if self.settings else ""
+        if not saved or not Path(saved).is_file():
+            self.status.setText("The last project snapshot is unavailable. Open another project.")
+            return
+        self.open_path(Path(saved))
 
     def open_path(self, path):
         def read():
@@ -503,6 +517,17 @@ class ProjectPage(QWidget):
         else:
             selected_id = self.selected()["id"] if self.selected() else None
             self.project, self.path, self.snapshot_sha256 = result
+            if self.settings:
+                previous = self.settings.get("last_project_snapshot", "")
+                self.settings.set("last_project_snapshot", str(self.path))
+                self.settings.store.sync()
+                if self.settings.store.status() != QSettings.Status.NoError:
+                    if previous:
+                        self.settings.set("last_project_snapshot", previous)
+                    else:
+                        self.settings.store.remove("last_project_snapshot")
+                    self.settings.store.sync()
+                    self.notification.emit("Recent project shortcut could not be saved.", "warning")
             self.project_changed.emit(self.project["name"])
             self.table.populate(self.project["acquisitions"], selected_id)
             self.table.search(self.search.text())
@@ -551,12 +576,15 @@ class ProjectPage(QWidget):
             self.advanced,
         ):
             widget.setVisible(populated)
-        for control in (self.new, self.open, self.scan, self.add):
+        for control in (self.new, self.open, self.recent, self.scan, self.add):
             control.setVisible(self.project is not None)
+        remembered = bool(self.settings and self.settings.get("last_project_snapshot", ""))
+        self.recent.setVisible(remembered)
         for action in self.empty.actions:
-            action.setEnabled(idle)
+            action.setEnabled(idle and (action.text() != "Open last project" or remembered))
         self.new.setEnabled(idle)
         self.open.setEnabled(idle)
+        self.recent.setEnabled(idle and remembered)
         for control in (self.scan, self.add):
             control.setEnabled(idle and self.project is not None)
         for control in (self.load_input, self.attach):

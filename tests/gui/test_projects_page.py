@@ -109,3 +109,25 @@ def test_external_project_edit_does_not_create_silent_revision(window, qtbot, tm
     path.write_text(path.read_text() + "\n")
     with pytest.raises(ValueError, match="changed externally"):
         window.projects.persist(window.projects.project)
+
+
+def test_recent_project_is_explicit_and_rechecked(window, qtbot, tmp_path):
+    """Remember the snapshot path without loading private data at startup."""
+    from dmri_studio.gui.projects import ProjectPage
+
+    path = save_project(new_project("Recent project"), tmp_path / "project.json")
+    window.projects.open_path(path)
+    qtbot.waitUntil(lambda: window.projects.thread is None)
+    assert window.settings.get("last_project_snapshot") == str(path)
+
+    reopened = ProjectPage(lambda: (None, None), window.settings)
+    qtbot.addWidget(reopened)
+    assert reopened.project is None and reopened.thread is None
+    reopened.open_recent()
+    qtbot.waitUntil(lambda: reopened.thread is None)
+    assert reopened.project["name"] == "Recent project"
+    assert window.dataset is None
+
+    path.unlink()
+    reopened.open_recent()
+    assert "unavailable" in reopened.status.text()

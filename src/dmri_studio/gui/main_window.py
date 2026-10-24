@@ -281,7 +281,7 @@ class MainWindow(QMainWindow):
         self.validation_host.setWidgetResizable(True)
         self.validation_host.setWidget(self.validation_page)
         self.workspace.addWidget(self.validation_host)
-        self.projects = ProjectPage(lambda: (self.dataset, self.workflow.history))
+        self.projects = ProjectPage(lambda: (self.dataset, self.workflow.history), self.settings)
         self.workspace.addWidget(self.projects)
         self.projects.load_requested.connect(self.load_saved_result)
         self.projects.run_requested.connect(self.open_saved_run)
