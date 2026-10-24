@@ -238,7 +238,7 @@ class MainWindow(QMainWindow):
         theme.set_icon(self.open_image_action, "folder-open")
         theme.set_icon(self.open_tract_action, "route")
         self.plan_tracking_action = self.toolbar.addAction(
-            "Generate / filter tracks…", self.focus_tracking_plan
+            "Tractography tasks…", self.focus_tracking_plan
         )
         self.plan_tracking_action.setToolTip(
             "Generate MRtrix tracks, filter streamlines or create tract-density maps after command review and approval"
@@ -1321,7 +1321,7 @@ class MainWindow(QMainWindow):
         add("Tools", "Software Dependencies…", self.focus_dependencies)
         add("Tools", "Quality Control", self.focus_qc)
         add("Tools", "Diffusion Models", self.focus_models)
-        add("Tools", "Generate / filter tracks…", self.focus_tracking_plan)
+        add("Tools", "Tractography tasks…", self.focus_tracking_plan)
         add("Tools", "Connectivity", self.focus_connectivity)
         add(
             "Window",

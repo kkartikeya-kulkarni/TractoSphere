@@ -602,7 +602,7 @@ class ScientificPlanningPage(QWidget):
         from .tracking import TrackingExecutionPanel
 
         self.tracking = TrackingExecutionPanel(self)
-        self.tabs.addTab(self.tracking, "Generate / filter tracks")
+        self.tabs.addTab(self.tracking, "Tractography tasks")
         from .five_tissue import AnatomyPanel
 
         self.anatomy = AnatomyPanel(self)

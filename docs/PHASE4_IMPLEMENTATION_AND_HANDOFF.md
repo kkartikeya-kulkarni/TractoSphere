@@ -32,6 +32,21 @@ Baseline tests in the restricted local session with `PYTHONPATH=src`, `QT_QPA_PL
 5. **4.5 Results/QC:** Show exact plan, outcome, provenance and separate scientific review. Use the shared Viewer loader.
 6. **4.6 Integration:** Run relevant GUI/core/CLI and Phase 1–3 regressions, profile before/after, request native Cocoa/VTK tests only after a committed code checkpoint, and record actual native results.
 
+## Checkpoint 4.1: task-first interface
+
+The default Tractography view now asks for one of three tasks: **Generate New Streamlines**, **Select or Filter Existing Streamlines**, or **Create a Tract-Density Map**. Each task has a separate input form. The Generate view explains seeding versus endpoints and tracking masks versus pathway conditions. Filter presents a source tractogram, reference and endpoint-only choice without generation algorithms. Density presents only the source tractogram and reference grid, with directional channels left under Advanced. The existing controls, typed task builder, exact plan preview, digest approval, worker and result/QC routes remain authoritative. Guided selectors synchronize with those controls; Advanced still exposes all prior scientific parameters. Returning to the initialized Tractography page reuses its widget and draft state. A task change invalidates the unexecuted plan and approval.
+
+Files in this checkpoint: new `src/dmri_studio/gui/tracking_guided.py`, updated `gui/tracking.py`, `gui/scientific_planning.py`, `gui/main_window.py`, new `tests/gui/test_tracking_guided.py`, and this handoff. No scientific compiler or executable behavior changed.
+
+Offscreen verification after this checkpoint:
+
+| Test or measurement | Result |
+|---|---|
+| `pytest -q tests/gui/test_tracking_guided.py` plus the three selected non-VTK legacy tracking GUI tests | **8 passed in 14.27 s.** Covers task separation, typed-task mapping, approval invalidation, page reuse and advanced/guided synchronization. |
+| The same GUI selection plus `tests/gui/test_phase2_lazy_workspaces.py` and `tests/gui/test_scientific_software_settings.py` | **30 passed in 82.89 s** after formatting. Covers Phase 1 settings defaults and Phase 2 lazy workspace regressions relevant to this UI change. |
+| `ruff check` on changed GUI and test files | Passed before formatting. |
+| Three fresh `scripts/benchmark_gui_performance.py` offscreen processes | Tractography plan first navigation **28.242–29.022 ms**, median **28.901 ms**; return **22.779–23.243 ms**, median **22.840 ms**. ScientificPlanningPage construction **209.298–270.320 ms**, median **212.027 ms**. Script-to-interactive **802.185–842.685 ms**, median **806.372 ms**. Compared with the three pre-change runs, the guided controls add measurable first/repeated navigation and constructor cost, but no measured startup regression. These are warm-cache offscreen samples, not native Cocoa benchmarks. |
+
 ## Checkpoint status
 
-Only 4.0 is complete. No Phase 4 code change or native Phase 4 claim has yet been made. Do not mark Phase 4 or Phase 5 readiness complete from this audit.
+4.0 and 4.1 are implemented and offscreen tested. ROI role selection, guided generation details, filtering/density completion, native VTK verification and complete beginner walkthrough remain open. No native Phase 4 claim has yet been made. Do not mark Phase 4 or Phase 5 readiness complete from these checkpoints.

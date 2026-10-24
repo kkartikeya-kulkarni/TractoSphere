@@ -271,13 +271,10 @@ class TrackingExecutionPanel(QScrollArea):
         row.addStretch()
         setup.addLayout(row)
         self.setup = Disclosure("Tracking setup", config, expanded=True)
-        root.addWidget(self.setup)
         self.approval = QCheckBox(
             "I reviewed the source, coordinates, seeding, commands and scientific limitations"
         )
-        root.addWidget(self.approval)
         self.run_button = button("Run approved tracking", self.run)
-        root.addWidget(self.run_button)
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(3000)
@@ -285,7 +282,17 @@ class TrackingExecutionPanel(QScrollArea):
         self.log.setMaximumHeight(190)
         self.log.setAccessibleName("Tracking commands and live log")
         self.log_section = Disclosure("Command preview and live logs", self.log, expanded=False)
-        root.addWidget(self.log_section)
+        from .tracking_guided import GuidedTracking
+
+        self.guided = GuidedTracking(self)
+        root.addWidget(self.guided)
+        advanced = QWidget()
+        advanced_layout = QVBoxLayout(advanced)
+        advanced_layout.addWidget(self.setup)
+        advanced_layout.addWidget(self.approval)
+        advanced_layout.addWidget(self.run_button)
+        advanced_layout.addWidget(self.log_section)
+        root.addWidget(Disclosure("Advanced tracking settings and exact controls", advanced))
         root.addStretch()
         for combo in (
             self.operation,
@@ -335,6 +342,8 @@ class TrackingExecutionPanel(QScrollArea):
     def invalidate(self, *_):
         self.plan = None
         self.approval.setChecked(False)
+        if hasattr(self, "guided"):
+            self.guided.clear_plan()
         self.update_actions()
 
     def refresh(self, *_):
@@ -402,6 +411,8 @@ class TrackingExecutionPanel(QScrollArea):
                     row.setCheckState(existing.get(item.id, Qt.CheckState.Unchecked))
                     w.addItem(row)
             w.blockSignals(False)
+        if hasattr(self, "guided"):
+            self.guided.refresh_inventory()
         self.update_actions()
 
     def choose_parent(self):
@@ -575,6 +586,7 @@ class TrackingExecutionPanel(QScrollArea):
             self.owner.status.setText("Commands prepared. Review the exact plan before approval.")
             self.setup.toggle.setChecked(False)
             self.log_section.toggle.setChecked(True)
+            self.guided.plan_ready(result)
         else:
             self.manifest = result
             self.plan = None
@@ -630,6 +642,7 @@ class TrackingExecutionPanel(QScrollArea):
                             ),
                         )
                 self.setup.toggle.setChecked(False)
+            self.guided.result_ready(result)
         self.update_actions()
 
     def failed(self, message, cancelled=False, running=False):
@@ -648,6 +661,7 @@ class TrackingExecutionPanel(QScrollArea):
             self.result_label.show()
         self.log.appendPlainText(("Cancelled: " if cancelled else "Operation failed: ") + message)
         self.log_section.toggle.setChecked(True)
+        self.guided.clear_plan()
         self.update_actions()
 
     def update_actions(self, *_):
@@ -754,6 +768,8 @@ class TrackingExecutionPanel(QScrollArea):
             idle and generate and not (act and self.backtrack.isChecked())
         )
         self.task_source.apply_enabled(idle)
+        if hasattr(self, "guided"):
+            self.guided.update_actions()
 
     def open_result(self):
         product = self.maps.currentData()
