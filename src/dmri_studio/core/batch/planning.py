@@ -316,6 +316,8 @@ def build_batch_plan(
     output: Path,
     *,
     tool_directory=None,
+    fsl_directory=None,
+    ants_directory=None,
     limits=None,
     cancelled=lambda: False,
     progress=lambda _: None,
@@ -426,6 +428,8 @@ def build_batch_plan(
                             preview,
                             nthreads=row["resources"]["threads"],
                             tool_directory=tool_directory,
+                            fsl_directory=fsl_directory,
+                            ants_directory=ants_directory,
                             cancelled=cancelled,
                             progress=progress,
                         )
@@ -469,9 +473,8 @@ def build_batch_plan(
         else {}
     )
     if registration_methods:
-        import os
-
         from ..anatomy import anatomical_tools
+        from ..dependencies import fsl_root
 
         fsl_names, mr_names = set(), set()
         for method in registration_methods:
@@ -491,8 +494,10 @@ def build_batch_plan(
                 # and verifies the exact selected tool before execution.
                 fsl_names.update(("flirt", "applywarp", "invwarp", "convertwarp", "convert_xfm"))
                 mr_names.update(("mrtransform", "transformconvert", "transformcalc"))
-        root = Path(os.environ.get("FSLDIR", ""))
+        root = fsl_root(fsl_directory)
         if fsl_names:
+            if root is None or not root.is_absolute():
+                raise ValueError("Configure FSL for deferred registration before batch approval")
             fsl, _ = anatomical_tools(root / "bin", tuple(sorted(fsl_names)), cancelled)
             deferred_tools.update(fsl)
             for path in [root / "etc/fslversion", *(root / "etc/flirtsch").glob("*.sch")]:
@@ -515,6 +520,8 @@ def build_batch_plan(
             workflow=workflow,
             output_directory=str(output),
             tool_directory=str(tool_directory) if tool_directory else None,
+            fsl_directory=str(fsl_directory) if fsl_directory else None,
+            ants_directory=str(ants_directory) if ants_directory else None,
             limits=configured,
             rows=rows,
             scientific_acceptance="unassigned",
@@ -531,7 +538,11 @@ def build_batch_plan(
 
 def compile_node(acquisition, node, artifacts, tasks, output, **kwargs):
     """Adapt preprocessing's existing dataset interface; no new scientific executor."""
+    fsl_directory = kwargs.pop("fsl_directory", None)
+    ants_directory = kwargs.pop("ants_directory", None)
     if node["adapter"] != "preprocessing":
+        if node["adapter"] in {"registration", "anatomy"}:
+            kwargs["fsl_directory"] = fsl_directory
         return compiler(node["adapter"])(artifacts, tasks, output, **kwargs)
     from ..dataset import DatasetPaths
     from ..execution import prepare_execution
@@ -556,6 +567,10 @@ def compile_node(acquisition, node, artifacts, tasks, output, **kwargs):
     try:
         history = ProcessingHistory.from_dict(config["history"])
         options = dict(config.get("options", {}))
+        if fsl_directory is not None:
+            options.setdefault("fsl_directory", fsl_directory)
+        if ants_directory is not None:
+            options.setdefault("ants_directory", ants_directory)
         # Paths retain source identity; the existing adapter owns scientific eligibility.
         for key in (
             "fitting_mask",

@@ -60,6 +60,8 @@ def test_shared_report_and_explicit_default_paths(window, qtbot, monkeypatch, tm
     paths = {f: str(tmp_path / f / "bin") for f in ("MRtrix3", "FSL", "ANTs")}
     for tool in report["tools"]:
         tool["path"] = str(Path(paths[tool["family"]]) / tool["name"])
+        tool["state"] = "version_match"
+        tool["version"] = "synthetic compatible version"
     monkeypatch.setattr(dependency_setup, "inspect_dependencies", lambda **_: report)
     widget = window.preferences.dependencies
     widget.scan()
@@ -138,6 +140,7 @@ def test_real_app_entry_opens_studio_without_setup_modal(window, qtbot, monkeypa
     assert window.dependencies.thread is None
     window.focus_dependencies()
     assert window.workspace.currentWidget() is window.dependency_host
+
 
 def test_batch_reads_saved_mrtrix_location_without_asking_again(window):
     """A new batch workspace reuses the application-level installation path."""

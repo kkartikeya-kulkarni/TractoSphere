@@ -1106,7 +1106,7 @@ class MainWindow(QMainWindow):
                 )
         else:
             self.focus_viewer()
-            if self.scientific_viewer is not None:
+            if getattr(self, "scientific_viewer", None) is not None:
                 self.scientific_viewer.safe(lambda: self.scientific_viewer.load_image(path))
 
     def focus_preferences(self):
@@ -1142,6 +1142,9 @@ class MainWindow(QMainWindow):
                 from .scientific_viewer import ScientificViewer
 
                 self.scientific_viewer = ScientificViewer(self.theme)
+                self.scientific_viewer.mrtrix_directory = self.dependencies.saved_directories()[
+                    "MRtrix3"
+                ]
             except ImportError as exc:
                 self.toast.show_message(f"Install dmri-studio[gui] for viewing: {exc}", "error")
                 return
@@ -1472,7 +1475,7 @@ class MainWindow(QMainWindow):
 
     def apply_dependency_locations(self, locations):
         """Apply only explicit/saved tool defaults, invalidating command previews."""
-        if self.workflow.execution.thread is not None:
+        if not self.can_change_dependencies():
             return
         panel = self.workflow.execution
         if "MRtrix3" in locations:
@@ -1482,13 +1485,48 @@ class MainWindow(QMainWindow):
             # Batch Processing must share the same saved installation instead of
             # prompting for a second MRtrix3 directory on every new batch.
             self.batch.tool_directory = Path(directory) if directory else None
-            self.batch.mrtrix_directory.setText(directory)
+            if not self.batch.historical_toolchain:
+                self.batch.mrtrix_directory.setText(directory)
+            if getattr(self, "scientific_viewer", None) is not None:
+                self.scientific_viewer.mrtrix_directory = directory
         if "ANTs" in locations:
-            panel.bias_inputs["ants_directory"].setText(locations["ANTs"])
+            directory = str(locations["ANTs"] or "")
+            panel.bias_inputs["ants_directory"].setText(directory)
+            self.batch.ants_directory = Path(directory) if directory else None
         if "FSL" in locations:
-            panel.correction_inputs["fsl_directory"].setText(locations["FSL"])
-            panel.anatomy_inputs.fields["fsl_directory"].setText(locations["FSL"])
-            panel.combination_inputs.fields["fsl_directory"].setText(locations["FSL"])
+            directory = str(locations["FSL"] or "")
+            self.scientific.fsl_directory = Path(directory) if directory else None
+            self.batch.fsl_directory = Path(directory) if directory else None
+            panel.correction_inputs["fsl_directory"].setText(directory)
+            panel.anatomy_inputs.fields["fsl_directory"].setText(directory)
+            panel.combination_inputs.fields["fsl_directory"].setText(directory)
+        self.scientific.refresh()
+
+    def can_change_dependencies(self):
+        viewer = getattr(self, "scientific_viewer", None)
+        roi_dialog = getattr(viewer, "native_roi_dialog", None)
+        idle = (
+            self.workflow.execution.thread is None
+            and self.scientific.thread is None
+            and self.batch.thread is None
+            and (roi_dialog is None or roi_dialog.thread is None)
+        )
+        if not idle or self.batch.approval.isChecked():
+            return False
+        return (
+            not any(
+                panel.approval.isChecked()
+                for panel in (
+                    self.scientific.dti,
+                    self.scientific.csd,
+                    self.scientific.tracking,
+                    self.scientific.registration,
+                    self.scientific.anatomy,
+                    self.scientific.sift2,
+                )
+            )
+            and not self.scientific.connectome.approve.isChecked()
+        )
 
     def closeEvent(self, event: object) -> None:
         """Close cooperatively, leaving the event loop responsive during I/O."""

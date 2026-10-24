@@ -45,6 +45,7 @@ from dmri_studio.core.scientific.records import read_json
 
 from .components import button, label
 from .execution import ProcessingWorker
+from .settings import ScientificSoftwareSettings
 
 
 class BatchPage(QWidget):
@@ -64,6 +65,10 @@ class BatchPage(QWidget):
         self._retired_workers = []
         self.cancel = Event()
         self.tool_directory = None
+        self.fsl_directory = None
+        self.ants_directory = None
+        self.historical_toolchain = False
+        self.historical_plan = None
         self.processing_available = lambda: True
         self.kind = ""
         self.rows = []
@@ -94,9 +99,11 @@ class BatchPage(QWidget):
         # Reuse the installation configured once in Software Dependencies.
         # Saved batch histories may still explicitly pin an earlier toolchain.
         if self.settings:
-            self.mrtrix_directory.setText(
-                str(self.settings.get("dependencies/MRtrix3", "") or "")
-            )
+            software = ScientificSoftwareSettings(self.settings)
+            self.tool_directory = software.location("MRtrix3")
+            self.fsl_directory = software.location("FSL")
+            self.ants_directory = software.location("ANTs")
+            self.mrtrix_directory.setText(str(self.tool_directory or ""))
         self.mrtrix_directory.setPlaceholderText(
             "Uses saved MRtrix3 location; configure it in Software Dependencies"
         )
@@ -173,6 +180,7 @@ class BatchPage(QWidget):
         self.tabs.addTab(review, "Plan")
         controls = QHBoxLayout()
         self.plan_button = button("Validate / Dry run", self.dry_run)
+        self.new_button = button("New batch with current software", self.new_batch)
         self.run_button = button("Run approved batch", self.execute)
         self.pause_button = button("Pause scheduling", lambda: self.send_control("pause"))
         self.resume_button = button("Resume", self.resume)
@@ -184,6 +192,7 @@ class BatchPage(QWidget):
             "Retry selected", lambda: self.send_control("retry", selected=True)
         )
         for widget in (
+            self.new_button,
             self.plan_button,
             self.run_button,
             self.pause_button,
@@ -364,6 +373,11 @@ class BatchPage(QWidget):
         self.start("discover", operation)
 
     def dry_run(self):
+        if self.historical_toolchain:
+            self.status.setText(
+                "This batch retains its approved toolchain. Choose New batch with current software to plan a separate batch."
+            )
+            return
         if not self.study:
             self.status.setText("Discover or open a study first.")
             return
@@ -393,6 +407,8 @@ class BatchPage(QWidget):
                 output,
                 limits=limits,
                 tool_directory=directory,
+                fsl_directory=self.fsl_directory,
+                ants_directory=self.ants_directory,
                 cancelled=cancel,
                 progress=progress,
             ),
@@ -486,6 +502,9 @@ class BatchPage(QWidget):
             self.status.setText(error)
             return
         if self.kind in {"discover", "study"}:
+            self.historical_toolchain = False
+            self.historical_plan = None
+            self.mrtrix_directory.setReadOnly(False)
             self.study, self.plan, self.folder = result, None, None
             self.details.clear()
             self.products = []
@@ -509,6 +528,8 @@ class BatchPage(QWidget):
             )
         elif self.kind == "history":
             folder, saved = result
+            self.historical_toolchain = True
+            self.historical_plan = saved
             data = saved.to_dict()
             self.study = Study.from_dict(data["study"])
             self.study_name.setText(self.study.study_id)
@@ -516,6 +537,7 @@ class BatchPage(QWidget):
             self.output.setText(str(folder))
             self.workflow.setPlainText(json.dumps(data["workflow"], indent=2))
             self.mrtrix_directory.setText(data.get("tool_directory") or "")
+            self.mrtrix_directory.setReadOnly(True)
             for widget, name in (
                 (self.max_subjects, "max_subjects"),
                 (self.max_processes, "max_processes"),
@@ -532,7 +554,10 @@ class BatchPage(QWidget):
             self.tabs.setCurrentIndex(1)
             self.remember_batch()
             self.refresh()
-            self.status.setText("Saved batch reopened. Resume verifies identities before reuse.")
+            self.status.setText(
+                "Saved batch reopened with its pinned approved toolchain. Resume verifies identities before reuse."
+            )
+
         elif self.kind == "plan":
             self.plan = result
             self.folder = None
@@ -574,6 +599,24 @@ class BatchPage(QWidget):
                 "Batch state: " + result.get("state", "loaded") + ". Scientific QC requires review."
             )
 
+    def new_batch(self):
+        """Leave the historical approval intact and start a distinct configuration."""
+        if self.thread is not None:
+            return
+        self.historical_toolchain = False
+        self.historical_plan = None
+        self.folder = None
+        self.output.clear()
+        self.mrtrix_directory.setReadOnly(False)
+        if self.settings:
+            software = ScientificSoftwareSettings(self.settings)
+            self.tool_directory = software.location("MRtrix3")
+            self.fsl_directory = software.location("FSL")
+            self.ants_directory = software.location("ANTs")
+        self.mrtrix_directory.setText(str(self.tool_directory or ""))
+        self.invalidate()
+        self.status.setText("New batch uses current saved software; review and approve a new plan.")
+
     def finished(self):
         thread, worker = self.thread, self.worker
         self.thread = self.worker = None
@@ -591,7 +634,9 @@ class BatchPage(QWidget):
         if not hasattr(self, "plan_button"):
             return
         idle = self.thread is None
-        self.plan_button.setEnabled(idle and self.study is not None)
+        self.plan_button.setEnabled(
+            idle and self.study is not None and not self.historical_toolchain
+        )
         self.run_button.setEnabled(idle and self.plan is not None and self.approval.isChecked())
         self.resume_button.setEnabled(idle and self.folder is not None)
         self.approval.setEnabled(idle and self.plan is not None)
@@ -874,6 +919,19 @@ class BatchPage(QWidget):
             f"Study: {data['study']['study_id']}",
             f"Acquisitions: {len(data['study']['acquisitions'])}",
             f"Output: {data['output_directory']}",
+            "MRtrix3: " + str(data.get("tool_directory") or "not selected"),
+            "FSL: "
+            + (
+                str(data.get("fsl_directory") or "not selected")
+                if "fsl_directory" in data
+                else "legacy plan; inspect recorded tool hashes"
+            ),
+            "ANTs: "
+            + (
+                str(data.get("ants_directory") or "not selected")
+                if "ants_directory" in data
+                else "legacy plan; inspect recorded tool hashes"
+            ),
             "Resources: " + json.dumps(data["limits"]),
             "Scientific acceptance: unassigned",
             "",

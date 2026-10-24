@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from threading import Event
 
-from PySide6.QtCore import QObject, QSettings, Qt, QThread, Signal
+from PySide6.QtCore import QObject, Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -26,7 +26,7 @@ from dmri_studio.core.dependencies import INSTALL_LINKS, inspect_dependencies
 from dmri_studio.core.software_setup import family_state, verify_archive
 
 from .components import Disclosure, button, label
-from .settings import Settings
+from .settings import ScientificSoftwareSettings, Settings
 from .workers import ViewerTaskWorker
 
 
@@ -48,6 +48,7 @@ class DependencyController(QObject):
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
         self.settings = settings
+        self.software = ScientificSoftwareSettings(settings)
         self.thread = self.worker = None
         self.cancel = Event()
         self.report = None
@@ -59,7 +60,7 @@ class DependencyController(QObject):
 
     def saved_directories(self) -> dict:
         """Read only app-owned preferences, never system profiles or tool configs."""
-        return {name: str(self.settings.get(f"dependencies/{name}", "")) for name in INSTALL_LINKS}
+        return self.software.locations()
 
     def scan(self, directories: dict, common=True):
         """Launch one background inventory; all widget values are copied first."""
@@ -130,28 +131,36 @@ class DependencyController(QObject):
         self.busy_changed.emit(False)
 
     def apply(self):
-        """Explicit user action: save bin paths as app defaults, never alter tools."""
-        if not self.report or self.report["cancelled"] or self.thread is not None:
+        """Save only complete, compatible families from this exact inventory."""
+        if (
+            not self.report
+            or self.report["cancelled"]
+            or self.error
+            or self.cancel.is_set()
+            or self.thread is not None
+        ):
             raise ValueError("Finish a complete scan before saving tool locations.")
         locations = {}
         for family in INSTALL_LINKS:
-            paths = {
-                str(Path(r["path"]).parent)
-                for r in self.report["tools"]
-                if r["family"] == family and r["path"]
-            }
-            if len(paths) > 1:
-                raise ValueError(
-                    f"{family} uses multiple executable folders. Select one installation and recheck."
-                )
-            locations[family] = next(iter(paths)) if paths else self.inputs.get(family, "")
-        # The window consumes this signal before settings persist; it protects
-        # active plans/runs and explicitly invalidates previews when paths change.
-        self.configuration_applied.emit(locations)
+            state = family_state(self.report, family)["state"]
+            if state == "ready":
+                rows = [r for r in self.report["tools"] if r["family"] == family]
+                locations[family] = str(Path(rows[0]["path"]).parent)
+            elif self.inputs.get(family):
+                raise ValueError(f"{family} is {state.replace('_', ' ')}; no locations saved.")
+        if not locations:
+            raise ValueError("No compatible installation was verified; no locations saved.")
+        previous = self.software.locations()
         for family, path in locations.items():
-            self.settings.set(f"dependencies/{family}", path)
+            try:
+                self.software.replace(family, path)
+            except OSError:
+                for prior, old in previous.items():
+                    if prior in locations and prior != family:
+                        self.software.replace(prior, old)
+                raise
         self.settings.set("dependencies/search_common", self.common)
-        self.settings.store.sync()
+        self.configuration_applied.emit(locations)
         return locations
 
     def apply_verified_family(self, family):
@@ -159,6 +168,7 @@ class DependencyController(QObject):
         if (
             self.thread is not None
             or self.cancel.is_set()
+            or self.error
             or family_state(self.report, family)["state"] != "ready"
         ):
             raise ValueError(
@@ -166,18 +176,18 @@ class DependencyController(QObject):
             )
         rows = [r for r in self.report["tools"] if r["family"] == family]
         path = str(Path(rows[0]["path"]).parent)
-        old = self.settings.get(f"dependencies/{family}", "")
-        self.settings.set(f"dependencies/{family}", path)
-        self.settings.store.sync()
-        if self.settings.store.status() != QSettings.Status.NoError:
-            self.settings.set(f"dependencies/{family}", old)
-            self.settings.store.sync()
-            raise OSError(
-                "Could not save application settings; previous configuration retained. Check preferences permissions."
-            )
+        self.software.replace(family, path)
         self.inputs[family] = path
         self.configuration_applied.emit({family: path})
         return path
+
+    def remove_family(self, family):
+        if self.thread is not None:
+            raise ValueError("Finish the current verification before removing a location.")
+        self.software.replace(family, None)
+        self.inputs[family] = ""
+        self.report = None
+        self.configuration_applied.emit({family: ""})
 
     def shutdown(self):
         """Cooperative stop between read-only queries; never kill an MRI process."""
@@ -194,7 +204,7 @@ class DependencyWidget(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 24, 24, 24)
         root.setSpacing(16)
-        root.addWidget(label("Software Dependencies", "title"))
+        root.addWidget(label("Scientific Software", "title"))
         root.addWidget(
             label(
                 "Viewer, atlas, ROI/tract editing and saved QC work without MRtrix3, FSL or ANTs. "
@@ -203,6 +213,8 @@ class DependencyWidget(QWidget):
             )
         )
         self.fields, self.guides, self.family_labels, self.family_details = {}, {}, {}, {}
+        self.browse_buttons, self.verify_buttons, self.remove_buttons = {}, {}, {}
+        self.pending_family = None
         for family, url in INSTALL_LINKS.items():
             section = QWidget()
             family_layout = QVBoxLayout(section)
@@ -210,13 +222,21 @@ class DependencyWidget(QWidget):
             family_layout.setSpacing(8)
             heading = QHBoxLayout()
             heading.addWidget(label(family, "section"))
-            state = label("Not checked", "caption")
+            state = label("Not configured", "caption")
             state.setAccessibleName(f"{family} installation state")
             heading.addWidget(state, 1)
             self.family_labels[family] = state
             family_layout.addLayout(heading)
             actions = QHBoxLayout()
-            actions.addWidget(button("Locate Installation…", lambda _, f=family: self.browse(f)))
+            browse = button("Locate Installation…", lambda _, f=family: self.browse(f))
+            actions.addWidget(browse)
+            self.browse_buttons[family] = browse
+            verify = button("Verify and Save", lambda _, f=family: self.verify_and_save(f))
+            remove = button("Remove Saved Location", lambda _, f=family: self.remove_location(f))
+            actions.addWidget(verify)
+            actions.addWidget(remove)
+            self.verify_buttons[family] = verify
+            self.remove_buttons[family] = remove
             actions.addWidget(button("Install / Setup…", lambda _, f=family: self.open_guide(f)))
             actions.addWidget(
                 button("Test Installation", lambda _, f=family: self.open_guide(f, test=True))
@@ -227,10 +247,10 @@ class DependencyWidget(QWidget):
             detail_layout = QVBoxLayout(detail)
             detail_layout.setContentsMargins(0, 4, 0, 4)
             field = QLineEdit(controller.inputs.get(family, ""))
-            field.setPlaceholderText("Auto-detect, or select existing root/bin folder")
+            field.setPlaceholderText("Not configured — select an existing root/bin folder")
             field.setAccessibleName(f"{family} setup location")
             field.textChanged.connect(self.refresh_actions)
-            detail_layout.addWidget(label("Application-specific installation path", "caption"))
+            detail_layout.addWidget(label("Saved location / selected installation", "caption"))
             detail_layout.addWidget(field)
             link = label(
                 f'<a href="{url}">Official {family} installation instructions</a>', "caption"
@@ -289,6 +309,7 @@ class DependencyWidget(QWidget):
         controller.updated.connect(self.populate)
         controller.busy_changed.connect(self.busy)
         controller.configuration_applied.connect(self.locations_applied)
+        controller.busy_changed.connect(self.finish_verify)
         self.populate(controller.report)
         self.busy(controller.thread is not None)
 
@@ -308,6 +329,8 @@ class DependencyWidget(QWidget):
         for family, path in locations.items():
             self.fields[family].setText(path)
         self.refresh_actions()
+        if self.controller.report is None:
+            self.populate(None)
 
     def browse(self, family):
         """User selects an existing installation; no folder is created."""
@@ -317,8 +340,62 @@ class DependencyWidget(QWidget):
 
     def scan(self):
         """Submit immutable UI choices to the shared worker."""
+        self.pending_family = None
         self.controller.scan(
             {f: w.text().strip() for f, w in self.fields.items()}, self.common.isChecked()
+        )
+
+    def verify_and_save(self, family):
+        """One explicit action: background check, then transactional persistence."""
+        if not self.can_apply():
+            self.status.setText(
+                "Finish the active command preview/run before changing tool locations."
+            )
+            return
+        if not self.fields[family].text().strip():
+            self.status.setText(f"Locate {family} before verifying and saving it.")
+            return
+        if self.controller.thread is not None:
+            return
+        self.pending_family = family
+        self.controller.scan({f: w.text().strip() for f, w in self.fields.items()}, False)
+
+    def finish_verify(self, busy):
+        if busy or self.pending_family is None:
+            return
+        family, self.pending_family = self.pending_family, None
+        if (
+            not self.can_apply()
+            or self.fields[family].text().strip() != self.controller.inputs[family]
+        ):
+            self.status.setText(
+                "Installation or processing state changed; verify again before saving."
+            )
+            return
+        try:
+            path = self.controller.apply_verified_family(family)
+        except (ValueError, OSError) as exc:
+            self.status.setText(str(exc))
+            return
+        self.status.setText(
+            f"{family} verified and saved at {path}. Scientific command checks still apply."
+        )
+
+    def remove_location(self, family):
+        if not self.can_apply():
+            self.status.setText(
+                "Finish the active command preview/run before changing tool locations."
+            )
+            return
+        try:
+            self.controller.remove_family(family)
+        except (ValueError, OSError) as exc:
+            self.status.setText(str(exc))
+            return
+        self.fields[family].clear()
+        self.populate(None)
+        self.status.setText(
+            f"Removed saved {family} location. New operations require configuration."
         )
 
     def refresh_actions(self, *_):
@@ -329,7 +406,7 @@ class DependencyWidget(QWidget):
         if self.controller.report:
             for family, field in self.fields.items():
                 if field.text().strip() != self.controller.inputs.get(family, ""):
-                    self.family_labels[family].setText("Location changed · Scan Again to verify")
+                    self.family_labels[family].setText("Location changed · Verify and Save")
 
     def choices_current(self):
         """Bind the inventory to the folder/search choices actually inspected."""
@@ -347,6 +424,18 @@ class DependencyWidget(QWidget):
             and not self.controller.report["cancelled"]
         )
         self.export.setEnabled(not value and self.controller.report is not None)
+        for family in INSTALL_LINKS:
+            self.browse_buttons[family].setText(
+                "Change Location…"
+                if self.controller.software.location(family)
+                else "Locate Installation…"
+            )
+            self.verify_buttons[family].setEnabled(
+                not value and bool(self.fields[family].text().strip())
+            )
+            self.remove_buttons[family].setEnabled(
+                not value and bool(self.controller.software.location(family))
+            )
 
     def populate(self, report):
         """Missing/unvalidated tools never masquerade as scientifically accepted."""
@@ -354,7 +443,18 @@ class DependencyWidget(QWidget):
         from .software_installation import STATE_LABELS
 
         for family, widget in self.family_labels.items():
-            state = STATE_LABELS[family_state(report, family)["state"]]
+            if report is None or self.fields[family].text().strip() != self.controller.inputs.get(
+                family, ""
+            ):
+                state = {
+                    "not_configured": "Not configured",
+                    "configured": "Configured, awaiting verification",
+                    "missing": "Missing installation · Change Location",
+                    "incomplete": "Incomplete installation · Change Location",
+                    "unsupported": "Unsupported platform",
+                }[self.controller.software.state(family)]
+            else:
+                state = STATE_LABELS[family_state(report, family)["state"]]
             versions = (
                 sorted(
                     {
@@ -485,9 +585,7 @@ class DependencyDialog(QDialog):
         layout = QVBoxLayout(self)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        self.content = DependencyWidget(
-            window.dependencies, lambda: window.workflow.execution.thread is None
-        )
+        self.content = DependencyWidget(window.dependencies, window.can_change_dependencies)
         scroll.setWidget(self.content)
         layout.addWidget(scroll)
         row = QHBoxLayout()
