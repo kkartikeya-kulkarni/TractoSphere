@@ -189,7 +189,13 @@ class AnatomyPanel(QScrollArea):
             combo.clear()
             combo.addItem(f"Select imported {name}…", None)
             for a in self.owner.artifacts:
-                if a.kind in kinds:
+                if a.kind in kinds and (
+                    not (generate and combo is self.source)
+                    or (
+                        a.payload.get("declarations", {}).get("anatomical_modality") == "T1w"
+                        and a.payload.get("declarations", {}).get("metric") != "FA"
+                    )
+                ):
                     combo.addItem(Path(a.payload["path"]).name, a.id)
             if combo.count() == 1:
                 combo.setItemText(0, f"No imported {name} — use Import beside this field")
@@ -203,6 +209,16 @@ class AnatomyPanel(QScrollArea):
     def update_input_help(self, *_):
         """Display required selections while the core remains the eligibility authority."""
         generate = self.operation.currentData() == "5ttgen.fsl"
+        blocked_anatomy = [
+            Path(a.payload["path"]).name
+            for a in self.owner.artifacts
+            if generate
+            and a.kind == "anatomy"
+            and (
+                a.payload.get("declarations", {}).get("anatomical_modality") != "T1w"
+                or a.payload.get("declarations", {}).get("metric") == "FA"
+            )
+        ]
         missing = [
             name
             for name, control in (
@@ -215,13 +231,20 @@ class AnatomyPanel(QScrollArea):
             )
             if control is not None and control.currentData() is None
         ]
-        self.input_help.setText(
+        message = (
             "Select "
             + ", ".join(missing)
             + ". Use Import beside the missing field; 5TT import requires exact channel and anatomical review evidence. The planner checks spatial identity and review evidence."
             if missing
             else "Inputs selected. Validate tissue order, registration evidence and exact commands before approval."
         )
+        if blocked_anatomy:
+            message += (
+                " Imported anatomy not eligible for 5TT generation: "
+                + ", ".join(blocked_anatomy[:3])
+                + ". Generation requires an explicitly declared T1w image; FA, b0 and unknown contrast are not T1 inputs. Review declarations in Inputs if source documentation establishes T1w, or import another image."
+            )
+        self.input_help.setText(message)
 
     def choose_parent(self):
         """Choose only a parent; exclusive attempt creation occurs in the engine."""

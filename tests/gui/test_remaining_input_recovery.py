@@ -57,6 +57,9 @@ def test_anatomy_role_import_routes_follow_the_selected_operation(
             if action.accessibleName() == "Browse Input file"
         )
         qtbot.mouseClick(browse, Qt.MouseButton.LeftButton)
+        dialog.declarations["anatomical_modality"].setCurrentIndex(
+            dialog.declarations["anatomical_modality"].findData("T1w")
+        )
         qtbot.mouseClick(
             dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Ok),
             Qt.MouseButton.LeftButton,
@@ -71,6 +74,29 @@ def test_anatomy_role_import_routes_follow_the_selected_operation(
     assert panel.source.count() == 2, page.status.text()
     assert panel.source.itemText(1) == anatomy.name
     assert panel.plan is None and not panel.approval.isChecked()
+
+
+def test_anatomy_generation_excludes_imported_fa_and_undeclared_t1(window, qtbot, tmp_path):
+    window.focus_models()
+    page = window.scientific
+    panel = page.anatomy
+    image = nib.Nifti1Image(np.ones((5, 6, 7), dtype="f4"), np.eye(4))
+    image.header.set_xyzt_units("mm")
+    fa = tmp_path / "fa.nii.gz"
+    t1 = tmp_path / "T1w_acpc_dc_restore_1.25.nii.gz"
+    nib.save(image, fa)
+    nib.save(image, t1)
+    page.import_request(
+        ImportRequest("anatomy", fa, declarations={"metric": "FA", "anatomical_modality": "FA"})
+    )
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    page.import_request(ImportRequest("anatomy", t1))
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    assert panel.source.count() == 1
+    assert fa.name in panel.input_help.text() and t1.name in panel.input_help.text()
+    assert "Review declarations in Inputs" in panel.input_help.text()
+    assert page.inputs.count() == 2
+    assert panel.plan is None and not panel.run_button.isEnabled()
 
 
 def test_sift2_required_and_policy_specific_inputs_have_scoped_import(window, qtbot):
