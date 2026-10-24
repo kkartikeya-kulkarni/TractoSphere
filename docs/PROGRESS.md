@@ -1,5 +1,22 @@
 # Outstanding Scientific Verification and Release Blockers
 
+## 2026-10-23 — Phase 6 scientific workspace UX in verification
+
+The task-focused scientific input inventory, discoverable preprocessing entry,
+reconstruction/anatomy/SIFT2/connectivity guidance and explicit recent
+project/run navigation are implemented on
+`development/phase6-scientific-workspaces-ux-2026-10-23` from `38f2f78`.
+Exact planners, approval, scientific gates, source identities and workers remain
+the execution path. [The Phase 6 handoff](PHASE6_IMPLEMENTATION_AND_HANDOFF.md)
+records local tests and measured offscreen performance. At application/test code
+`03928a2`, the user's normal Mac Terminal returned **6 targeted Cocoa/VTK tests
+passed in 24.41 s, exit 0** for synthetic inputs, five-tissue QC, DTI, CSD,
+SIFT2 and Connectivity. Native performance and researcher usability review remain
+open; the interface work is **targeted-native-verified, not scientifically accepted**.
+The permanent 38-task scientific
+backlog remains open, and no EDDY preprocessing order or scientific acceptance
+policy changed.
+
 The permanent, prioritized task register and EDDY experimental protocol are in
 [SCIENTIFIC_VALIDATION_BACKLOG.md](SCIENTIFIC_VALIDATION_BACKLOG.md). It links the
 [Phase 0](PHASE0_AUDIT_AND_HANDOFF.md), [Phase 1](PHASE1_IMPLEMENTATION_AND_HANDOFF.md),

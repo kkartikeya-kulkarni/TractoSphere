@@ -11,6 +11,9 @@
 | ROIs | Grouped regions, colors/opacity, draw/erase/polygon/morphology, save/reload | Changes are explicit derivatives; original atlas remains immutable |
 | ROI tract filtering | ALL/ANY inclusion, exclusion, selected-group export | Actual volumetric segment intersections, not screen overlap |
 | Native preprocessing | Conversion, MP-PCA, Gibbs, dwi2mask | History/order and acquisition gates apply |
+| Scientific input inventory | Typed import, explicit conventions, searchable shared references | Inspection does not establish scientific acceptance; removing a reference never deletes source data |
+| DTI / CSD reconstruction | Guided tensor metrics and supported FOD methods with exact-plan approval | Shells, gradients, responses, software and output checks remain mandatory |
+| Five-tissue / SIFT2 / Connectivity | Supported tissue operations, exact-source streamline weights and registered-atlas matrices | Real anatomy, ACT, SIFT2 and connectome scientific validation remain open |
 | Correction | Supported acquisition-specific TOPUP/EDDY commands | PE/readout/calibration metadata required; failure blocks dependent work |
 | Bias correction | MRtrix dwibiascorrect ants, explicit fitting mask and saved field | Applied once to verified pre-N4 input; division/gradient checks |
 | Anatomy alignment | Supported extraction/segmentation and rigid/BBR adapters | Structural assumptions must be evidenced; registration separate from native DWI |
@@ -23,3 +26,14 @@
 FSL/MRtrix/ANTs are separate local CLI dependencies. NumPy/NiBabel/SciPy/VTK/Qt
 are imported local libraries. No remote inference API or container is needed for
 the released workflows. Additional processing engines are future work.
+
+In the Phase 6 development branch, open **Preprocessing** even before loading
+data to reach its input action and staged history/operation review. **Diffusion
+models** offers direct tensor and FOD tasks. The scientific input inventory is
+shared with Anatomy, SIFT2, Connectivity and the other scientific workspaces;
+explicit source identity and conventions remain required. Specialist controls
+are available under Advanced. Saved Runs and Projects offer explicit recent
+record actions; neither loads private data automatically at startup. Processing
+completion, technical output checks and human scientific review are distinct.
+See [the Phase 6 handoff](PHASE6_IMPLEMENTATION_AND_HANDOFF.md) for actual test
+coverage and native verification limits.
