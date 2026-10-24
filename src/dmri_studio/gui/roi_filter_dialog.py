@@ -233,6 +233,7 @@ class RoiFilterDialog(QDialog):
         layout.addLayout(extra)
         for text, callback in [
             ("View QC", self.show_qc),
+            ("View run details", self.show_run_details),
             ("Save configuration…", self.save_configuration),
             ("Load configuration…", self.load_configuration),
         ]:
@@ -576,6 +577,14 @@ class RoiFilterDialog(QDialog):
             self.preview.setPlainText(
                 json.dumps(self.result_record.get("validation", {}), indent=2)
             )
+            self.command_details.toggle.setChecked(True)
+
+    def show_run_details(self):
+        if self.result_record:
+            self.preview.setPlainText(json.dumps(self.result_record, indent=2))
+            self.command_details.toggle.setChecked(True)
+        else:
+            self.status.setText("No completed filtering run is available in this dialog.")
 
     def source_context_available(self):
         if (
@@ -596,13 +605,15 @@ class RoiFilterDialog(QDialog):
             for p in self.result_record["validation"]["products"]
             if p["role"] == "tracts"
         )
-        self.source.visible = False
         existing = next((g for g in self.viewer.groups if str(g.path) == product["path"]), None)
         if existing:
+            self.source.visible = False
             existing.visible = True
             self.viewer.tract_list.setCurrentRow(self.viewer.groups.index(existing))
             self.viewer.refresh_tracts()
         else:
+            # The loader validates the output hash asynchronously. Keep the original
+            # scene visible if that check or loading fails.
             self.viewer.load_tracts(product["path"], expected_hash=product["sources"][0]["sha256"])
         self.hide()
 

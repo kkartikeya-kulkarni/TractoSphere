@@ -174,6 +174,45 @@ def test_saved_filter_rules_reject_stale_atlas_labels(qtbot, tmp_path, monkeypat
     assert dialog.plan is None and not dialog.run_button.isEnabled()
 
 
+def test_opening_filtered_result_keeps_source_visible_until_hash_checked(qtbot, tmp_path):
+    viewer = viewer_fixture(qtbot, tmp_path)
+    dialog = RoiFilterDialog(viewer)
+    qtbot.addWidget(dialog)
+    dialog.source.visible = True
+    viewer.groups = [dialog.source]
+    calls = []
+    viewer.load_tracts = lambda *args, **kwargs: calls.append((args, kwargs))
+    dialog.result_record = {
+        "validation": {
+            "products": [
+                {
+                    "role": "tracts",
+                    "artifact": {
+                        "path": str(tmp_path / "filtered.tck"),
+                        "sources": [{"sha256": "expected-hash"}],
+                    },
+                }
+            ]
+        }
+    }
+    dialog.open_result()
+    assert calls == [((str(tmp_path / "filtered.tck"),), {"expected_hash": "expected-hash"})]
+    assert dialog.source.visible
+
+
+def test_completed_filter_run_details_and_qc_remain_separate(qtbot, tmp_path):
+    dialog = RoiFilterDialog(viewer_fixture(qtbot, tmp_path))
+    qtbot.addWidget(dialog)
+    dialog.result_record = {
+        "plan": {"digest": "approved-plan"},
+        "validation": {"status": "pending_qc"},
+    }
+    dialog.show_qc()
+    assert "pending_qc" in dialog.preview.toPlainText()
+    dialog.show_run_details()
+    assert "approved-plan" in dialog.preview.toPlainText()
+
+
 @pytest.mark.skipif(
     not Path("/usr/local/mrtrix3/bin/tckedit").is_file(), reason="Actual MRtrix required"
 )

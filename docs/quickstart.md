@@ -12,9 +12,12 @@
 4. In **ROIs**, import a binary mask or anatomical atlas. Provide its matching
    table and confirm anatomical space from provenance. Select regions to generate
    their 3D surfaces; Cmd/Ctrl-select multiple regions. Adjust opacity/color.
-5. Assign Include/Exclude roles, confirm tract/reference correspondence and filter
-   existing streamlines using ALL/ANY inclusion semantics. Save the selected tract
-   group as a new derivative. This does not generate tractography.
+5. In **Tractography**, choose **Select or Filter Existing Streamlines**. Import
+   compatible Viewer ROIs and assign **Must pass through**, **Must avoid** or
+   ordered waypoints. For original discrete-label atlases, open **Filter using
+   original Viewer atlas** to choose Include ANY/ALL without preassigning roles.
+   Confirm tract/reference correspondence, preview the exact plan and approve
+   it before running. The source tractogram remains unchanged.
 6. Save a workspace to preserve source references, ROI derivatives and display/
    camera state. Keep its source files and assets directory accessible.
 7. For preprocessing, first install the needed scientific tools and

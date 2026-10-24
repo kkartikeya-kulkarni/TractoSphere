@@ -49,6 +49,26 @@ def test_task_first_tracking_shows_separate_operations(window):
     assert "not an axon count" in guided.task_help.text()
 
 
+def test_guided_review_remains_reachable_at_minimum_window_size(window):
+    window.resize(960, 640)
+    window.focus_tracking_plan()
+    panel = window.scientific.tracking
+    guided = panel.guided
+    panel.ensureWidgetVisible(guided.run_button)
+    assert panel.verticalScrollBar().maximum() > 0
+    assert guided.run_button.mapTo(panel.viewport(), guided.run_button.rect().topLeft()).y() < 640
+
+
+def test_original_atlas_filter_entry_explains_missing_viewer_inputs(window):
+    window.focus_tracking_plan()
+    guided = window.scientific.tracking.guided
+    guided.select_task("filter")
+    guided.atlas_filter_button.click()
+    assert "Open the source tractogram, reference image and original label atlas" in (
+        window.scientific.status.text()
+    )
+
+
 def test_guided_generation_uses_existing_typed_task(window):
     window.focus_tracking_plan()
     panel = window.scientific.tracking
@@ -368,6 +388,7 @@ def test_guided_preview_summarizes_real_approved_plan(window, qtbot, tmp_path):
     not Path("/usr/local/mrtrix3/bin/tckmap").is_file(), reason="Actual MRtrix required"
 )
 def test_guided_density_and_unlimited_filter_prepare_real_commands(window, qtbot, tmp_path):
+    from dmri_studio.core.execution import hash_file
     from dmri_studio.core.scientific import ImportRequest, import_artifact
 
     spec = importlib.util.spec_from_file_location(
@@ -399,6 +420,12 @@ def test_guided_density_and_unlimited_filter_prepare_real_commands(window, qtbot
     assert not any("-number" in c["argv"] for c in commands)
     assert "full pathway" in guided.summary.text()
     assert "Maximum output streamlines" not in guided.summary.text()
+    original_hash = hash_file(source / "tracks.tck")
+    guided.approval.setChecked(True)
+    guided.run_button.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=30000)
+    assert page.tracking.manifest["status"] == "validated_pending_qc", page.status.text()
+    assert hash_file(source / "tracks.tck") == original_hash
 
     guided.select_task("density")
     _select(guided.density_tracts, tracts.id)
@@ -410,6 +437,13 @@ def test_guided_density_and_unlimited_filter_prepare_real_commands(window, qtbot
     assert page.tracking.plan.to_dict()["bindings"][0]["algorithm"] == "tckmap"
     assert "Reference grid: reference.nii.gz" in guided.summary.text()
     assert "tckmap" in guided.commands.toPlainText()
+    guided.approval.setChecked(True)
+    guided.run_button.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=30000)
+    assert page.tracking.manifest["status"] == "validated_pending_qc", page.status.text()
+    assert page.tracking.maps.currentData()["kind"] == "scalar"
+    assert guided.open_button.isEnabled()
+    assert hash_file(source / "tracks.tck") == original_hash
 
 
 def test_verified_density_product_is_available_to_open_in_viewer(window, tmp_path):
