@@ -122,10 +122,13 @@ targeted Cocoa diagnostic at `070e555` showed that the action passed
 `source` is its reference image; the tractogram is the explicit
 `input_bindings["tracts"]`. The action now selects that binding and verifies its
 recorded hash. Synthetic regression fixtures now match the real plan shape and
-test source/reference tampering. Offscreen handoff tests pass; the corrected
-Viewer reopening still needs a native rerun. Native file-picker layout, atlas selection,
-Viewer preservation, real TRK conversion, and real anatomical correspondence
-remain explicit follow-ups.
+test source/reference tampering. The corrected targeted native Cocoa walkthrough
+passed at application commit `3f4cbbf`: **1 passed in 2.86 seconds, exit 0**.
+It exercised the Viewer button, two loaded groups, source-specific approved
+filtering, filtered-result loading, and original-source reopening. The full
+seven-test Cocoa suite has not been rerun at this commit. Native file-picker
+layout, atlas selection, broader Viewer preservation, real TRK conversion, and
+real anatomical correspondence remain explicit follow-ups.
 
 ## Native acceptance on the normal Mac
 

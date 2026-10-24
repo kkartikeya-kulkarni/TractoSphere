@@ -16,9 +16,10 @@ in the authorized bounded roots. The user's first normal-Mac Cocoa suite at
 the intended source and opened the verified output, but **View Original Tracks**
 timed out. A targeted Cocoa diagnostic at `070e555` showed that it sent the
 reference NIfTI as a tractogram. The action now uses the explicit tractogram
-binding and source hash; corrected offscreen handoff tests pass. Native
-reopening remains pending at the new commit, so the complete native workflow
-is not yet verified. The 38-task
+binding and source hash; corrected offscreen handoff tests pass. The targeted
+native Cocoa walkthrough at `3f4cbbf` passed **1 test in 2.86 seconds (exit
+0)**, including verified original-source reopening. The full seven-test Cocoa
+suite has not been rerun at that commit. The 38-task
 scientific backlog and separate Phase 7 EDDY work retain their statuses.
 
 ## 2026-10-24 — Native Registration low-b summary follow-up
