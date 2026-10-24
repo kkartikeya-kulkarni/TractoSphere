@@ -54,6 +54,18 @@ TOOLS = {
     ),
     "ANTs": ("N4BiasFieldCorrection",),
 }
+
+
+def fsl_root(directory: str | Path | None = None, environ: Mapping | None = None) -> Path | None:
+    """Resolve an explicit FSL root/bin without ever interpreting empty as CWD."""
+    environment = os.environ if environ is None else environ
+    selected = str(directory) if directory else str(environment.get("FSLDIR", ""))
+    if not selected.strip():
+        return None
+    path = Path(selected).expanduser()
+    return path.parent if path.name == "bin" else path
+
+
 FEATURES = {
     "convert_mask": ("Conversion / brain masking", {"MRtrix3": ("mrconvert", "dwi2mask")}),
     "denoise": ("MP-PCA denoising", {"MRtrix3": ("mrconvert", "dwi2mask", "dwidenoise")}),

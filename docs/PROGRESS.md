@@ -1,3 +1,7 @@
+# 2026-10-23 — Phase 1 scientific software configuration
+
+The current Phase 1 implementation, tests, unresolved native/sandbox verification and next action are recorded in [PHASE1_IMPLEMENTATION_AND_HANDOFF.md](PHASE1_IMPLEMENTATION_AND_HANDOFF.md). The work is on `development/phase1-scientific-software-2026-10-23`; public `main`, releases and draft PR #3 remain untouched.
+
 # 2026-10-14 — Phase 3 cross-platform compatibility completed locally
 
 Preserved the existing dependency manager, scientific gates and all source data.

@@ -486,6 +486,7 @@ class ScientificPlanningPage(QWidget):
         self.product_handoff = None
         self.stage = "models"
         self.tool_directory = None
+        self.fsl_directory = None
         self.processing_available = lambda: True
         root = QVBoxLayout(self)
         root.setContentsMargins(20, 20, 20, 20)

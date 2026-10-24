@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import html
 import json
-import os
 import shlex
 from pathlib import Path
 
@@ -102,6 +101,7 @@ def prepare_registration(
     *,
     nthreads=2,
     tool_directory=None,
+    fsl_directory=None,
     cancelled=lambda: False,
     progress=lambda _: None,
 ):
@@ -159,7 +159,9 @@ def prepare_registration(
     commands, outputs = [], []
     specs = {}
     fsl_names, mr_names = set(), set()
-    root = Path(os.environ.get("FSLDIR", ""))
+    from ..dependencies import fsl_root
+
+    root = fsl_root(fsl_directory)
     env = _environment_contract(cancelled)
     env["overrides"].update(
         OMP_NUM_THREADS=str(nthreads),
@@ -497,7 +499,8 @@ def prepare_registration(
     tools, software = {}, {}
     if fsl_names:
         if (
-            not root.is_absolute()
+            root is None
+            or not root.is_absolute()
             or not (root / "etc/fslversion").is_file()
             or (root / "etc/fslversion").read_text().strip() != "6.0.7.18"
         ):

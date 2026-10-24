@@ -254,6 +254,7 @@ class RegistrationPanel(QScrollArea):
         output = Path(self.output.text())
         threads = self.threads.value()
         directory = self.owner.tool_directory
+        fsl_directory = self.owner.fsl_directory
         self.owner.tasks = [t for t in self.owner.tasks if t.id != task.id] + [task]
         self.owner.start(
             "registration-preview",
@@ -263,6 +264,7 @@ class RegistrationPanel(QScrollArea):
                 output,
                 nthreads=threads,
                 tool_directory=directory,
+                fsl_directory=fsl_directory,
                 cancelled=cancel,
                 progress=progress,
             ),

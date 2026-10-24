@@ -20,6 +20,8 @@ The GUI, CLI and Python APIs share the scientific processing engine. Commands ar
 
 Python **3.12 or newer** is required. Install the external scientific tools separately for the operations that use them: **MRtrix3**, **FSL** and **ANTs/N4**. FSL has separate licensing terms. The software setup checker reports detected executables and operation-specific version requirements. Earlier macOS validation used MRtrix3 3.0.5 and FSL 6.0.7.18; these version observations are not a guarantee for other installations.
 
+In Settings, open **Software Dependencies** to locate an existing installation and choose **Verify and Save**. TractoSphere remembers compatible MRtrix3, FSL and ANTs folders across launches and supplies them to new applicable workflows; every scientific command still validates its exact inputs and binaries. See [dependency setup](docs/dependency_setup.md).
+
 For macOS or Linux shells:
 
 ```sh

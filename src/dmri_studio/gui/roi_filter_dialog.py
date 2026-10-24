@@ -114,9 +114,7 @@ class RoiFilterDialog(QDialog):
         choose = QPushButton("Choose output parent…")
         choose.clicked.connect(self.choose_output)
         form.addRow(choose, self.parent_dir)
-        self.tools = QLineEdit(
-            "/usr/local/mrtrix3/bin" if Path("/usr/local/mrtrix3/bin").is_dir() else ""
-        )
+        self.tools = QLineEdit(getattr(viewer, "mrtrix_directory", ""))
         form.addRow("MRtrix directory", self.tools)
         self.preview = QPlainTextEdit()
         self.preview.setReadOnly(True)
