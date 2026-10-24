@@ -40,6 +40,8 @@ On Windows PowerShell, create the environment with `py -3.12 -m venv .venv`, act
 
 The existing [installation guide](docs/installation.md) describes the released alpha and tool setup. Its release-specific screenshots and package version are historical; this branch is the newer development snapshot.
 
+The development Batch Processing workspace now has a [guided workflow](docs/batch_processing.md) for data discovery, acquisition selection, supported scientific presets, exact plan approval, monitoring and QC. Advanced Settings retains saved workflow definitions and technical execution controls.
+
 ## Quality control and scientific limits
 
 The toolbox records technical validation, numerical checks, native image/atlas review, tracking and connectome QC, and batch findings. A registration decision applies only to its exact evidence. Missing or changed registration evidence requires review or an explicitly identified diagnostic operation. QC warnings remain visible after a command succeeds.
