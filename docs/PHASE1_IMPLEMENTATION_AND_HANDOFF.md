@@ -1,6 +1,6 @@
 # Phase 1 scientific software configuration — implementation and handoff
 
-Date: 2026-10-23. Phase 0 baseline: [PHASE0_AUDIT_AND_HANDOFF.md](PHASE0_AUDIT_AND_HANDOFF.md). Scope is the saved MRtrix3/FSL/ANTs installation experience only. Do not merge PR #3 or start Phase 2 from this record.
+Date: 2026-10-23 EDT, with Phase 1.2 verification added later that day. Phase 0 baseline: [PHASE0_AUDIT_AND_HANDOFF.md](PHASE0_AUDIT_AND_HANDOFF.md). Scope is the saved MRtrix3/FSL/ANTs installation experience only. Do not merge PR #3. Phase 2 readiness is assessed below; performance code awaits separate Phase 2 instructions.
 
 ## Repository and PR state
 
@@ -60,11 +60,13 @@ The combined dependency/core/CLI suite in `/private/tmp/phase1-final-focused.log
 - [x] Clear/change, moved/incompatible/interrupted/empty path and write failure behavior are covered by focused tests.
 - [x] Active approved GUI plan protection and historical batch default separation are covered by focused tests.
 - [ ] Native GUI verification of the complete per-family setup and all workflow tabs on macOS Cocoa; this sandbox cannot initialize native VTK reliably.
+- [x] The selected native Cocoa dependency-path GUI test passed outside the sandbox (Phase 1.2 user report); broader GUI/VTK coverage is still open.
 - [ ] Full BatchRunner execution and historical resume/retry against pinned MRtrix/FSL/ANTs paths outside the `psutil` sandbox restriction.
+- [x] The three selected native batch execution/resume tests passed outside the sandbox (Phase 1.2 user report); this does not cover every historical toolchain.
 - [ ] Physical Linux and Windows/WSL2 validation of the expanded scientific workflows. Native FSL execution on Windows remains unsupported.
 - [x] Draft PR #4 opened against the scientific development branch. Its initial CI results are analyzed in the Phase 1.1 section below.
 
-Do not call Phase 1 fully verified until the unchecked native and BatchRunner checks are run in a suitable environment. Do not weaken version or provenance gates to make a scan look successful. The specific next verification task is to run the full GUI and batch tests on a native macOS host with process enumeration and VTK access, then resolve only residual application failures. Phase 2 startup/navigation optimization follows only after this gate.
+The selected native checks have since passed as recorded in Phase 1.2 below. Broader scientific and GUI verification remains open. Do not weaken version or provenance gates to make a scan look successful.
 
 ## Phase 1.1 native verification and CI triage — 2026-10-23/24
 
@@ -106,11 +108,33 @@ The first round-trip assertion incorrectly expected the FSL root string to remai
 - [x] Synthetic ANTs save/restart and cross-workspace reuse covered by offscreen GUI tests; real ANTs native verification is unavailable because ANTs is not installed.
 - [x] Historical approved-plan executable paths and SHA-256 records proved unchanged by a global default change, without running the batch.
 - [x] PR #3 versus PR #4 failed test names and logs compared on all five CI jobs; no new failing node IDs.
-- [ ] Native Cocoa/VTK GUI workflow verification: blocked by segmentation fault before test body; permission escalation unavailable.
-- [ ] BatchRunner native resume/retry and historical tool revalidation: blocked before processing by sandbox `sysctl` denial.
+- [x] The selected native Cocoa dependency-path GUI test subsequently passed outside the sandbox; broader Cocoa/VTK GUI coverage remains open.
+- [x] The three selected BatchRunner execution/resume tests subsequently passed outside the sandbox; historical FSL/ANTs toolchain revalidation remains open.
 - [ ] Native ANTs verification: no installed ANTs 2.6.5 binary on this Mac.
 - [ ] Passing PR #4 CI: pre-existing external-tool fixtures block the core step and all downstream GUI steps.
 
-**Native Phase 1 acceptance has not passed in full.** The precise next task is to run the native GUI suite and BatchRunner resume/retry in a Mac session with VTK window-service access and process enumeration, with MRtrix3/FSL/ANTs installations available, then distinguish any actual failures from these restrictions. Do not start Phase 2 until those native checks pass or the remaining risk is explicitly accepted.
+**Phase 1.1 initially had unverified native checks; Phase 1.2 below supersedes those two selected checkpoints.** Complete native GUI, ANTs and historical FSL/ANTs execution coverage remains open.
 
-The first Phase 1.1 follow-up [CI run 40047596347](https://github.com/kkartikeya-kulkarni/TractoSphere/actions/runs/40047596347) stopped earlier than the baseline core test failures: the release audit found a literal hosted-runner home path in this handoff. That path has been replaced with a generic description. The repository's source release audit then **passed** locally with 372 files and zero findings. The subsequent PR checks must be inspected for the result on this fix; no GUI CI result can be inferred from the earlier stopped run.
+The first Phase 1.1 follow-up [CI run 40047596347](https://github.com/kkartikeya-kulkarni/TractoSphere/actions/runs/40047596347) stopped earlier than the baseline core test failures: the release audit found a literal hosted-runner home path in this handoff. That path was replaced with a generic description. The repository's source release audit then **passed** locally with 372 files and zero findings. Final-head [CI run 40047818751](https://github.com/kkartikeya-kulkarni/TractoSphere/actions/runs/40047818751) passed the release audit on all five jobs and retained exactly the PR #3 failed test IDs: 31 on each macOS/Ubuntu job and 36 on Windows. The core failures prevented CI GUI tests and viewer smoke tests from running.
+
+## Phase 1.2 normal-Terminal native checkpoint — 2026-10-23 EDT
+
+The user reran the previously blocked tests directly in a normal macOS Terminal outside the Codex sandbox and reported **4 passed, 0 failed**:
+
+| Selected test group | User-reported result | What this verifies |
+| --- | --- | --- |
+| One native Cocoa GUI dependency-path test previously attempted above | **1 passed in 1.41 s** | The selected window and dependency-path assertions completed under native Cocoa. It does not establish that the complete GUI/VTK suite passed. |
+| Three BatchRunner execution/resume tests previously attempted above | **3 passed in 3.26 s** | The selected execution, tool-change/reuse, and registration resume cases completed with process enumeration available. It does not cover every historical MRtrix/FSL/ANTs batch configuration. |
+
+The current local TractoSphere checkout is `development/phase1-scientific-software-2026-10-23` at `d9dca2f86f54a8eae033956956deba88273564d4`, with a clean working tree before this documentation update. Its reflog shows no checkout or commit after that SHA. The Terminal report did not include `git rev-parse HEAD` output, so the exact test-to-commit association is **inferred from the unchanged checkout**, not independently captured from the Terminal test process. These four results are user-reported and were not rerun by Codex inside its restricted sandbox.
+
+### Phase 2 readiness and remaining limits
+
+- [x] Selected native Cocoa dependency-path test passed in normal Terminal.
+- [x] Selected native batch execution/resume tests passed in normal Terminal.
+- [ ] Real ANTs 2.6.5 installation verification on this Mac; no real ANTs installation was found in Phase 1.1.
+- [ ] Broader native GUI/VTK suite and all scientific workflows; no claim of full-suite passage.
+- [ ] Full historical batch toolchain coverage, including unavailable/incompatible original binaries and FSL/ANTs provenance during resume or retry.
+- [ ] Pre-existing CI fixture failures; final PR #4 run remains red at the core step with no new failing test IDs relative to PR #3.
+
+**Decision:** The selected formerly blocked native checks now pass, so Phase 1 is sufficiently verified to begin Phase 2 development with these limits tracked. This is a readiness decision, not a claim that every Phase 1 acceptance checkbox or scientific workflow has passed. Keep PR #4 draft and unmerged; wait for the Phase 2 instructions before changing startup or navigation performance code.
