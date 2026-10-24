@@ -34,7 +34,7 @@ imported 12 representative inputs and refreshed the live scientific inventory:
 | WM FOD | Tractography and SIFT2 source selectors | FOD/tractogram association is not established by selection. |
 | Tractogram | Tractography, SIFT2 and Connectivity selectors | Spatial compatibility remains a planner check. |
 | ROI and mask | ROI inventory; mask choices in DTI, CSD, Anatomy, Tractography and SIFT2 | ROI/reference correspondence remains unverified. |
-| Atlas and FA | Connectivity parcellation and FA selectors | A matching grid alone never establishes atlas registration. |
+| Atlas and FA | Connectivity parcellation and FA selectors; the selected real atlas displayed 23 original node rows | A matching grid or readable node table alone never establishes atlas registration. |
 | T1 | Imported Registration list | Initially ineligible for Reference T1 and 5TT generation pending explicit declarations. |
 
 The Project/Load Data form also loaded the actual 288-volume DWI, populated
@@ -62,6 +62,7 @@ rendering, human review or output acceptance was inferred.
 | P1 | A real FA map was importable, but the import dialog omitted FA, MD and mean-b0 contrast values already recognized by Registration. | Added those explicit choices; no contrast is inferred. A synthetic FA import became a supported Registration candidate only with declared source identity/history. |
 | P1 | A contrast-only image could appear in generic Registration choices despite missing subject/acquisition/space IDs, then fail at planning. | Guided image-role selectors now require these core spatial fields and state the missing declarations while keeping the imported item visible. Exact core plan checks remain authoritative. |
 | P1 | A real FA map appeared as a source for **Generate 5TT with FSL**, although `anatomical_input_qc` rejects FA. | That selector now requires explicit T1w contrast and excludes FA metric inputs. The page identifies imported, blocked filenames and directs users to review declarations or choose another image. Mask inputs remain optional according to the chosen extraction method. |
+| P1 | A real atlas was selectable under Connectivity's **Registered parcellation** field although no native registration QC bundle was declared. | The atlas remains available for node inspection, but Connectivity now explicitly identifies missing declared QC evidence and directs the user to Registration. Exact atlas/reference review remains enforced by the core planner. The real atlas showed 23 node rows and the warning in offscreen Qt. |
 
 The reported HCP-style T1 was reproduced: read/inspection and hash recording
 succeeded, the imported list retained it, and the Reference T1 selector
@@ -77,7 +78,8 @@ atlas, and no `epi_reg` plan was approved or executed.
 
 - Offscreen Qt: 39 focused Registration/import/usability tests passed; 9
   input-recovery tests passed after the Anatomy change. The latter are separate
-  runs and overlap prior suites.
+  runs and overlap prior suites. Three Connectivity recovery tests passed after
+  its warning change.
 - Core/offscreen: 40 input-recovery, Batch discovery and scientific-foundation
   tests passed before the Anatomy change; the affected GUI tests were rerun
   afterward.

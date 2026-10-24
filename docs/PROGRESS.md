@@ -8,8 +8,9 @@ offscreen propagation across scientific workspaces, a real DWI Project →
 Preprocessing → DTI/CSD path, non-BIDS custom discovery, and verified historical
 Results/QC reopening. Local repairs add declaration review for imported draft
 inputs, supported FA/MD/mean-b0 import choices, accurate Registration spatial
-eligibility, and a T1-only 5TT generation source selector. Native Cocoa
-interaction and broader scientific plan acceptance remain unverified at this
+eligibility, a T1-only 5TT generation source selector, and explicit
+Connectivity guidance when an imported atlas lacks declared registration QC.
+Native Cocoa interaction and broader scientific plan acceptance remain unverified at this
 checkpoint. The permanent 38-task backlog and Phase 7 EDDY work are unchanged.
 
 ## 2026-10-24 — Registration anatomical declaration review
