@@ -14,7 +14,7 @@ def tracking_algorithms(algorithm, parameter):
         "seeds/selected count and warnings; scientific acceptance remains pending",
     )
     params = {
-        "select": parameter("int", minimum=1, maximum=1000000),
+        "select": parameter("int", minimum=1, maximum=10000000),
         "seeds": parameter("int", minimum=1, maximum=100000000),
         "seed_method": parameter(
             "choice",
@@ -129,7 +129,7 @@ def tracking_algorithms(algorithm, parameter):
             {
                 "min_length_mm": parameter("number", minimum=0),
                 "max_length_mm": parameter("number", minimum=0.01),
-                "number": parameter("int", minimum=1, maximum=1000000, required=False),
+                "number": parameter("int", minimum=1, maximum=10000000, required=False),
                 "skip": parameter("int", minimum=0, required=False),
                 "ends_only": parameter("choice", choices=("on", "off")),
             },

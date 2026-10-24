@@ -33,11 +33,13 @@ def test_task_first_tracking_shows_separate_operations(window):
     assert guided.pages.currentIndex() == 0
     assert guided.source.isVisibleTo(guided)
     assert not guided.filter_tracts.isVisibleTo(guided)
+    assert guided.count.maximum() == 10_000_000
 
     guided.task_buttons["filter"].click()
     assert panel.operation.currentData() == "filter"
     assert guided.pages.currentIndex() == 1
     assert guided.filter_tracts.isVisibleTo(guided)
+    assert guided.filter_count.maximum() == 10_000_000
     assert not guided.source.isVisibleTo(guided)
     assert guided.ends_only.text().startswith("Test endpoints only")
 

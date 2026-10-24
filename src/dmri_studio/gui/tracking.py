@@ -132,7 +132,7 @@ class TrackingExecutionPanel(QScrollArea):
         ]:
             self.seed_method.addItem(text, key)
         self.count = QSpinBox()
-        self.count.setRange(1, 1000000)
+        self.count.setRange(1, 10000000)
         self.count.setValue(1000)
         self.output = QLineEdit()
         self.output.setPlaceholderText("New immutable attempt directory")
@@ -214,7 +214,7 @@ class TrackingExecutionPanel(QScrollArea):
         self.skip.setValue(0)
         self.filter_limit = QCheckBox("Limit the number of retained streamlines")
         self.filter_count = QSpinBox()
-        self.filter_count.setRange(1, 1000000)
+        self.filter_count.setRange(1, 10000000)
         self.filter_count.setValue(1000)
         self.filter_minimum = number(0, 1000000, 0, 1)
         self.filter_maximum = number(0.01, 1000000, 1000000, 1)
