@@ -70,6 +70,8 @@ def test_shared_report_and_explicit_default_paths(window, qtbot, monkeypatch, tm
     widget.apply()
     panel = window.workflow.execution
     assert panel.tool_directory.text() == paths["MRtrix3"]
+    assert window.batch.mrtrix_directory.text() == paths["MRtrix3"]
+    assert window.batch.tool_directory == Path(paths["MRtrix3"])
     assert panel.correction_inputs["fsl_directory"].text() == paths["FSL"]
     assert panel.anatomy_inputs.fields["fsl_directory"].text() == paths["FSL"]
     assert panel.bias_inputs["ants_directory"].text() == paths["ANTs"]
