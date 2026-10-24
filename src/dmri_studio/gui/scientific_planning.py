@@ -634,13 +634,19 @@ class ScientificPlanningPage(QWidget):
         self.visible_algorithms = [a for a in ALGORITHMS.values() if a.stage == stage]
         for spec in self.visible_algorithms:
             self.algorithms.addItem(spec.name + " · " + spec.implementation.capitalize())
-        self.heading.findChildren(type(self.input_details))[0].setText(
+        heading_labels = self.heading.findChildren(type(self.input_details))
+        heading_labels[0].setText(
             {
                 "registration": "Registration and Spatial Transforms",
                 "models": "Diffusion Models",
                 "tractography": "Tractography",
                 "connectivity": "Connectivity",
             }[stage]
+        )
+        heading_labels[1].setText(
+            "Choose an alignment or spatial task, then review the exact inputs and transform direction."
+            if stage == "registration"
+            else "Independent scientific inputs. DTI and CSD reconstruction are available; tracking generation is available; connectomics is available with verified registered parcellations."
         )
         self.tabs.setTabVisible(self.tabs.indexOf(self.dti), stage == "models")
         self.tabs.setTabVisible(self.tabs.indexOf(self.csd), stage == "models")

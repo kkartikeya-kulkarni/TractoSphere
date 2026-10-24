@@ -40,6 +40,10 @@ def test_guided_registration_goals_are_separate_and_reused(window):
     window.focus_registration()
     panel = window.scientific.registration
     guided = panel.guided
+    assert (
+        "transform direction"
+        in window.scientific.heading.findChildren(type(guided.summary))[1].text()
+    )
     assert guided.goal == "align_two"
     assert guided.pages.currentIndex() == 2
     assert guided.moving.isVisibleTo(guided)
@@ -69,6 +73,7 @@ def test_guided_controls_remain_scroll_accessible_at_minimum_size(window, qapp, 
     qapp.processEvents()
     panel = window.scientific.registration
     guided = panel.guided
+    assert panel.horizontalScrollBar().maximum() == 0
     assert guided.preview.accessibleName() or guided.preview.text()
     assert all(button.minimumSizeHint().height() > 0 for button in guided.goal_buttons.values())
     panel.ensureWidgetVisible(guided.run_button)

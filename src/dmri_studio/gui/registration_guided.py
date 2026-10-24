@@ -240,9 +240,12 @@ class GuidedRegistration(QWidget):
         self.derivative = self._input("Atlas, ROI or image to move")
         self.target = self._input("Target reference image")
         self.transform = self._input("Imported source-to-target transform")
+        self.transform.setToolTip(
+            "The exact source, target, convention and direction are verified during plan preview."
+        )
         form.addRow("Atlas, ROI or image", self.derivative)
         form.addRow("Reference image in target space", self.target)
-        form.addRow("Imported transform; exact direction verified on preview", self.transform)
+        form.addRow("Source → target transform", self.transform)
         return page
 
     def _inspect_page(self):

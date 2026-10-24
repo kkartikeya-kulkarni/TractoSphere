@@ -48,7 +48,7 @@ def test_native_guided_rigid_alignment_inspection(window, qtbot, tmp_path, monke
     from dmri_studio.core.execution import hash_file
 
     mod, f = _fixture(tmp_path, monkeypatch)
-    original = hash_file(f["a"].payload["path"])
+    original = hash_file(Path(f["a"].payload["path"]))
     window.focus_registration()
     page = window.scientific
     page.artifacts = [f["a"], f["b"]]
@@ -61,7 +61,7 @@ def test_native_guided_rigid_alignment_inspection(window, qtbot, tmp_path, monke
     _select(guided.cost, "mutualinfo")
     guided.output.setText(str(f["out"] / "guided-rigid"))
     _run_guided(page, qtbot)
-    assert hash_file(f["a"].payload["path"]) == original
+    assert hash_file(Path(f["a"].payload["path"])) == original
     guided.open_button.click()
     qtbot.waitUntil(lambda: page.thread is None, timeout=15000)
     qtbot.waitUntil(
@@ -273,7 +273,7 @@ def test_native_batch_registration_product_uses_verified_historical_handoff(
     from dmri_studio.core.runs import inspect_run
 
     mod, f = _fixture(tmp_path, monkeypatch)
-    original = hash_file(f["a"].payload["path"])
+    original = hash_file(Path(f["a"].payload["path"]))
     folder, record = mod.run(
         f,
         "apply.scalar",
@@ -298,8 +298,8 @@ def test_native_batch_registration_product_uses_verified_historical_handoff(
         ),
         timeout=20000,
     )
-    assert hash_file(f["a"].payload["path"]) == original
-    assert hash_file(product["path"]) == product["sha256"]
+    assert hash_file(Path(f["a"].payload["path"])) == original
+    assert hash_file(Path(product["path"])) == product["sha256"]
     assert not any(
         control.isEnabled() for control in window.scientific_viewer.registration_review_buttons
     )
