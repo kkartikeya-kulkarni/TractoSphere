@@ -1,5 +1,9 @@
 # Outstanding Scientific Verification and Release Blockers
 
+## 2026-10-24 — Registration anatomical declaration review
+
+The [post-audit handoff](USABILITY_AUDIT_FIXES_2026-10-24.md#registration-anatomical-import-eligibility-follow-up) records a fix for imported T1 anatomy that was hidden from the EPI-to-T1 Reference selector. Imported images are now visible apart from role eligibility, with specific missing-declaration reasons and a path-preserving review/reinspection action. HCP ACPC-aligned subject T1 structural space is explained without filename inference or automatic MNI/raw classification. The synthetic Registration import-to-selection flow passed **2 focused offscreen tests**; the selected Registration/import/core run passed **57 tests, 10 deselected**. Native Cocoa picker/layout checks and real HCP association/registration remain open. Scientific planning, approval, source hashing and the 38-task validation backlog are unchanged.
+
 ## 2026-10-24 — Cross-workspace scientific input recovery
 
 The [post-audit usability handoff](USABILITY_AUDIT_FIXES_2026-10-24.md#cross-workspace-input-recovery-follow-up) records contextual import actions and missing-input explanations across Connectivity, Anatomy/5TT, SIFT2, DTI, CSD/FOD, Tractography, Preprocessing and the advanced task editor; Registration and Batch keep their existing guided routes. **50 selected offscreen GUI tests and 122 selected core/CLI tests passed**. Two real-process cancellation tests remain unverified in the restricted command environment, and current-code native Cocoa pickers, layout and Viewer behavior await the user's normal-Mac check. Scientific validation, exact plan approval and the separate 38-task backlog are unchanged. Continued Phase 7 work must include the reviewed post-audit fixes rather than start again from `8102df1`.
