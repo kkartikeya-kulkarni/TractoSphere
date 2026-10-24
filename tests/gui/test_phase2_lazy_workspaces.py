@@ -2,6 +2,13 @@
 
 from pathlib import Path
 
+from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QApplication
+
+from dmri_studio.gui.main_window import MainWindow
+from dmri_studio.gui.settings import Settings
+from dmri_studio.gui.theme import Theme
+
 
 def test_scientific_workspace_created_once_and_keeps_state(window):
     assert window._scientific is None
@@ -88,3 +95,39 @@ def test_navigation_restyles_only_changed_buttons(window, monkeypatch):
     assert [name for widget, name in window.nav_buttons if widget.property("selected")] == [
         "Settings"
     ]
+
+
+def test_restart_restores_defaults_before_lazy_pages_exist(qapp, tmp_path):
+    settings_file = tmp_path / "preferences.ini"
+    saved = Settings(QSettings(str(settings_file), QSettings.IniFormat))
+    paths = {family: str(tmp_path / family / "bin") for family in ("MRtrix3", "FSL", "ANTs")}
+    for family, path in paths.items():
+        saved.set(f"dependencies/{family}", path)
+    saved.store.sync()
+    assert saved.store.status() == QSettings.Status.NoError
+
+    first = MainWindow(Theme(qapp), Settings(QSettings(str(settings_file), QSettings.IniFormat)))
+    assert first._scientific is None and first._batch is None
+    assert first.batch.mrtrix_directory.text() == paths["MRtrix3"]
+    first.close()
+    qapp.processEvents()
+
+    reopened = MainWindow(Theme(qapp), Settings(QSettings(str(settings_file), QSettings.IniFormat)))
+    assert reopened._scientific is None and reopened._batch is None
+    assert reopened.workflow.execution.bias_inputs["ants_directory"].text() == paths["ANTs"]
+    assert reopened.scientific.fsl_directory == Path(paths["FSL"])
+    assert reopened.batch.fsl_directory == Path(paths["FSL"])
+    reopened.close()
+
+
+def test_repeated_navigation_does_not_create_more_widgets(window):
+    window.focus_models()
+    window.focus_batch()
+    scientific, batch = window.scientific, window.batch
+    count = len(QApplication.allWidgets())
+    for _ in range(20):
+        window.focus_registration()
+        window.focus_tracking_plan()
+        window.focus_batch()
+    assert window.scientific is scientific and window.batch is batch
+    assert len(QApplication.allWidgets()) == count
