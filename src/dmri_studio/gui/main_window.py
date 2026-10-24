@@ -1476,8 +1476,13 @@ class MainWindow(QMainWindow):
             return
         panel = self.workflow.execution
         if "MRtrix3" in locations:
-            self.scientific.tool_directory = Path(locations["MRtrix3"])
-            panel.tool_directory.setText(locations["MRtrix3"])
+            directory = str(locations["MRtrix3"] or "")
+            self.scientific.tool_directory = Path(directory) if directory else None
+            panel.tool_directory.setText(directory)
+            # Batch Processing must share the same saved installation instead of
+            # prompting for a second MRtrix3 directory on every new batch.
+            self.batch.tool_directory = Path(directory) if directory else None
+            self.batch.mrtrix_directory.setText(directory)
         if "ANTs" in locations:
             panel.bias_inputs["ants_directory"].setText(locations["ANTs"])
         if "FSL" in locations:

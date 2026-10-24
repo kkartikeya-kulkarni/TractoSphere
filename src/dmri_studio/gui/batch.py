@@ -91,7 +91,15 @@ class BatchPage(QWidget):
         self.import_file = QLineEdit()
         self.output = QLineEdit()
         self.mrtrix_directory = QLineEdit()
-        self.mrtrix_directory.setPlaceholderText("Optional verified MRtrix bin directory")
+        # Reuse the installation configured once in Software Dependencies.
+        # Saved batch histories may still explicitly pin an earlier toolchain.
+        if self.settings:
+            self.mrtrix_directory.setText(
+                str(self.settings.get("dependencies/MRtrix3", "") or "")
+            )
+        self.mrtrix_directory.setPlaceholderText(
+            "Uses saved MRtrix3 location; configure it in Software Dependencies"
+        )
         for title, widget in [
             ("Study ID", self.study_name),
             ("Input method", self.method),
