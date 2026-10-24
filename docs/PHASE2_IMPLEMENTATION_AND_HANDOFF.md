@@ -25,20 +25,20 @@ Hardware observed by Python: Apple ARM64, macOS 26.3, Python 3.12.15. Five fresh
 | 1,000-row unchanged journal refresh | 35.9 (35.0–70.7) |
 | Batch timer callbacks in 1.8 s / CPU time consumed | 3 (3–4) / 215.2 ms (207.0–252.3) |
 
-The batch profiler deliberately opened Batch and installed an unchanged 1,000-row synthetic journal. Its idle CPU measurement includes that open page and timer, so it is not an estimate of the application's ordinary unopened Batch idle CPU. A separate small synthetic 8×10×12×4 NIfTI load through the actual GUI worker succeeded in 831.7 ms in one offscreen run; loaded navigation remained similar to the empty case (for example first Registration 34.9 ms, first Batch 24.3 ms). More repetitions and a native loaded-data benchmark remain due.
+The batch profiler had constructed Batch and installed an unchanged 1,000-row synthetic journal, but had navigated to Software Dependencies before the idle interval. Thus this measures the inactive Batch page's polling cost, not ordinary startup with no batch opened. A separate small synthetic 8×10×12×4 NIfTI load through the actual GUI worker succeeded in 831.7 ms in one offscreen run; loaded navigation remained similar to the empty case (for example first Registration 34.9 ms, first Batch 24.3 ms). Native loaded-data navigation remains unmeasured.
 
 Measured causes: `MainWindow` constructs all scientific subpanels before Start is visible; `BatchPage` starts a 600 ms timer in its constructor and rereads/rebuilds an unchanged journal. The initial Start does not import VTK (`vtkmodules` absent), and Viewer itself is already lazy. At this baseline, navigation and 1,000-row initial rendering are already below the 200 ms repeated-navigation goal offscreen; do not rewrite them solely on suspicion. Native viewer/dialog costs remain unmeasured.
 
-The first native Cocoa attempt with the correct application virtual environment exited 139 before producing metrics, with pasteboard and macOS service connection errors inside restricted execution. The user's normal Terminal passed a selected Cocoa test during Phase 1. Native performance is **pending**; do not classify this restricted-environment crash as an application defect. Earlier mistaken attempt with another Python environment lacked `psutil` and measured nothing.
+The first native Cocoa attempt with the correct application virtual environment exited 139 before producing metrics, with pasteboard and macOS service connection errors inside restricted execution. A later normal-Terminal native benchmark and two VTK smoke tests passed; see the native checkpoint below. The restricted-environment crash was not an application defect. An earlier mistaken attempt with another Python environment lacked `psutil` and measured nothing.
 
 ## Work plan and verification checkpoints
 
-- [x] 2.1 Empty offscreen startup, navigation, batch and idle baseline. Native Cocoa and loaded-data repetitions remain open.
-- [x] 2.2 Defer measured expensive scientific and batch workspace construction. Offscreen tests cover state, restart, settings and close; native Cocoa remains open.
+- [x] 2.1 Empty offscreen startup, navigation, batch and idle baseline. A post-change native Cocoa measurement is recorded below; a same-conditions pre-change native baseline and native loaded-data repetitions remain open.
+- [x] 2.2 Defer measured expensive scientific and batch workspace construction. Offscreen tests cover state, restart, settings and close; selected native Cocoa/VTK startup and Viewer smoke tests passed.
 - [x] 2.3 Recolor only the two affected sidebar entries on navigation. Offscreen tests cover route state, one cached instance and stable widget count over 20 cycles.
 - [x] 2.4 Stop unchanged journal rereads/table rebuilds and inactive idle polling; preserve selection by acquisition key after changed journal renders. Offscreen 10/100/1,000-row measurements and tests are below.
-- [ ] 2.5 Profile common dialogs and Viewer in permitted native Cocoa. Offscreen dialogs are fast; Viewer was already lazy and no VTK was imported by initial Start. Native Cocoa/VTK remains open.
-- [ ] 2.6 Native smoke/performance verification and full regression completion remain open. Focused offscreen GUI and core/CLI runs are below.
+- [ ] 2.5 Profile common dialogs and Viewer in permitted native Cocoa. Offscreen dialogs are fast; Viewer was already lazy and no VTK was imported by initial Start. Two native VTK smoke tests passed, but native picker/ROI dialog timing and broader Viewer behavior remain open.
+- [ ] 2.6 Selected native smoke/performance verification passed; broader native GUI and full core regression completion remain open. Focused offscreen GUI and core/CLI runs are below.
 
 The Phase 1 handoff remains authoritative for native dependency verification limits and the pre-existing CI fixture failures. Do not turn those into scientific validation shortcuts.
 
@@ -50,6 +50,8 @@ Commits on this branch:
 - `14c80a1` — create `ScientificPlanningPage` and `BatchPage` only on first access through cached public properties. Factories connect signals once and apply the current Phase 1 dependency defaults. Batch navigation no longer forces scientific page construction. Active-worker and close guards inspect already-created pages without instantiating them. Sidebar navigation recolors the old and new selected buttons rather than all 14 buttons.
 - `4af1bc9` — Batch timer runs only while a saved batch is visible or a worker is active. A journal file identity/mtime/size check skips parsing and rendering if unchanged. Changed renders clear stale row-index selection before restoring acquisition-key selection.
 - `d16af42` — full settings/window restart and 20-cycle widget reuse tests for deferred workspaces.
+- `8312865`, `bd1b933` — handoff results and final focused GUI regression count.
+- `8ea26d1` — verify scientific signal connections fire once after repeated navigation.
 
 Five fresh, warm-cache offscreen processes ran the same `scripts/benchmark_gui_performance.py` before and after code changes. The initial state was empty and temporary; each process used the same runtime variables and synthetic 1,000-row journal. Median milliseconds, with ranges:
 
@@ -82,9 +84,21 @@ In one clean offscreen process, five show-and-process-event trials measured scie
 - Focused core scientific software/dependency and all CLI tests: **61 passed**. Two non-VTK worker lifecycle tests: **2 passed, 1 VTK test deselected**. Two non-VTK desktop tests: **2 passed, 8 deselected**.
 - Broad `tests/core tests/cli` run was interrupted after **62 passed, 12 failed** in 96.80 s; eleven Batch failures reached a macOS sandbox `psutil.process_iter`/`sysctl` permission denial, a restriction already demonstrated in Phase 1. The remaining ACT child-cancellation assertion returned `validated_pending_qc` instead of `cancelled`; its cause is unproven and the scientific code was not modified. This partial run is **not** a passing full core suite. The offscreen Batch GUI suite separately had **1 passed, 3 failed** from the same `sysctl` restriction. The user's normal Terminal passed the selected native batch execution/resume tests in Phase 1.2; those were not rerun natively for Phase 2.
 - `ruff check .` passed. Repository-wide `ruff format --check src tests` reports four pre-existing core files as unformatted; Phase 2 files pass their focused format checks.
-- One restricted native Cocoa profiler attempt exited 139 before timing. Do not repeat it in this sandbox or infer a product crash. Native startup, VTK interaction and shutdown remain pending user Terminal results. Cold-start behavior and native file-picker latency are unverified.
+- One restricted native Cocoa profiler attempt exited 139 before timing. Do not repeat it in this sandbox or infer a product crash. The user's normal-Terminal selected native checks passed as recorded below. Cold-start behavior, native file-picker latency, broader VTK workflows and a same-conditions pre-change native benchmark remain unverified.
 
-Normal Terminal verification requested from the user (capture HEAD with results):
+### Phase 2 native Cocoa checkpoint — normal Mac Terminal
+
+The user ran from the repository on clean `development/phase2-startup-navigation-2026-10-23` at recorded commit `bd1b933`. With `PYTHONPATH=src`, `QT_QPA_PLATFORM=cocoa`, `OPENBLAS_NUM_THREADS=1` and the existing application virtual environment, `scripts/benchmark_gui_performance.py` exited **0**. It reported Apple ARM64, macOS 26.3, Python 3.12.15, and a native Start first-event time of **1155.719 ms** from the script's first instruction (still a warm-cache, in-process timing rather than cold OS launch). MainWindow construction was **604.548 ms**, show/event processing **193.901 ms**, first/repeated Reconstruction **363.498/21.772 ms**, first/repeated Batch **37.925/22.681 ms**, and the two unchanged 1,000-row journal callbacks after the initial read took **0.067/0.017 ms**. The inactive Batch timer fired **0** times and used **4.668 ms CPU** over 1.8 s. The benchmark did not construct a Viewer, as confirmed by `vtkmodules_loaded: false`.
+
+The user then ran these two selected Cocoa/VTK tests in normal Terminal:
+
+```sh
+PYTHONPATH=src QT_QPA_PLATFORM=cocoa OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/python -m pytest -q tests/gui/test_desktop_redesign.py::test_image_route_is_not_tractography_and_has_honest_empty_state tests/gui/test_worker_retirement.py::test_native_scene_finalizes_before_parent_destruction --tb=short
+```
+
+Result: **2 passed in 3.02 s, exit 0**. This verifies selected native VTK creation, image/tractography route switching, and safe Viewer finalization. It does not cover all Viewer interactions or scientific processing. The later `8ea26d1` commit changed only a test and this handoff; `git diff --quiet bd1b933 8ea26d1 -- src scripts/benchmark_gui_performance.py` returned 0, so the tested application and profiler code match the later local checkout. The user's captured HEAD is direct evidence of the exact tested commit. There is no pre-change native Cocoa run under identical conditions, so **no native percentage speedup is claimed**.
+
+For follow-up native measurement or broader VTK testing, use the same environment and capture HEAD with the result:
 
 ```sh
 cd ~/Projects/dmri-studio2.0/TractoSphere-publication
@@ -93,4 +107,4 @@ PYTHONPATH=src QT_QPA_PLATFORM=cocoa OPENBLAS_NUM_THREADS=1 ../application/.venv
 PYTHONPATH=src QT_QPA_PLATFORM=cocoa OPENBLAS_NUM_THREADS=1 ../application/.venv/bin/python -m pytest -q tests/gui/test_desktop_redesign.py::test_image_route_is_not_tractography_and_has_honest_empty_state tests/gui/test_worker_retirement.py::test_native_scene_finalizes_before_parent_destruction --tb=short
 ```
 
-Phase 2 is code-complete for the measured offscreen bottlenecks. Native performance and VTK acceptance are **not verified** until real Terminal results are recorded. Phase 3 Batch UX work can be considered after this native checkpoint; do not claim Phase 2 fully accepted yet. Continue to track real ANTs verification, broader Phase 1 native GUI coverage, and pre-existing CI fixture failures in the Phase 1 handoff.
+Phase 2 is implemented and sufficiently verified on the measured bottlenecks, selected native shell/VTK behavior, and focused regressions to begin Phase 3 Batch UX development. This is a readiness decision, not a claim of complete native GUI, native cold-start, or full core-suite passage. Track the outstanding verification above alongside real ANTs installation verification, broader Phase 1 native GUI coverage, and pre-existing CI fixture failures in the Phase 1 handoff.
