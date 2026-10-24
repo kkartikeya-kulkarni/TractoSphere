@@ -42,7 +42,9 @@ Preprocessing's active context, and passed that same loaded acquisition to
 DTI/CSD through **Use loaded DWI**. No EDDY/TOPUP or other expensive MRI
 processing was run. An explicit custom mapping of the non-BIDS HCP-style
 folder discovered one acquisition with unique DWI/bval/bvec roles and no
-discovery findings. A bounded BIDS root with no supported DWI returned zero
+discovery findings through both the core service and offscreen guided Batch
+controls; the Review Subjects table showed one row. A bounded BIDS root with
+no supported DWI returned zero
 acquisitions; a derivative-style root was rejected as requiring an explicit
 manifest and provenance. These are discovery observations, not plan approval.
 Saving and restoring a private selection containing the real T1, DWI and FOD
