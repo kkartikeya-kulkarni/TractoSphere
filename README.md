@@ -16,6 +16,16 @@ TractoSphere is a diffusion MRI research workstation with a Python processing co
 
 The GUI, CLI and Python APIs share the scientific processing engine. Commands are previewed before execution, results use new derivative directories, and provenance stores parameters, tool versions, hashes and QC. Scientific review is separate from command success.
 
+If an atlas was **already registered**, use Registration → **Review an Existing
+Registered Atlas**. Import the exact atlas and its verified diffusion reference,
+review the original registration manifest or a hash-bound QC association, then
+preview the QC-only plan. This route does not rerun alignment. Inspect its
+overlay in all three planes and record a separate anatomical review before a
+new Connectivity plan can use it. An older review assertion, matching image
+grids or a completed historical connectome cannot supply missing native QC
+evidence by itself. Connectivity's **Review atlas registration…** action carries
+its selected atlas and reference into that Registration goal.
+
 ## Installation and launch
 
 Python **3.12 or newer** is required. Install the external scientific tools separately for the operations that use them: **MRtrix3**, **FSL** and **ANTs/N4**. FSL has separate licensing terms. The software setup checker reports detected executables and operation-specific version requirements. Earlier macOS validation used MRtrix3 3.0.5 and FSL 6.0.7.18; these version observations are not a guarantee for other installations.
