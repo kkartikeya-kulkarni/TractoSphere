@@ -211,3 +211,17 @@ def test_native_batch_registration_approval_qc_table(window, qtbot, tmp_path, mo
     page.load_batch(folder)
     qtbot.waitUntil(lambda: page.thread is None, timeout=20000)
     assert all(len(r["attempts"]) == 1 for r in page.rows)
+
+def test_registration_methods_explain_what_they_do(window):
+    """Everyday registration tasks are labeled by outcome, not command syntax."""
+    panel = window.scientific.registration
+    index = panel.method.findData("registration.flirt")
+    assert index >= 0
+    panel.method.setCurrentIndex(index)
+    assert "Align two images" in panel.method.currentText()
+    assert "rotation and translation" in panel.method_help.text()
+    index = panel.method.findData("registration.apply.labels")
+    assert index >= 0
+    panel.method.setCurrentIndex(index)
+    assert "atlas labels" in panel.method.currentText()
+    assert "region IDs" in panel.method_help.text()

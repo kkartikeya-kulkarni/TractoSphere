@@ -30,6 +30,72 @@ from dmri_studio.core.spatial import FORMATS, save_transform, transform_record
 from .components import button, label
 
 
+# User-facing descriptions are deliberately separate from engine identifiers.
+# They do not relax input, transform-direction, or QC validation.
+REGISTRATION_CHOICES = {
+    "registration.reference": (
+        "Create a diffusion reference (low-b)",
+        "Use this first when you need a reference image in diffusion space. "
+        "It extracts the first or mean low-b image from an already preprocessed DWI.",
+    ),
+    "registration.qc": (
+        "Check atlas alignment on diffusion",
+        "Compare an already aligned atlas with a diffusion reference and save "
+        "quality-control evidence. This does not register the atlas automatically.",
+    ),
+    "registration.flirt": (
+        "Align two images (rigid or affine)",
+        "Move one image onto a fixed reference. Rigid allows rotation and "
+        "translation; affine also allows scaling and shearing. Review the result.",
+    ),
+    "registration.epi_reg": (
+        "Align diffusion reference to T1 anatomy",
+        "Use boundary-based EPI-to-T1 registration when suitable brain-extracted "
+        "T1 and white-matter segmentation inputs are available.",
+    ),
+    "registration.fnirt": (
+        "Nonlinear alignment of anatomy (advanced)",
+        "Estimate a nonlinear warp after a verified initial alignment. "
+        "Use only when nonlinear registration is scientifically appropriate.",
+    ),
+    "registration.invert": (
+        "Reverse a verified transform (advanced)",
+        "Reverse the direction of a supported transform, for example from "
+        "image A → B to B → A. Check the source and target identities.",
+    ),
+    "registration.compose": (
+        "Combine matched transforms (advanced)",
+        "Join two compatible transforms to move between spaces. "
+        "The intermediate image space and directions must match.",
+    ),
+    "registration.convert": (
+        "Convert a linear transform for MRtrix (advanced)",
+        "Convert a supported, verified linear transform into the coordinate "
+        "convention expected by MRtrix. This does not align images by itself.",
+    ),
+    "registration.apply.scalar": (
+        "Apply transform to a scalar image",
+        "Move a continuous image such as FA or MD into the chosen reference "
+        "space using a verified transform.",
+    ),
+    "registration.apply.labels": (
+        "Apply transform to atlas labels",
+        "Move a labeled atlas into the reference image space without blending "
+        "distinct region IDs. Inspect the atlas against the anatomy afterward.",
+    ),
+    "registration.apply.roi": (
+        "Apply transform to an ROI mask",
+        "Move a region-of-interest mask into the reference image space. "
+        "Verify location and mask boundaries before using it for analysis.",
+    ),
+    "registration.apply.probability": (
+        "Apply transform to a probability atlas",
+        "Move a continuous probability map into the reference image space. "
+        "Check the registration and resampled values afterward.",
+    ),
+}
+
+
 class TransformImportDialog(QDialog):
     def __init__(self, owner):
         super().__init__(owner)
@@ -129,15 +195,26 @@ class RegistrationPanel(QScrollArea):
                 "caption",
             )
         )
+        root.addWidget(
+            label(
+                "Choose what you want to accomplish. Transform conversion and "
+                "chaining are advanced utilities, not required for a typical alignment.",
+                "caption",
+            )
+        )
         self.method = QComboBox()
+        self.method.setAccessibleName("Registration goal")
         for key, spec in ALGORITHMS.items():
             if spec.stage == "registration":
-                self.method.addItem(spec.name, key)
+                self.method.addItem(REGISTRATION_CHOICES.get(key, (spec.name, ""))[0], key)
         root.addWidget(self.method)
+        self.method_help = label("", "caption")
+        self.method_help.setWordWrap(True)
+        root.addWidget(self.method_help)
         row = QHBoxLayout()
         self.configure = button("Select inputs and parameters…", self.configure_task)
         row.addWidget(self.configure)
-        self.import_transform = button("Import existing transform…", self.import_existing)
+        self.import_transform = button("Import transform (advanced)…", self.import_existing)
         row.addWidget(self.import_transform)
         root.addLayout(row)
         self.selection = QPlainTextEdit()
@@ -181,9 +258,14 @@ class RegistrationPanel(QScrollArea):
         self.output.textChanged.connect(self.invalidate)
         self.threads.valueChanged.connect(self.invalidate)
         self.approval.toggled.connect(self.update_actions)
-        self.update_actions()
+        self.method_changed()
 
     def method_changed(self, *_):
+        key = self.method.currentData()
+        self.method_help.setText(
+            REGISTRATION_CHOICES.get(key, ("", "Select an operation to see what it does."))[1]
+            + " Inputs and transform directions still require verification."
+        )
         self.task = None
         self.selection.clear()
         self.invalidate()

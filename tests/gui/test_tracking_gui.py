@@ -226,3 +226,11 @@ def test_preview_to_run_directory_collision_is_terminal(window, qtbot, tmp_path)
     assert page.operation_state.state == State.FAILED and not page.operation_state.busy
     assert not p.result_label.text().startswith("Running") and p.maps.count() == 0
     assert (destination / "retained.txt").read_text() == "do not overwrite"
+
+def test_tractography_roi_constraints_explain_path_rules(window):
+    """ROI inclusion, exclusion, and order should be understandable in the UI."""
+    panel = window.scientific.tracking
+    assert "every checked ROI" in panel.constraints["include"].toolTip()
+    assert "any checked ROI" in panel.constraints["exclude"].toolTip()
+    assert "ordered waypoints" in panel.constraints["ordered"].toolTip()
+    assert "endpoints" in panel.ends.text()

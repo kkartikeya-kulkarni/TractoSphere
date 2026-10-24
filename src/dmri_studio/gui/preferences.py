@@ -89,7 +89,12 @@ class PreferencesPage(QWidget):
         )
         # One existing controller and widget, hosted by the separate setup route.
         self.dependencies = DependencyWidget(
-            window.dependencies, lambda: window.workflow.execution.thread is None
+            window.dependencies,
+            lambda: (
+                window.workflow.execution.thread is None
+                and window.scientific.thread is None
+                and window.batch.thread is None
+            ),
         )
         root.addStretch()
 
