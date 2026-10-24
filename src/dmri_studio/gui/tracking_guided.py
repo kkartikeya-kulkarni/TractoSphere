@@ -86,6 +86,8 @@ class GuidedTracking(QWidget):
         root.addLayout(choices)
         self.task_help = label("", "caption")
         root.addWidget(self.task_help)
+        self.saved_task_notice = label("", "caption")
+        root.addWidget(self.saved_task_notice)
         self.pages = QStackedWidget()
         self.pages.addWidget(self._generate_page())
         self.pages.addWidget(self._filter_page())
@@ -138,6 +140,7 @@ class GuidedTracking(QWidget):
         self.approval.toggled.connect(owner.approval.setChecked)
         owner.approval.toggled.connect(self._approval_from_advanced)
         owner.operation.currentIndexChanged.connect(self._operation_from_advanced)
+        owner.task_source.currentIndexChanged.connect(self._saved_task_changed)
         owner.method.currentIndexChanged.connect(self._method_from_advanced)
         owner.count.valueChanged.connect(self._count_from_advanced)
         for source in (
@@ -155,6 +158,7 @@ class GuidedTracking(QWidget):
         self._operation_from_advanced()
         self._output_from_advanced(owner.output.text())
         self._approval_from_advanced(owner.approval.isChecked())
+        self._saved_task_changed()
         self.update_actions()
 
     def _form_page(self, title, explanation):
@@ -192,6 +196,26 @@ class GuidedTracking(QWidget):
         self.count.setRange(1, 1000000)
         self.count.setAccessibleName("Requested output streamline count")
         self.count.valueChanged.connect(self.owner.count.setValue)
+        self.tensor_shells = QLineEdit()
+        self.tensor_shells.setPlaceholderText("Explicit b0 and one weighted shell, s/mm²")
+        self.tensor_shells.setAccessibleName("Tensor tracking shells")
+        self.tensor_shells.textChanged.connect(self.owner.shells.setText)
+        self.owner.shells.textChanged.connect(
+            lambda value: self._copy_text(self.tensor_shells, value)
+        )
+        self.sphere_coords = QLineEdit()
+        self.sphere_coords.setPlaceholderText("World RAS x, y, z, radius in mm")
+        self.sphere_coords.setAccessibleName("Seed sphere coordinates")
+        self.sphere_coords.textChanged.connect(self.owner.sphere.setText)
+        self.owner.sphere.textChanged.connect(
+            lambda value: self._copy_text(self.sphere_coords, value)
+        )
+        self.backtrack = QCheckBox("Retry poor structural terminations (ACT iFOD2 only)")
+        self.crop = QCheckBox("Crop endpoints at the gray/white matter interface")
+        self.backtrack.toggled.connect(self.owner.backtrack.setChecked)
+        self.crop.toggled.connect(self.owner.crop.setChecked)
+        self.owner.backtrack.toggled.connect(lambda value: self._copy_check(self.backtrack, value))
+        self.owner.crop.toggled.connect(lambda value: self._copy_check(self.crop, value))
         for title, widget in (
             ("Tracking input", self.source),
             ("Method", self.method),
@@ -202,6 +226,10 @@ class GuidedTracking(QWidget):
             ("Five-tissue anatomy", self.five_tt),
             ("Reference image", self.reference_generate),
             ("Requested output streamlines", self.count),
+            ("Tensor shells (s/mm²)", self.tensor_shells),
+            ("Seed sphere (world RAS mm)", self.sphere_coords),
+            ("ACT backtracking", self.backtrack),
+            ("ACT endpoint cropping", self.crop),
         ):
             form.addRow(title, widget)
         self.generate_form = form
@@ -413,6 +441,7 @@ class GuidedTracking(QWidget):
         key = self._selected_roi()
         if not key:
             return
+        self._use_form_settings()
         source = self.owner.constraints[role]
         for index in range(source.count()):
             item = source.item(index)
@@ -426,6 +455,7 @@ class GuidedTracking(QWidget):
         selected = self.roi_groups[role].currentItem()
         if selected is None:
             return
+        self._use_form_settings()
         key = selected.data(Qt.ItemDataRole.UserRole)
         source = self.owner.constraints[role]
         for index in range(source.count()):
@@ -440,6 +470,7 @@ class GuidedTracking(QWidget):
         selected = target.currentItem()
         if selected is None:
             return
+        self._use_form_settings()
         ids = [target.item(i).data(Qt.ItemDataRole.UserRole) for i in range(target.count())]
         position = ids.index(selected.data(Qt.ItemDataRole.UserRole))
         new_position = position + delta
@@ -469,10 +500,35 @@ class GuidedTracking(QWidget):
             self.highlight_requested.emit(key)
 
     def select_task(self, task):
+        self._use_form_settings()
         index = self.owner.operation.findData(task)
-        if index >= 0:
+        if index >= 0 and index != self.owner.operation.currentIndex():
             self.owner.operation.setCurrentIndex(index)
-        self._operation_from_advanced()
+        elif task in self.task_buttons:
+            self.task_buttons[task].setChecked(True)
+
+    def _use_form_settings(self):
+        if self.owner.task_source.currentData() is not None:
+            self.owner.task_source.setCurrentIndex(0)
+
+    def _saved_task_changed(self, *_):
+        task = self.owner.task_source.task()
+        if task is None:
+            self.saved_task_notice.setText("")
+            return
+        operation = (
+            "generate"
+            if task.algorithm.startswith("tckgen.")
+            else "filter"
+            if task.algorithm == "tckedit"
+            else "density"
+        )
+        index = self.owner.operation.findData(operation)
+        if index >= 0 and index != self.owner.operation.currentIndex():
+            self.owner.operation.setCurrentIndex(index)
+        self.saved_task_notice.setText(
+            "An exact saved scientific task is selected in Advanced Settings. Its parameters take precedence; choose a task above to edit form settings instead."
+        )
 
     def _operation_from_advanced(self, *_):
         current = self.owner.operation.currentData()
@@ -488,6 +544,7 @@ class GuidedTracking(QWidget):
     def _set_advanced_combo(self, source, target):
         if self._syncing:
             return
+        self._use_form_settings()
         index = target.findData(source.currentData())
         if index >= 0:
             target.setCurrentIndex(index)
@@ -528,6 +585,10 @@ class GuidedTracking(QWidget):
         self._syncing = False
         self._count_from_advanced(self.owner.count.value())
         self._ends_from_advanced(self.owner.ends.isChecked())
+        self._copy_text(self.tensor_shells, self.owner.shells.text())
+        self._copy_text(self.sphere_coords, self.owner.sphere.text())
+        self._copy_check(self.backtrack, self.owner.backtrack.isChecked())
+        self._copy_check(self.crop, self.owner.crop.isChecked())
         self._method_from_advanced()
         self.refresh_roi_inventory()
         self.update_actions()
@@ -545,6 +606,34 @@ class GuidedTracking(QWidget):
             self.owner.seed_method.currentData()
             in {"image", "roi", "random_per_voxel", "grid_per_voxel", "gmwmi"},
         )
+        tensor = self.owner.method.currentData() in {
+            "tckgen.tensor_det",
+            "tckgen.tensor_prob",
+        }
+        act = self.owner.mode.currentData() == "act"
+        self.generate_form.setRowVisible(self.tensor_shells, tensor)
+        self.generate_form.setRowVisible(
+            self.sphere_coords, self.owner.seed_method.currentData() == "sphere"
+        )
+        self.generate_form.setRowVisible(
+            self.backtrack, act and self.owner.method.currentData() == "tckgen.ifod2"
+        )
+        self.generate_form.setRowVisible(self.crop, act)
+        self.backtrack.setEnabled(self.owner.backtrack.isEnabled())
+
+    @staticmethod
+    def _copy_text(target, value):
+        if target.text() != value:
+            target.blockSignals(True)
+            target.setText(value)
+            target.blockSignals(False)
+
+    @staticmethod
+    def _copy_check(target, value):
+        if target.isChecked() != value:
+            target.blockSignals(True)
+            target.setChecked(value)
+            target.blockSignals(False)
 
     def _count_from_advanced(self, value):
         self.count.blockSignals(True)
@@ -580,13 +669,56 @@ class GuidedTracking(QWidget):
 
     def plan_ready(self, plan):
         data = plan.to_dict()
-        self.summary.setText(
-            f"{self.task_help.text()}\nOutput: {data['output_directory']}\n"
-            f"Commands: {len(data['commands'])}. Approval digest: {plan.digest}. "
-            "Scientific QC remains separate from execution."
-        )
+        row = data["bindings"][0] if data.get("bindings") else {}
+        bound = row.get("input_bindings", {})
+        parameters = row.get("parameters", {})
+        algorithm = row.get("algorithm", "Unknown")
+        source = bound.get("tracts") or bound.get("fod") or bound.get("dwi") or {}
+        parts = [
+            f"Task: {algorithm}",
+            f"Input: {Path(source['path']).name if source.get('path') else 'Unavailable'}",
+        ]
+        if algorithm.startswith("tckgen."):
+            parts.append(f"Seed method: {parameters.get('seed_method', 'unspecified')}")
+            parts.append(f"Requested output streamlines: {parameters.get('select', 'unspecified')}")
+            if bound.get("mask"):
+                parts.append("Tracking mask: " + Path(bound["mask"]["path"]).name)
+            if bound.get("five_tt"):
+                parts.append("Five-tissue anatomy: " + Path(bound["five_tt"]["path"]).name)
+        elif algorithm == "tckedit":
+            parts.append(
+                "Filtering scope: "
+                + (
+                    "streamline endpoints"
+                    if parameters.get("ends_only") == "on"
+                    else "full pathway"
+                )
+            )
+            if parameters.get("number"):
+                parts.append(f"Maximum output streamlines: {parameters['number']}")
+        elif algorithm == "tckmap":
+            parts.append("Reference grid: " + Path(bound["reference"]["path"]).name)
+            parts.append("Directional channels: " + parameters.get("directional", "off"))
+        for role, title in (
+            ("include", "Must pass through every"),
+            ("exclude", "Must avoid any"),
+            ("ordered", "Ordered waypoints"),
+        ):
+            entries = row.get("constraints", {}).get(role, [])
+            if entries:
+                parts.append(title + ": " + " → ".join(self._bound_roi_name(e) for e in entries))
+        parts += [
+            "Output: " + data["output_directory"],
+            f"Exact commands: {len(data['commands'])}; approval digest: {plan.digest}",
+            "Technical validation and scientific QC/review are separate.",
+        ]
+        self.summary.setText("\n".join(parts))
         self.commands.setPlainText(self.owner.log.toPlainText())
         self.update_actions()
+
+    def _bound_roi_name(self, record):
+        artifact = next((a for a in self.owner.owner.artifacts if a.id == record.get("id")), None)
+        return self._roi_name(artifact) if artifact else Path(record["path"]).name
 
     def result_ready(self, record):
         status = record.get("status", "unknown").replace("_", " ")

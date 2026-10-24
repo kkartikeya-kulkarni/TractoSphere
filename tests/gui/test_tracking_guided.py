@@ -1,9 +1,14 @@
 """Task-first tracking controls edit the existing typed scientific task."""
 
+import importlib.util
+from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QListWidget
+
+from dmri_studio.core.scientific import Task
 
 
 def _artifact(kind, name):
@@ -76,6 +81,11 @@ def test_task_change_invalidates_approval_but_return_reuses_panel(window):
     panel.update_actions()
     guided.approval.setChecked(True)
     assert panel.approval.isChecked() and guided.run_button.isEnabled()
+    guided.select_task("generate")
+    assert panel.plan is not None and guided.approval.isChecked()
+    guided.task_buttons["generate"].click()
+    assert guided.task_buttons["generate"].isChecked()
+    assert panel.plan is not None and guided.approval.isChecked()
     guided.select_task("filter")
     assert panel.plan is None
     assert not panel.approval.isChecked()
@@ -191,3 +201,102 @@ def test_viewer_highlight_requires_the_original_roi_object(window, monkeypatch):
     assert focused == [True]
     assert "changed or was removed" in window.scientific.status.text()
     window.scientific_viewer = None
+
+
+def test_guided_act_uses_exact_supported_variant(window):
+    window.focus_tracking_plan()
+    panel = window.scientific.tracking
+    panel.owner.artifacts = [
+        _artifact("fod", "fod"),
+        _artifact("5tt", "tissue"),
+        _artifact("anatomy", "grid"),
+    ]
+    panel.refresh()
+    guided = panel.guided
+    _select(guided.method, "tckgen.ifod2")
+    _select(guided.mode, "act")
+    _select(guided.source, "fod")
+    _select(guided.five_tt, "tissue")
+    _select(guided.reference_generate, "grid")
+    _select(guided.seed_method, "dynamic")
+    assert guided.five_tt.isVisibleTo(guided)
+    assert guided.backtrack.isVisibleTo(guided)
+    assert guided.backtrack.isChecked()
+    task = panel.selected_task()
+    assert task.algorithm == "tckgen.act_ifod2"
+    assert task.inputs["five_tt"] == "tissue"
+    assert task.inputs["reference"] == "grid"
+    assert task.parameters["backtrack"] == "on"
+    assert task.parameters["crop_at_gmwmi"] == "on"
+
+
+def test_guided_tensor_exposes_required_shell_selection(window):
+    window.focus_tracking_plan()
+    panel = window.scientific.tracking
+    panel.owner.artifacts = [_artifact("dwi", "dwi"), _artifact("mask", "mask")]
+    panel.refresh()
+    guided = panel.guided
+    _select(guided.method, "tckgen.tensor_det")
+    _select(guided.source, "dwi")
+    _select(guided.mask, "mask")
+    _select(guided.seed_method, "image")
+    _select(guided.seed, "mask")
+    assert guided.tensor_shells.isVisibleTo(guided)
+    guided.tensor_shells.setText("0, 1000")
+    assert panel.selected_task().parameters["shells"] == (0.0, 1000.0)
+    _select(guided.method, "tckgen.ifod2")
+    assert not guided.tensor_shells.isVisibleTo(guided)
+
+
+def test_guided_task_choice_exits_saved_task_precedence(window):
+    window.focus_tracking_plan()
+    panel = window.scientific.tracking
+    panel.owner.tasks = [Task("saved", "tckedit", {}, {})]
+    panel.refresh()
+    panel.task_source.setCurrentIndex(panel.task_source.findData("saved"))
+    assert panel.guided.pages.currentIndex() == 1
+    assert "take precedence" in panel.guided.saved_task_notice.text()
+    panel.guided.select_task("generate")
+    assert panel.task_source.currentData() is None
+    assert panel.operation.currentData() == "generate"
+    assert panel.guided.saved_task_notice.text() == ""
+
+
+@pytest.mark.skipif(
+    not Path("/usr/local/mrtrix3/bin/tckgen").is_file(), reason="Actual MRtrix required"
+)
+def test_guided_preview_summarizes_real_approved_plan(window, qtbot, tmp_path):
+    spec = importlib.util.spec_from_file_location(
+        "tracking_fixture", Path(__file__).parents[1] / "core/test_tracking.py"
+    )
+    fixture = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fixture)
+    fod, mask, _ = fixture.source.__wrapped__(tmp_path)
+    window.focus_tracking_plan()
+    page = window.scientific
+    page.artifacts = [fod, mask]
+    page.tool_directory = Path("/usr/local/mrtrix3/bin")
+    page.refresh()
+    guided = page.tracking.guided
+    _select(guided.method, "tckgen.sdstream")
+    _select(guided.source, fod.id)
+    _select(guided.mask, mask.id)
+    _select(guided.seed_method, "image")
+    _select(guided.seed, mask.id)
+    guided.count.setValue(10)
+    page.tracking.minimum.setValue(3)
+    page.tracking.maximum.setValue(20)
+    page.tracking.cutoff.setValue(0.01)
+    page.tracking.seed_cutoff.setValue(0.02)
+    page.tracking.attempts.setValue(10)
+    guided.output.setText(str(tmp_path / "attempt"))
+    guided.preview.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=15000)
+    assert page.tracking.plan is not None, page.status.text()
+    assert "tckgen.sdstream" in guided.summary.text()
+    assert "Requested output streamlines: 10" in guided.summary.text()
+    assert page.tracking.plan.digest in guided.summary.text()
+    assert "SD_Stream" in guided.commands.toPlainText()
+    assert not guided.run_button.isEnabled()
+    guided.approval.setChecked(True)
+    assert guided.run_button.isEnabled()

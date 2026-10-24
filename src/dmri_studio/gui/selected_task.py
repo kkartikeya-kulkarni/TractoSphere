@@ -47,6 +47,9 @@ class SelectedTask(QComboBox):
             return
         form_enabled = idle and self.currentData() is None
         exceptions = {self, self.panel.output, self.panel.threads, self.panel.approval}
+        guided = getattr(self.panel, "guided", None)
+        if guided is not None:
+            exceptions.update({guided.output, guided.approval})
         for widget in self.panel.findChildren(QComboBox):
             if widget not in exceptions:
                 widget.setEnabled(form_enabled)
