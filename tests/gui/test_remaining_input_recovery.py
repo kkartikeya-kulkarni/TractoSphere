@@ -5,6 +5,7 @@ import numpy as np
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication, QDialogButtonBox, QFileDialog, QPushButton
 
+from dmri_studio.core.scientific import ImportRequest
 from dmri_studio.gui.scientific_planning import ImportDialog
 
 
@@ -190,3 +191,25 @@ def test_preprocessing_can_open_input_import_without_replacing_existing_state(wi
     qtbot.mouseClick(workflow.change_input, Qt.MouseButton.LeftButton)
     assert window._selected_navigation == "Project"
     assert workflow.dataset is None
+
+
+def test_inspected_tractogram_reaches_tracking_sift2_and_connectivity(window, qtbot, tmp_path):
+    source = tmp_path / "synthetic.tck"
+    tracks = nib.streamlines.Tractogram(
+        [np.array([[1, 1, 1], [2, 2, 2]], dtype="f4")],
+        affine_to_rasmm=np.eye(4),
+    )
+    nib.streamlines.save(tracks, source)
+    window.focus_tracking_plan()
+    page = window.scientific
+    page.import_request(ImportRequest("tractogram", source, declarations={"space_id": "synthetic"}))
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    assert len(page.artifacts) == 1, page.status.text()
+    imported = page.artifacts[0]
+    assert imported.kind == "tractogram"
+    guided = page.tracking.guided
+    assert guided.filter_tracts.findData(imported.id) > 0
+    assert guided.density_tracts.findData(imported.id) > 0
+    assert page.sift2.tracts.findData(imported.id) > 0
+    assert page.connectome.tracts.findData(imported.id) > 0
+    assert page.sift2.plan is None and page.connectome.plan is None
