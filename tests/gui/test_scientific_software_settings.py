@@ -227,6 +227,14 @@ def test_reopened_approved_batch_keeps_recorded_toolchain(window, qtbot, tmp_pat
         limits={"disk_headroom_bytes": GIB},
     )
     folder = create_batch(plan, plan.digest)
+    approved_path = folder / "approved-plan.json"
+    approved_before = read_json(approved_path.read_text())
+    recorded_tools = approved_before["plan"]["rows"][0]["preview"]["tools"]
+    assert recorded_tools
+    assert all(
+        tool["sha256"] and tool["path"].startswith(str(module.BIN))
+        for tool in recorded_tools.values()
+    )
     page = window.batch
     page.load_batch(folder)
     qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
@@ -236,4 +244,4 @@ def test_reopened_approved_batch_keeps_recorded_toolchain(window, qtbot, tmp_pat
     assert "historical-fsl" in page.preview.toPlainText()
     window.apply_dependency_locations({"MRtrix3": str(tmp_path / "new-mrtrix")})
     assert page.mrtrix_directory.text() == str(module.BIN)
-    assert read_json((folder / "approved-plan.json").read_text())["digest"] == plan.digest
+    assert read_json(approved_path.read_text()) == approved_before
