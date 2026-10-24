@@ -10,6 +10,8 @@ Statuses are **Not started**, **In progress**, **Implemented, unverified**, **Ve
 
 The owner-reported 13 October 2026 correspondence from Professor Jesper Andersson is treated as **expert feedback to investigate**, not an independently reproduced result or proof of a defect. The cited [Andersson et al. 2016 outlier detection/replacement paper](https://pubmed.ncbi.nlm.nih.gov/27393418/) describes the prediction and replacement framework; the denoising/order/mask observations below come from the project owner's account of the correspondence, not from an inference that the paper proves a universal processing order.
 
+**Phase 7 evidence reconciliation (24 October 2026):** The [Phase 7 audit and controlled protocol](PHASE7_EDDY_SCIENTIFIC_VALIDATION.md) located an older, restricted local EDDY investigation with exact historical commands, numerical anomaly records, several already executed controls, and a hash-indexed input bundle. This corrects the earlier “no controlled result” wording below: **no new Phase 7 MRI experiment was run**, and no old control established an acceptable preprocessing policy. Some original large output arrays are no longer at their recorded paths, so the old numerical findings are historical evidence pending restored-array recheck or an authorized exact replay. The register remains **38 outstanding tasks**; only the evidence-audit/design activity on `SV-EDDY01`/`02` has advanced to In progress. Never commit the restricted participant records or private paths.
+
 ## P0 — scientific correctness and data integrity
 
 ### SV-A01 — Reverify Stage A critical scientific contracts
@@ -30,19 +32,19 @@ The owner-reported 13 October 2026 correspondence from Professor Jesper Andersso
 
 ### SV-EDDY01 — Reproduce the b1000 prediction and CNR anomaly
 
-- **Origin / priority / status / subsystem:** Stage B EDDY scientific validation; P0; Not started; preprocessing output diagnostics and QC.
+- **Origin / priority / status / subsystem:** Stage B EDDY scientific validation; P0; In progress (evidence audit only; Phase 7 reproduction unrun); preprocessing output diagnostics and QC.
 - **Acceptance:** Reproduce or refute the reported infinite weighted CNR and zero inclusive prediction residuals for the previously investigated b1000 acquisition using frozen inputs and exact commands. Record finite/zero/nonfinite counts, denominators, affected voxels/slices/volumes, b-values, motion/outlier locations, masks and software versions; preserve the original data.
 - **Environment:** Authorized access to the original acquisition or a permitted equivalent, compatible FSL EDDY and MRtrix, controlled storage and sufficient compute. No participant data enters this repository.
-- **Evidence:** User reports prior anomalies; [limitations](limitations.md) already says EDDY exit success does not establish valid CNR/predictions. No reproduction is claimed here.
-- **Remaining / dependencies and blockers:** Recover exact original inputs and prior settings, define diagnostic extraction and run the experiment. Data authorization, access and provenance are prerequisites.
+- **Evidence:** The Phase 7 audit found a restricted prior comparison and read-only denominator-mechanism record: earlier b≈1000 EDDY output had near-global positive-infinite weighted CNR where inclusive weighted residuals were exactly zero. The prior run recorded FSL EDDY 2401.2 and an exact executable hash/argv. This is **historical research evidence**, not an independently rerun Phase 7 finding. [Limitations](limitations.md) already rejects EDDY exit success as scientific acceptance.
+- **Remaining / dependencies and blockers:** Original run folders lack some large raw/intermediate/CNR/residual NIfTI arrays; a restricted local bundle retains hash-indexed input copies and records. Establish access/authorization, restore and rehash original output arrays or approve one exclusive unchanged replay, then independently recompute voxel and shell correspondence. See the Phase 7 protocol; do not infer the upstream cause from the confirmed denominator symptom.
 
 ### SV-EDDY02 — Compare no-denoising and MP-PCA-before-EDDY controls
 
-- **Origin / priority / status / subsystem:** Stage B and Andersson feedback; P0; Not started; preprocessing order, EDDY Gaussian-process prediction and QC.
+- **Origin / priority / status / subsystem:** Stage B and Andersson feedback; P0; In progress (historical controls inventoried; decisive matched comparison unrun); preprocessing order, EDDY Gaussian-process prediction and QC.
 - **Acceptance:** Run matched no-denoising and current MP-PCA-before-EDDY branches on the same eligible acquisitions. Hold EDDY version/settings, acquisition metadata, gradient orientation, mask definition and analysis regions constant where scientifically possible. Compare residual and CNR distributions/maps, prediction failures, outlier patterns and downstream QC with reproducible commands; determine whether denoising is associated with zero residuals without claiming causality from one case.
 - **Environment:** Authorized original and comparison acquisitions, real compatible MRtrix/FSL, sufficient compute/storage, scientific reviewer.
-- **Evidence:** Current workflow has used MP-PCA before EDDY; owner-reported feedback suggests potential overfitting but says its mechanism was not fully investigated. No controlled result yet.
-- **Remaining / dependencies and blockers:** Complete `SV-EDDY01`, preregister comparisons and inspect tool-specific residual definitions before runs. Version, acquisition and mask differences must be tracked rather than silently pooled.
+- **Evidence:** Historical restricted controls omitted MP-PCA while retaining Gibbs, and separately omitted both MP-PCA and Gibbs; neither passed strict CNR/QC. Another control combined no MP-PCA with a changed GP objective and is **not** a one-factor baseline contrast. Denoising may matter, but neither causality nor an approved alternative was established. [Cieslak et al. 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC10826632/) found improved EDDY motion estimation with prior MP-PCA in its simulated settings, so a universal conclusion is unsupported.
+- **Remaining / dependencies and blockers:** Complete `SV-EDDY01`; use authenticated existing runs before considering repeats. Explicitly separate natural-pipeline differences in TOPUP/BET from a fixed-field/fixed-mask analysis, and compare prediction fidelity, motion, replacement and downstream outputs. Version, acquisition, partial Fourier and mask differences must not be silently pooled.
 
 ### SV-EDDY03 — Assess EDDY-before-denoising feasibility and assumptions
 

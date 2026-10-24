@@ -1,5 +1,20 @@
 # Outstanding Scientific Verification and Release Blockers
 
+## 2026-10-24 — Phase 7 EDDY evidence audit and experiment design
+
+On `development/phase7-eddy-validation` from Phase 6 commit `8102df1`,
+[the Phase 7 scientific record](PHASE7_EDDY_SCIENTIFIC_VALIDATION.md) reconciles
+the original b≈1000 EDDY anomaly with a previously completed, restricted local
+research investigation. It records the historical exact-command provenance,
+earlier no-denoising and other failed controls, the confirmed residual-denominator
+explanation for nonfinite CNR, gaps in currently available large output arrays,
+primary literature, and a controlled next-experiment protocol. No Phase 7 MRI
+experiment, correction-code change, QC-policy change or preprocessing-order
+change occurred. Existing focused synthetic core tests passed (7/7). The
+[38-task backlog](SCIENTIFIC_VALIDATION_BACKLOG.md) remains open; `SV-EDDY01`
+and `SV-EDDY02` are In progress only for audit/protocol, pending authenticated
+array restoration or an authorized exact replay and matched scientific review.
+
 ## 2026-10-23 — Phase 6 scientific workspace UX in verification
 
 The task-focused scientific input inventory, discoverable preprocessing entry,
