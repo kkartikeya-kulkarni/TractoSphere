@@ -30,6 +30,13 @@ Dependency setup uses core/dependencies.py and shared tool_versions.py. It recor
 versions/provenance without MRI execution. GUI dependency_setup.py owns one shared
 bounded worker for first run and Preferences; cli/dependencies.py exposes doctor.
 Setup inventory never replaces the stricter prepare/execute evidence checks.
+GUI `ScientificSoftwareSettings` is the single application-level reader/writer for
+the legacy QSettings `dependencies/MRtrix3`, `dependencies/FSL` and
+`dependencies/ANTs` keys. The shell distributes these defaults to new GUI
+workflows without rescanning on navigation. Core compilers remain Qt-free and
+receive explicit directories; batch plans pin the chosen directories so resume
+uses historical tool identity. A remembered path is display configuration, while
+inventory verification and exact scientific plan validation are separate steps.
 
 Platform utilities keep core Qt-free: core/resources.py provides explicit resource
 measurement semantics; GUI capture.py composites actual native VTK framebuffer

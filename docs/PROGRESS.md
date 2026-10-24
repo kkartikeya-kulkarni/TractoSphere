@@ -56,3 +56,7 @@ full-history and curated-tree credential scanning. See validation.md.
 Publication must remain gated until prior GitHub historical research content is
 inaccessible and the distribution/install checks pass. A prepared tag, commit or
 private draft does not establish a completed public release.
+# 2026-10-23 — Phase 1 scientific software configuration
+
+The current Phase 1 implementation, tests, unresolved native/sandbox verification and next action are recorded in [PHASE1_IMPLEMENTATION_AND_HANDOFF.md](PHASE1_IMPLEMENTATION_AND_HANDOFF.md). The work is on `development/phase1-scientific-software-2026-10-23`; public `main`, releases and draft PR #3 remain untouched.
+
