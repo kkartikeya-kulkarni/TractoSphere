@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QComboBox,
+    QDialog,
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
@@ -33,6 +34,7 @@ from dmri_studio.core.batch.discovery import Study
 from dmri_studio.core.scientific.records import read_json
 from dmri_studio.core.workflow import ProcessingHistory
 
+from .batch_mapping import CustomMappingDialog
 from .components import button, label
 
 STAGES = (
@@ -173,13 +175,17 @@ class GuidedBatch(QWidget):
         self.source_help = label("Choose a BIDS root containing diffusion acquisitions.", "caption")
         layout.addWidget(self.source_help)
         self.mapping_help = label(
-            "JSON mapping: subject_pattern and optional session_pattern/acquisition_pattern select folders. "
+            "Create a mapping by assigning files to named roles, or open an existing JSON mapping. "
+            "subject_pattern and optional session_pattern/acquisition_pattern select folders. "
             "files maps roles such as dwi, bval, bvec, json, mask and t1 to relative filename patterns. "
             "Each pattern must match exactly one file per acquisition; zero or multiple matches are reported for review. "
             "Edit the example to match your folder names. Discovery never guesses scientific identity.",
             "caption",
         )
         layout.addWidget(self.mapping_help)
+        self.create_mapping_button = button("Create mapping from file roles…", self.create_mapping)
+        self.create_mapping_button.setAccessibleName("Create custom mapping from file roles")
+        layout.addWidget(self.create_mapping_button)
         self.mapping_example = QPlainTextEdit(json.dumps(CUSTOM_MAPPING_EXAMPLE, indent=2))
         self.mapping_example.setReadOnly(True)
         self.mapping_example.setMaximumHeight(115)
@@ -232,7 +238,9 @@ class GuidedBatch(QWidget):
             if path:
                 field.setText(path)
 
-        box.addWidget(button("Browse…", choose))
+        browse = button("Browse…", choose)
+        browse.setAccessibleName(f"Browse {field.accessibleName()}")
+        box.addWidget(browse)
         return row
 
     def save_mapping_example(self):
@@ -258,6 +266,18 @@ class GuidedBatch(QWidget):
             "Example mapping saved. Edit its folder and file patterns to match your dataset before discovery."
         )
 
+    def create_mapping(self):
+        root = Path(self.dataset_root.text().strip()).expanduser()
+        if not root.is_dir():
+            self.notice.setText("Choose an existing dataset folder before creating a mapping.")
+            return
+        dialog = CustomMappingDialog(root, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.saved_path:
+            self.source_file.setText(str(dialog.saved_path))
+            self.notice.setText(
+                "Mapping saved. Discover acquisitions to review each exact file-role match and ambiguity."
+            )
+
     def _source_mode(self):
         mode = self.source_kind.currentData()
         self.data_form.setRowVisible(self.file_row, mode in {"custom", "manifest"})
@@ -271,12 +291,17 @@ class GuidedBatch(QWidget):
         self.source_help.setText(
             {
                 "bids": "Choose a BIDS root. Discovery reports missing inputs; it does not certify scientific eligibility.",
-                "custom": "Choose the dataset root and an explicit supported JSON mapping. Ambiguous files are not guessed.",
+                "custom": "Choose the dataset root, then create a mapping from explicit file roles or open an existing JSON mapping. Ambiguous files are not guessed.",
                 "manifest": "Choose the dataset root and a CSV/TSV manifest with explicit acquisition paths.",
                 "saved": "Open a study to make a new plan, or inspect and resume a previously approved batch.",
             }[mode]
         )
-        for control in (self.mapping_help, self.mapping_example, self.save_example):
+        for control in (
+            self.mapping_help,
+            self.create_mapping_button,
+            self.mapping_example,
+            self.save_example,
+        ):
             control.setVisible(mode == "custom")
         if mode in {"custom", "manifest"}:
             self.data_form.labelForField(self.file_row).setText(

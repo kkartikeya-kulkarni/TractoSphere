@@ -15,6 +15,7 @@ from PySide6.QtGui import QAction, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
+    QLayout,
     QLineEdit,
     QListWidget,
     QMainWindow,
@@ -99,6 +100,18 @@ class MainWindow(QMainWindow):
         theme.set_icon(self.collapse, "panel-left-close")
         sidebar.addWidget(self.collapse)
         sidebar.addSpacing(8)
+        self.navigation_scroll = QScrollArea()
+        self.navigation_scroll.setWidgetResizable(True)
+        self.navigation_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.navigation_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.navigation_scroll.setAccessibleName("Workspace navigation")
+        navigation_content = QWidget()
+        navigation = QVBoxLayout(navigation_content)
+        navigation.setContentsMargins(0, 0, 0, 0)
+        navigation.setSpacing(8)
+        navigation.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        self.navigation_scroll.setWidget(navigation_content)
+        sidebar.addWidget(self.navigation_scroll, 1)
         self.nav_buttons = []
         self.nav_headers = []
         names = [
@@ -126,11 +139,10 @@ class MainWindow(QMainWindow):
                 "Software Dependencies": "System",
             }.get(name)
             if group:
-                if name == "Software Dependencies":
-                    sidebar.addStretch()
                 heading = label(group, "caption")
                 heading.setContentsMargins(8, 8, 0, 0)
-                sidebar.addWidget(heading)
+                heading.setMinimumHeight(25)
+                navigation.addWidget(heading)
                 self.nav_headers.append(heading)
             nav = button(
                 name,
@@ -211,7 +223,7 @@ class MainWindow(QMainWindow):
                 theme.bind(nav, "accent.subtle", "accent.text")
             nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             nav.setMinimumHeight(30)
-            sidebar.addWidget(nav)
+            navigation.addWidget(nav)
             self.nav_buttons.append((nav, name))
         self._selected_navigation = "Project"
         self.sidebar_note = label("Research alpha", "caption")
@@ -845,6 +857,8 @@ class MainWindow(QMainWindow):
                 if nav.isEnabled()
                 else "text.disabled",
             )
+            if active:
+                self.navigation_scroll.ensureWidgetVisible(nav, 0, 4)
 
     def browse_project(self):
         self.focus_projects()

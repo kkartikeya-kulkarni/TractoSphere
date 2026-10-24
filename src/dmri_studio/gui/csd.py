@@ -109,6 +109,8 @@ class CSDExecutionPanel(QScrollArea):
         setup.addWidget(self.acquisition)
         self.method_info = label("", "caption")
         setup.addWidget(self.method_info)
+        self.response_help = label("", "caption")
+        setup.addWidget(self.response_help)
         advanced = QWidget()
         advanced_form = QFormLayout(advanced)
         advanced_form.addRow("WM lmax", self.lmax)
@@ -198,6 +200,37 @@ class CSDExecutionPanel(QScrollArea):
             )
             + "The exact plan decides eligibility; this choice alone does not."
         )
+        mode = self.response_mode.currentData()
+        if mode == "import":
+            tissues = ("wm", "gm", "csf") if multi else ("wm",)
+            missing = [t.upper() for t in tissues if self.responses[t].count() <= 1]
+            self.response_help.setText(
+                "Missing imported response functions: "
+                + ", ".join(missing)
+                + ". Use Import response above and declare its tissue/shell evidence, "
+                + (
+                    "or choose Dhollander three-tissue estimation when the acquisition meets its requirements."
+                    if multi
+                    else "or choose supported Tournier/Tax WM estimation when the acquisition meets its requirements."
+                )
+                if missing
+                else "Select the exact imported responses. Tissue and shell compatibility are checked at plan validation."
+            )
+        elif multi and mode in {"tournier", "tax"}:
+            self.response_help.setText(
+                "Tournier and Tax estimate WM only. Choose single-tissue CSD, "
+                "estimate three tissues with Dhollander, or import WM/GM/CSF responses."
+            )
+        elif not multi and mode == "dhollander":
+            self.response_help.setText(
+                "Dhollander is not used by this single-tissue guided fit. "
+                "Choose Tournier/Tax or import a reviewed WM response."
+            )
+        else:
+            self.response_help.setText(
+                "Response estimation is a separate validated task using the selected DWI, "
+                "mask and explicit shells. Preview its exact commands before approval."
+            )
 
     def invalidate(self, *_):
         """A changed execution configuration always needs fresh approval."""
@@ -234,6 +267,7 @@ class CSDExecutionPanel(QScrollArea):
                     + " — use Import above",
                 )
         self.update_actions()
+        self.explain_method()
 
     def source_info(self, *_):
         a = next((a for a in self.owner.artifacts if a.id == self.source.currentData()), None)

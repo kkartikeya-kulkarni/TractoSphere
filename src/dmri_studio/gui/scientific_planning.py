@@ -117,7 +117,9 @@ class ImportDialog(QDialog):
             field.setAccessibleName(title)
             self.paths[name] = field
             layout.addWidget(field, 1)
-            layout.addWidget(button("Browse…", lambda _=False, n=name: self.browse(n)))
+            browse = button("Browse…", lambda _=False, n=name: self.browse(n))
+            browse.setAccessibleName(f"Browse {title}")
+            layout.addWidget(browse)
             form.addRow(title, row)
             self.path_rows[name] = (row, form.labelForField(row))
         self.state = choice(("raw", "preprocessed", "unknown"))
@@ -292,7 +294,13 @@ class ImportDialog(QDialog):
 
     def browse(self, name: str) -> None:
         """Use a conventional chooser; no automatic sidecar association."""
-        path, _ = QFileDialog.getOpenFileName(self, "Choose scientific input")
+        title = {
+            "path": "input file",
+            "bval": "b-values",
+            "bvec": "b-vectors",
+            "sidecar": "acquisition or provenance JSON",
+        }[name]
+        path, _ = QFileDialog.getOpenFileName(self, f"Choose {title}")
         if path:
             self.paths[name].setText(path)
 

@@ -60,6 +60,7 @@ class DTIExecutionPanel(QScrollArea):
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         self.source = QComboBox()
         self.source.setAccessibleName("DTI DWI input")
+        self.source.setPlaceholderText("No imported DWI — use Import DWI")
         self.acquisition = label(
             "Import DWI to inspect its acquisition and gradient summary.", "caption"
         )
@@ -86,8 +87,15 @@ class DTIExecutionPanel(QScrollArea):
         self.threads = QSpinBox()
         self.threads.setRange(1, 64)
         self.threads.setValue(4)
+        source_row = QWidget()
+        source_layout = QHBoxLayout(source_row)
+        source_layout.setContentsMargins(0, 0, 0, 0)
+        source_layout.addWidget(self.source, 1)
+        self.import_dwi = button("Import DWI…", lambda: self.owner.browse_import("dwi"))
+        self.import_dwi.setAccessibleName("Import DWI for tensor fitting")
+        source_layout.addWidget(self.import_dwi)
+        form.addRow("DWI", source_row)
         for title, field in [
-            ("DWI", self.source),
             ("Shells (s/mm²)", self.shells),
             ("Fit", self.fit),
         ]:
@@ -160,6 +168,7 @@ class DTIExecutionPanel(QScrollArea):
     def refresh(self):
         """Inventory changes invalidate approval but never change source scientific files."""
         self.invalidate()
+        selected_source = self.source.currentData()
         self.source.clear()
         self.mask.clear()
         self.mask.addItem("No mask — all voxels must be valid", None)
@@ -168,6 +177,9 @@ class DTIExecutionPanel(QScrollArea):
                 self.source.addItem(Path(artifact.payload["path"]).name, artifact.id)
             elif artifact.kind == "mask":
                 self.mask.addItem(Path(artifact.payload["path"]).name, artifact.id)
+        if self.source.count():
+            restored = self.source.findData(selected_source) if selected_source else -1
+            self.source.setCurrentIndex(restored if restored >= 0 else 0)
         self.update_actions()
 
     def source_info(self, *_):
