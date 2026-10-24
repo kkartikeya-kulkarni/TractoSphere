@@ -531,13 +531,26 @@ class ConnectomePanel(QWidget):
             missing.append("an identified FA sampling image")
         if needs_weights and self.weights.currentData() is None:
             missing.append("exact-source SIFT2 weight factors")
-        self.input_help.setText(
+        message = (
             "Select or import "
             + ", ".join(missing)
             + ". Use the action beside each input. For FA, import an anatomy/scalar image and explicitly declare Metric identity = FA; a filename is not sufficient. SIFT2 factors require their exact tractogram binding. Atlas registration, node identity and source binding are checked during plan validation."
             if missing
             else "Inputs selected. Validate atlas/tractogram correspondence, node IDs, assignment and weighting before approval."
         )
+        selected_atlas = next(
+            (a for a in self.owner.artifacts if a.id == self.atlas.currentData()), None
+        )
+        if selected_atlas and not selected_atlas.payload.get("declarations", {}).get(
+            "registration_qc"
+        ):
+            message += (
+                " This imported parcellation has no native registration QC bundle declared. "
+                "Selection is for inspection only until the exact atlas/reference review is "
+                "checked during plan validation. Open Registration to inspect the alignment "
+                "and record supported evidence; matching filenames or image grids are insufficient."
+            )
+        self.input_help.setText(message)
 
     def refresh(self):
         for combo, kind, name in [

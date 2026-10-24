@@ -5,6 +5,7 @@ import numpy as np
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication, QDialogButtonBox, QFileDialog, QPushButton
 
+from dmri_studio.core.scientific import ImportRequest
 from dmri_studio.gui.components import Disclosure
 from dmri_studio.gui.scientific_planning import ImportDialog
 
@@ -116,3 +117,23 @@ def test_imported_explicit_fa_reaches_only_eligible_selector(window, qtbot, tmp_
     assert not panel.form.isRowVisible(panel.input_rows["fa"])
     assert not panel.form.isRowVisible(panel.input_rows["weights"])
     assert panel.plan is None
+
+
+def test_imported_atlas_without_registration_qc_is_inspectable_but_explained(
+    window, qtbot, tmp_path
+):
+    image = nib.Nifti1Image(np.ones((5, 6, 7), dtype="i2"), np.eye(4))
+    image.header.set_xyzt_units("mm")
+    atlas = tmp_path / "parcellation.nii.gz"
+    nib.save(image, atlas)
+    window.focus_connectivity()
+    page = window.scientific
+    page.import_request(ImportRequest("atlas_labels", atlas))
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    panel = page.connectome
+    item = page.artifacts[0]
+    panel.atlas.setCurrentIndex(panel.atlas.findData(item.id))
+    assert panel.node_list.rowCount() == 1
+    assert "no native registration QC bundle declared" in panel.input_help.text()
+    assert "Open Registration" in panel.input_help.text()
+    assert panel.plan is None and not panel.run_button.isEnabled()
