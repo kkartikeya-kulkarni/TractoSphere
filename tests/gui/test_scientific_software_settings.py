@@ -138,6 +138,16 @@ def test_verify_and_save_requires_compatible_family(
         assert window.dependencies.software.state("ANTs") == "missing"
         widget.populate(None)
         assert "Missing installation" in widget.family_labels["ANTs"].text()
+        replacement = tmp_path / "replacement" / "bin"
+        replacement.mkdir(parents=True)
+        (replacement / "N4BiasFieldCorrection").touch()
+        record["path"] = str(replacement / "N4BiasFieldCorrection")
+        widget.fields["ANTs"].setText(str(replacement))
+        widget.verify_and_save("ANTs")
+        qtbot.waitUntil(lambda: window.dependencies.thread is None, timeout=10000)
+        qtbot.waitUntil(lambda: widget.pending_family is None, timeout=10000)
+        assert window.dependencies.saved_directories()["ANTs"] == str(replacement)
+        assert window.workflow.execution.bias_inputs["ants_directory"].text() == str(replacement)
     else:
         assert "incompatible" in widget.status.text()
 
@@ -158,6 +168,24 @@ def test_remove_updates_defaults_and_keeps_active_plan(window, tmp_path):
     assert window.dependencies.saved_directories()["MRtrix3"] == ""
     assert window.scientific.tool_directory is None
     assert window.batch.mrtrix_directory.text() == ""
+
+
+@pytest.mark.parametrize("worker", ["scientific", "batch", "preprocessing"])
+def test_active_worker_blocks_configuration_change(window, tmp_path, worker):
+    location = str(tmp_path / "mrtrix" / "bin")
+    window.settings.set("dependencies/MRtrix3", location)
+    target = {
+        "scientific": window.scientific,
+        "batch": window.batch,
+        "preprocessing": window.workflow.execution,
+    }[worker]
+    target.thread = object()
+    try:
+        window.preferences.dependencies.remove_location("MRtrix3")
+        assert window.dependencies.saved_directories()["MRtrix3"] == location
+        assert "Finish the active" in window.preferences.dependencies.status.text()
+    finally:
+        target.thread = None
 
 
 def test_historical_batch_is_not_replaced_by_new_global_default(window, tmp_path):
