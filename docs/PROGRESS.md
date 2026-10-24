@@ -11,8 +11,11 @@ real-data TCK/reference/two-ROI check imported, selected, planned and executed
 a four-track technical derivative with unchanged source hashes and scientific
 review still required. Synthetic TRK-to-TCK conversion verifies exact reference
 geometry and complete streamline coordinates; no real research TRK was found
-in the authorized bounded roots. Native Cocoa/VTK button, picker, rendering
-and filtered-result interactions await the normal Mac walkthrough. The 38-task
+in the authorized bounded roots. The user's first normal-Mac Cocoa suite at
+`4c8245c` returned **6 passed, 1 failed**: the new case selected and filtered
+the intended source and opened the verified output, but **View Original Tracks**
+timed out. A focused diagnostic and repair remain pending; the complete native
+workflow is not verified. The 38-task
 scientific backlog and separate Phase 7 EDDY work retain their statuses.
 
 ## 2026-10-24 — Native Registration low-b summary follow-up

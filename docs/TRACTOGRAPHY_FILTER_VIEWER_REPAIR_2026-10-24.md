@@ -114,8 +114,15 @@ pending.
 The added native Cocoa walkthrough test uses the actual Viewer button with two
 loaded tract groups, assigns synthetic Include/Exclude ROIs, checks exact
 command inputs and approval, executes a small `tckedit`, opens the verified
-filtered result, and reopens the original. **It has not yet run in this
-restricted command environment.** Native file-picker layout, atlas selection,
+filtered result, and reopens the original. The user's normal-Mac run at
+`4c8245c` returned **6 passed, 1 failed**. The new case passed source selection,
+filter execution and filtered-result Viewer opening, then timed out waiting
+for **View Original Tracks** to select the original source. This is a genuine
+unresolved native handoff failure; neither the full workflow nor original
+reopening is marked verified. A focused follow-up test now records the page
+status, Viewer status, emitted product, loaded groups, selected row and pending
+Viewer tasks at that point so the cause can be repaired. Native file-picker
+layout, atlas selection,
 Viewer preservation, real TRK conversion, and real anatomical correspondence
 remain explicit follow-ups.
 

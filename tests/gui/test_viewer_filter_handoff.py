@@ -310,3 +310,45 @@ def test_original_tracks_action_rechecks_source_and_reference_hashes(window, tmp
 
     with pytest.raises(ValueError, match="Verified reference changed"):
         panel.open_original()
+
+
+def test_original_tracks_handoff_emits_after_worker_finishes(window, qtbot, tmp_path):
+    source, declarations = _case(tmp_path)
+    window.focus_tracking_plan()
+    page = window.scientific
+    panel = page.tracking
+    output = tmp_path / "verified-attempt"
+    output.mkdir()
+    reference = output / "reference.nii.gz"
+    reference.write_bytes((source / "reference.nii.gz").read_bytes())
+    panel.manifest = {
+        "status": "validated_pending_qc",
+        "inputs_unchanged": True,
+        "plan": {
+            "output_directory": str(output),
+            "bindings": [
+                {
+                    "algorithm": "tckedit",
+                    "source": {
+                        "path": str(source / "tracks.tck"),
+                        "sources": [
+                            {
+                                "path": str(source / "tracks.tck"),
+                                "sha256": hash_file(source / "tracks.tck"),
+                            }
+                        ],
+                        "declarations": declarations,
+                    },
+                    "outputs": {"reference": reference.name},
+                }
+            ],
+        },
+        "outputs": {reference.name: {"sha256": hash_file(reference)}},
+    }
+    panel.view_requested.disconnect(window.open_scientific_product)
+    seen = []
+    panel.view_requested.connect(seen.append)
+    panel.open_original()
+    qtbot.waitUntil(lambda: page.thread is None and len(seen) == 1, timeout=15000)
+    assert seen[0]["path"] == str(source / "tracks.tck")
+    assert seen[0]["reference"] == str(reference)

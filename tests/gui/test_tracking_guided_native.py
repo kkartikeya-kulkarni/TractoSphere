@@ -113,16 +113,36 @@ def test_native_viewer_selected_group_filters_full_source_and_opens_result(windo
     assert viewer.current_group().path == Path(product["path"])
     window.focus_tracking_plan()
     assert guided.original_button.isEnabled()
+    handoffs = []
+    panel.view_requested.connect(handoffs.append)
     guided.original_button.click()
     qtbot.waitUntil(lambda: page.thread is None, timeout=15000)
-    qtbot.waitUntil(
-        lambda: (
-            viewer.current_group() is not None
-            and viewer.current_group().path == source / "tracks.tck"
-            and not viewer.tasks
-        ),
-        timeout=20000,
-    )
+    try:
+        qtbot.waitUntil(
+            lambda: (
+                viewer.current_group() is not None
+                and viewer.current_group().path == source / "tracks.tck"
+                and not viewer.tasks
+            ),
+            timeout=20000,
+        )
+    except Exception as exc:
+        raise AssertionError(
+            "Original Viewer handoff did not finish: "
+            + str(
+                {
+                    "page_status": page.status.text(),
+                    "viewer_status": viewer.status.text(),
+                    "page_pending": page.pending,
+                    "handoffs": handoffs,
+                    "groups": [str(group.path) for group in viewer.groups],
+                    "selected_row": viewer.tract_list.currentRow(),
+                    "viewer_tasks": len(viewer.tasks),
+                    "viewer_reference": str(viewer.reference.path) if viewer.reference else None,
+                    "tracking_identity": viewer.tracking_identity,
+                }
+            )
+        ) from exc
 
 
 @pytest.mark.skipif(
