@@ -159,6 +159,8 @@ def transform_record(
         raise ValueError("Unknown spatial review status")
     source.verify()
     target.verify()
+    if source.image == target.image:
+        raise ValueError("Transform source and target must be distinct images")
     if source.id == target.id:
         raise ValueError(
             "Source and target space IDs must differ; prevents accidental double registration"

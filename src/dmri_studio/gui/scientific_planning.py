@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
 
 from dmri_studio.core.dataset import DwiDataset
 from dmri_studio.core.execution import detect_mrtrix, save_execution_plan
+from dmri_studio.core.input_associations import suggest_dwi_companions
 from dmri_studio.core.scientific import (
     ALGORITHMS,
     ImportRequest,
@@ -129,6 +130,10 @@ class ImportDialog(QDialog):
             layout.addWidget(browse)
             form.addRow(title, row)
             self.path_rows[name] = (row, form.labelForField(row))
+        self.companion_notice = label("", "caption")
+        content_layout.addWidget(self.companion_notice)
+        self._associated_image = ""
+        self.paths["path"].editingFinished.connect(self.suggest_companions)
         self.state = choice(("raw", "preprocessed", "unknown"))
         self.state.setCurrentIndex(3)
         self.subject = QLineEdit()
@@ -199,6 +204,18 @@ class ImportDialog(QDialog):
                 {"atlas_labels"},
             ),
             ("whole_head", "Whole-head structural coverage", ("yes", "no"), {"anatomy"}),
+            (
+                "anatomical_preparation",
+                "Anatomical image preparation",
+                ("whole_head", "brain_extracted", "unknown"),
+                {"anatomy"},
+            ),
+            (
+                "mask_role",
+                "Binary mask purpose",
+                ("brain_mask", "white_matter_segmentation", "other", "unknown"),
+                {"mask"},
+            ),
             (
                 "tensor_layout",
                 "Tensor component order",
@@ -351,7 +368,7 @@ class ImportDialog(QDialog):
         self._original_declarations = dict(declarations)
 
     def browse(self, name: str) -> None:
-        """Use a conventional chooser; no automatic sidecar association."""
+        """Use a conventional chooser and suggest only unique DWI companions."""
         title = {
             "path": "input file",
             "bval": "b-values",
@@ -361,6 +378,28 @@ class ImportDialog(QDialog):
         path, _ = QFileDialog.getOpenFileName(self, f"Choose {title}")
         if path:
             self.paths[name].setText(path)
+            if name == "path":
+                self.suggest_companions()
+
+    def suggest_companions(self) -> None:
+        if self.kind.currentData() != "dwi" or hasattr(self, "_original_declarations"):
+            return
+        value = self.paths["path"].text().strip()
+        if not value:
+            self.companion_notice.clear()
+            return
+        if self._associated_image and self._associated_image != value:
+            # A previous image's gradients must never survive a source change.
+            for name in ("bval", "bvec", "sidecar"):
+                self.paths[name].clear()
+        self._associated_image = value
+        found = suggest_dwi_companions(Path(value))
+        for name in ("bval", "bvec", "sidecar"):
+            candidate = getattr(found, name)
+            # A deliberate selection always wins over a filesystem suggestion.
+            if candidate is not None and not self.paths[name].text().strip():
+                self.paths[name].setText(str(candidate))
+        self.companion_notice.setText(found.message)
 
     def update_fields(self) -> None:
         """Show only declarations relevant to the selected contract."""
@@ -374,6 +413,7 @@ class ImportDialog(QDialog):
             title.setVisible(kind in kinds)
         self.state.setVisible(kind == "dwi")
         self.state_label.setVisible(kind == "dwi")
+        self.companion_notice.setVisible(kind == "dwi")
         self.registration_reviewed.setVisible(kind == "atlas_labels")
         self.purpose.setText(
             input_description(kind)
@@ -1303,8 +1343,12 @@ class ScientificPlanningPage(QWidget):
         worker.moveToThread(self.thread)
         self.thread.started.connect(worker.run)
         worker.progress.connect(
-            lambda text: self.operation_state.update(
-                token, State.PROCESSING if kind.endswith("-run") else State.LOADING, text
+            lambda text: (
+                None
+                if cancel.is_set()
+                else self.operation_state.update(
+                    token, State.PROCESSING if kind.endswith("-run") else State.LOADING, text
+                )
             )
         )
         if kind.startswith("dti-"):
@@ -1399,9 +1443,9 @@ class ScientificPlanningPage(QWidget):
             if all(a.id != result.id for a in self.artifacts):
                 self.artifacts.append(result)
             self.refresh()
-            if result.kind == "anatomy":
-                selector = self.registration.guided.imported_anatomy
-                selector.setCurrentIndex(max(0, selector.findData(result.id)))
+            selector = self.registration.guided.imported_anatomy
+            if selector.findData(result.id) >= 0:
+                selector.setCurrentIndex(selector.findData(result.id))
             self.status.setText(
                 "Input inspected and source hashes recorded. Scientific review remains required."
             )
@@ -1416,9 +1460,9 @@ class ScientificPlanningPage(QWidget):
                 return
             self.artifacts[index] = result
             self.refresh()
-            if result.kind == "anatomy":
-                selector = self.registration.guided.imported_anatomy
-                selector.setCurrentIndex(max(0, selector.findData(result.id)))
+            selector = self.registration.guided.imported_anatomy
+            if selector.findData(result.id) >= 0:
+                selector.setCurrentIndex(selector.findData(result.id))
             self.status.setText(
                 "Input declarations updated after source reinspection. Workflow eligibility and exact plan validation remain separate."
             )
@@ -1556,6 +1600,9 @@ class ScientificPlanningPage(QWidget):
         self.probe_button.setEnabled(not busy and bool(self.tasks))
         self.export_button.setEnabled(not busy and self.plan is not None)
         self.cancel_button.setVisible(busy)
+        self.cancel_button.setEnabled(
+            busy and self.operation_state.busy and not self.cancel.is_set()
+        )
         if hasattr(self, "dti"):
             self.dti.update_actions()
         if hasattr(self, "csd"):
@@ -1573,9 +1620,18 @@ class ScientificPlanningPage(QWidget):
 
     def cancel_inspection(self) -> None:
         """Cancel the current request, not the Event from widget construction."""
+        if self.thread is None or self.cancel.is_set() or not self.operation_state.busy:
+            return
         self.cancel.set()
-        self.status.setText(
-            "Cancelling current operation; incomplete attempts retained, original files unchanged…"
+        self.cancel_button.setEnabled(False)
+        message = (
+            "Cancellation requested. Waiting for the current safe file-read checkpoint; "
+            "no inspected input will be published. Original files remain unchanged…"
+        )
+        self.operation_state.update(
+            self.operation_token,
+            State.PROCESSING if self.pending.endswith("-run") else State.LOADING,
+            message,
         )
 
     def shutdown(self) -> bool:

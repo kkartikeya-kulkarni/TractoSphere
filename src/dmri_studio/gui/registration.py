@@ -40,11 +40,20 @@ class TransformImportDialog(QDialog):
         root.addLayout(form)
         self.source = QComboBox()
         self.target = QComboBox()
+        missing = []
         for combo in (self.source, self.target):
             combo.addItem("Select image and declared space…", None)
             for a in owner.artifacts:
                 if a.kind == "anatomy":
-                    combo.addItem(Path(a.payload["path"]).name, a.id)
+                    reason = self._image_blocker(a)
+                    name = Path(a.payload["path"]).name
+                    combo.addItem(
+                        name if not reason else f"Imported · {name} · needs review",
+                        a.id if not reason else None,
+                    )
+                    if reason:
+                        combo.model().item(combo.count() - 1).setEnabled(False)
+                        missing.append(f"{name}: {reason}")
         self.format = QComboBox()
         for key, meaning in FORMATS.items():
             self.format.addItem(key + " · " + meaning, key)
@@ -66,6 +75,23 @@ class TransformImportDialog(QDialog):
         form.addRow("Native coordinate format", self.format)
         root.addWidget(
             label(
+                "Choose source and target images with established subject, acquisition and spatial identity. "
+                "If an imported image needs review, close this tool and use Registration → "
+                "Imported registration inputs → Review input evidence; then reopen transform import.",
+                "caption",
+            )
+        )
+        if missing:
+            details = QPlainTextEdit()
+            details.setReadOnly(True)
+            details.setMaximumHeight(90)
+            details.setAccessibleName("Imported images needing transform-space evidence")
+            details.setPlainText(
+                "Imported images needing evidence:\n• " + "\n• ".join(dict.fromkeys(missing))
+            )
+            root.addWidget(details)
+        root.addWidget(
+            label(
                 "Import records provenance; it does not assert anatomical accuracy. No matrix is applied or affine rewritten.",
                 "caption",
             )
@@ -78,6 +104,26 @@ class TransformImportDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         root.addWidget(buttons)
+
+    @staticmethod
+    def _image_blocker(artifact):
+        d = artifact.payload.get("declarations", {})
+        missing = [
+            title
+            for key, title in (
+                ("subject_id", "subject identity"),
+                ("acquisition_id", "acquisition identity"),
+                ("space_kind", "coordinate-space kind"),
+                ("space_id", "specific spatial identity"),
+            )
+            if not d.get(key)
+        ]
+        geometry = artifact.payload.get("geometry") or {}
+        if len(geometry.get("shape", [])) != 3:
+            missing.append("3D reference image")
+        if geometry.get("units") != "mm":
+            missing.append("millimeter spatial units")
+        return ", ".join(missing)
 
     def browse(self, key):
         path, _ = (
@@ -106,6 +152,8 @@ class TransformImportDialog(QDialog):
 class RegistrationPanel(QScrollArea):
     view_requested = Signal(dict)
     qc_requested = Signal(object)
+    history_requested = Signal()
+    activate_dwi_requested = Signal(object)
 
     def __init__(self, owner):
         super().__init__(owner)

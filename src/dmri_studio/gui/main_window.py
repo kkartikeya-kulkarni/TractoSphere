@@ -436,6 +436,8 @@ class MainWindow(QMainWindow):
             page.tracking.view_requested.connect(self.open_scientific_product)
             page.registration.view_requested.connect(self.open_scientific_product)
             page.registration.qc_requested.connect(self.open_generated_qc)
+            page.registration.history_requested.connect(self.open_registration_history)
+            page.registration.activate_dwi_requested.connect(self.activate_imported_dwi)
             page.anatomy.view_requested.connect(self.open_scientific_product)
             page.anatomy.qc_requested.connect(self.open_generated_qc)
             page.anatomy.run_requested.connect(self.open_saved_run)
@@ -829,9 +831,11 @@ class MainWindow(QMainWindow):
         if viewing:
             self.update_scene_identity()
         elif self.dataset:
-            self.dataset_label.setText("Processing input · " + self.dataset.paths.dwi.name)
+            self.dataset_label.setText("Active preprocessing DWI · " + self.dataset.paths.dwi.name)
         else:
-            self.dataset_label.setText("No processing input loaded")
+            self.dataset_label.setText(
+                "No active preprocessing DWI · scientific imports remain available"
+            )
         previous = self._selected_navigation
         self._selected_navigation = selected
         for nav, name in self.nav_buttons:
@@ -1472,6 +1476,30 @@ class MainWindow(QMainWindow):
         """Read an existing attempt without changing or restarting processing."""
         self.focus_results()
         self.results.load(path)
+
+    def open_registration_history(self) -> None:
+        """Use Results' verified manifest reader for an existing registration."""
+        self.focus_results()
+        self.results.browse()
+
+    def activate_imported_dwi(self, artifact) -> None:
+        """Revalidate an imported DWI through the normal Project loader on request."""
+        if artifact.kind != "dwi" or self.load_thread is not None:
+            return
+        request = artifact.payload.get("request", {})
+        if not all(request.get(role) for role in ("path", "bval", "bvec")):
+            self.toast.show_message("Imported DWI has no complete gradient pair.", "warning")
+            return
+        self.focus_load()
+        for role, name in (
+            ("dwi", "path"),
+            ("bval", "bval"),
+            ("bvec", "bvec"),
+            ("json", "sidecar"),
+        ):
+            self.page.fields[role].setText(request.get(name) or "")
+        self.page.update_enabled()
+        self.start_load()
 
     def load_saved_result(self, context: dict) -> None:
         """Use the normal transactional loader; carry verified history on success only."""

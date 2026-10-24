@@ -156,6 +156,29 @@ def test_native_guided_epi_to_t1_keeps_direction_and_structural_evidence(
         ImportRequest("anatomy", Path(f["t"].image), declarations=moving_declarations)
     )
     image = nib.load(f["s"].image)
+    brain = mod.image(f["src"] / "t1_brain.nii.gz", image.get_fdata(), image.affine)
+    brain_evidence = f["src"] / "t1-brain-space.json"
+    _publish_json(
+        brain_evidence,
+        dict(
+            schema="tractosphere.space-association/1",
+            image_sha256=hash_file(brain),
+            reference_sha256=f["s"].sha256,
+            status="reviewed",
+            review_notes="Controlled synthetic brain-extracted input; no anatomical acceptance",
+        ),
+    )
+    t1_brain = import_artifact(
+        ImportRequest(
+            "anatomy",
+            brain,
+            declarations={
+                **f["a"].to_dict()["declarations"],
+                "space_review": str(brain_evidence),
+                "anatomical_preparation": "brain_extracted",
+            },
+        )
+    )
     mask = mod.image(f["src"] / "wmseg.nii.gz", (image.get_fdata() > 0).astype("u1"), image.affine)
     evidence = f["src"] / "wm-space.json"
     _publish_json(
@@ -172,12 +195,16 @@ def test_native_guided_epi_to_t1_keeps_direction_and_structural_evidence(
         ImportRequest(
             "mask",
             mask,
-            declarations={**f["a"].to_dict()["declarations"], "space_review": str(evidence)},
+            declarations={
+                **f["a"].to_dict()["declarations"],
+                "space_review": str(evidence),
+                "mask_role": "white_matter_segmentation",
+            },
         )
     )
     window.focus_registration()
     page = window.scientific
-    page.artifacts = [moving, f["a"], wmseg]
+    page.artifacts = [moving, f["a"], t1_brain, wmseg]
     page.tool_directory = mod.MR
     page.refresh()
     guided = page.registration.guided
@@ -185,7 +212,7 @@ def test_native_guided_epi_to_t1_keeps_direction_and_structural_evidence(
     for combo, artifact in (
         (guided.epi_moving, moving),
         (guided.epi_reference, f["a"]),
-        (guided.t1_brain, f["a"]),
+        (guided.t1_brain, t1_brain),
         (guided.wmseg, wmseg),
     ):
         _select(combo, artifact.id)
@@ -251,8 +278,13 @@ def test_native_guided_low_b_reference_uses_gradients(window, qtbot, tmp_path, m
     guided.output.setText(str(f["out"] / "guided-low-b"))
     _run_guided(page, qtbot)
     assert page.registration.manifest["validation"]["checks"]["selected_indices"] == [1, 3]
+    assert "selected volume indices (2): 1, 3" in guided.summary.text()
     result = Path(page.registration.manifest["plan"]["output_directory"]) / "mean-b0.nii.gz"
     np.testing.assert_allclose(nib.load(result).get_fdata(), base * 5)
+    reference_artifact = next(a for a in page.artifacts if a.payload["path"] == str(result))
+    guided.select_goal("epi_t1")
+    assert guided.epi_moving.findData(reference_artifact.id) > 0
+    guided.select_goal("reference")
     guided.open_button.click()
     qtbot.waitUntil(lambda: page.thread is None, timeout=15000)
     qtbot.waitUntil(

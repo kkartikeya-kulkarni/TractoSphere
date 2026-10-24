@@ -92,7 +92,7 @@ def test_registration_explains_filtered_import_and_opens_scoped_dialog(
     qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
     assert len(page.artifacts) == 1, page.status.text()
     assert guided.moving.count() == 1
-    assert "supported image contrast" in guided.inventory_notice.text()
+    assert "supported image contrast" in guided.imported_details.text()
     image2 = tmp_path / "synthetic-T1-eligible.nii.gz"
     nib.save(synthetic, image2)
     page.import_request(

@@ -528,6 +528,29 @@ def test_actual_epi_reg_without_fieldmap(fixture):
     moving = import_artifact(ImportRequest("anatomy", Path(f["t"].image), declarations=d))
     reference = f["a"]
     im = nib.load(f["s"].image)
+    brain_path = image(f["src"] / "t1_brain.nii.gz", im.get_fdata(), im.affine)
+    brain_evidence = f["src"] / "t1-brain-space.json"
+    _publish_json(
+        brain_evidence,
+        dict(
+            schema="tractosphere.space-association/1",
+            image_sha256=hash_file(brain_path),
+            reference_sha256=f["s"].sha256,
+            status="reviewed",
+            review_notes="Controlled synthetic brain-extracted input for adapter contract",
+        ),
+    )
+    t1_brain = import_artifact(
+        ImportRequest(
+            "anatomy",
+            brain_path,
+            declarations={
+                **reference.to_dict()["declarations"],
+                "space_review": str(brain_evidence),
+                "anatomical_preparation": "brain_extracted",
+            },
+        )
+    )
     mask = image(f["src"] / "wmseg.nii.gz", (im.get_fdata() > 0).astype("u1"), im.affine)
     evidence = f["src"] / "wm-space.json"
     _publish_json(
@@ -544,12 +567,88 @@ def test_actual_epi_reg_without_fieldmap(fixture):
         ImportRequest(
             "mask",
             mask,
+            declarations={
+                **reference.to_dict()["declarations"],
+                "space_review": str(evidence),
+                "mask_role": "white_matter_segmentation",
+            },
+        )
+    )
+    unreviewed_wm = import_artifact(
+        ImportRequest(
+            "mask",
+            mask,
             declarations={**reference.to_dict()["declarations"], "space_review": str(evidence)},
         )
     )
+    with pytest.raises(ValueError, match="white-matter segmentation"):
+        prepare_registration(
+            (moving, reference, t1_brain, unreviewed_wm),
+            (
+                Task(
+                    "reg",
+                    "registration.epi_reg",
+                    dict(
+                        moving=moving.id,
+                        reference=reference.id,
+                        t1_brain=t1_brain.id,
+                        wmseg=unreviewed_wm.id,
+                    ),
+                    {},
+                ),
+            ),
+            f["out"] / "unreviewed-wm",
+            tool_directory=MR,
+        )
     folder, result = run(
-        f, "epi_reg", dict(moving=moving, reference=reference, t1_brain=reference, wmseg=wm)
+        f, "epi_reg", dict(moving=moving, reference=reference, t1_brain=t1_brain, wmseg=wm)
     )
     assert load_transform(folder / "transform.json")["source"]["kind"] == "DWI_NATIVE"
     assert result["validation"]["scientific_acceptance"] == "unassigned"
     assert all("--nofmap" not in c["argv"] for c in result["plan"]["commands"])
+
+
+def test_new_registration_rejects_same_source_file_with_different_declarations(fixture):
+    f = fixture
+    original = f["a"]
+    duplicate = import_artifact(
+        ImportRequest(
+            "anatomy",
+            Path(original.payload["path"]),
+            declarations={
+                **original.to_dict()["declarations"],
+                "space_id": "incorrectly-redeclared-other-space",
+            },
+        )
+    )
+    with pytest.raises(ValueError, match="distinct source data"):
+        prepare_registration(
+            (original, duplicate),
+            (
+                Task(
+                    "same-source",
+                    "registration.flirt",
+                    {"moving": original.id, "reference": duplicate.id},
+                    {"model": "rigid", "cost": "mutualinfo"},
+                ),
+            ),
+            f["out"] / "same-source",
+            tool_directory=MR,
+        )
+
+
+def test_transform_import_rejects_same_image_with_redeclared_space(fixture):
+    f = fixture
+    duplicate = ImageSpace.create(
+        f["s"].image, "DWI_NATIVE", "misdeclared-other-space", "synthetic", "acq1"
+    )
+    with pytest.raises(ValueError, match="distinct images"):
+        transform_record(
+            f["src"] / "a-b.mat",
+            f["s"],
+            duplicate,
+            "fsl_flirt",
+            software="controlled fixture",
+            version="1",
+            evidence="Invalid same-image direction",
+        )

@@ -21,6 +21,8 @@ def _artifact(kind, name):
         "anatomical_modality": modality,
         "processing_state": "preprocessed" if name == "dwi" else "unknown",
         "reference_history": "synthetic correction history" if name in {"epi", "dwi"} else "",
+        "anatomical_preparation": "brain_extracted" if name == "brain" else "unknown",
+        "mask_role": "white_matter_segmentation" if name == "wm" else "unknown",
     }
     return SimpleNamespace(
         id=name,
@@ -57,7 +59,7 @@ def test_guided_registration_goals_are_separate_and_reused(window):
     assert guided.dwi.isVisibleTo(guided)
     assert not guided.moving.isVisibleTo(guided)
     assert "does not align it with anatomy" in guided.explanation.text()
-    assert "Import a preprocessed DWI" in guided.inventory_notice.text()
+    assert "documented preprocessed DWI" in guided.inventory_notice.text()
     guided.select_goal("inspect")
     assert guided.pages.currentIndex() == 4
     assert not guided.preview.isVisibleTo(guided)
@@ -248,6 +250,29 @@ def test_guided_epi_t1_preview_binds_structural_evidence(window, qtbot, tmp_path
     d = dict(f["b"].to_dict()["declarations"], anatomical_modality="b0")
     moving = import_artifact(ImportRequest("anatomy", Path(f["t"].image), declarations=d))
     image = nib.load(f["s"].image)
+    brain = fixture.image(f["src"] / "t1_brain.nii.gz", image.get_fdata(), image.affine)
+    brain_evidence = f["src"] / "t1-brain-space.json"
+    _publish_json(
+        brain_evidence,
+        dict(
+            schema="tractosphere.space-association/1",
+            image_sha256=hash_file(brain),
+            reference_sha256=f["s"].sha256,
+            status="reviewed",
+            review_notes="Controlled synthetic brain extraction for guided planning",
+        ),
+    )
+    brain_artifact = import_artifact(
+        ImportRequest(
+            "anatomy",
+            brain,
+            declarations={
+                **f["a"].to_dict()["declarations"],
+                "space_review": str(brain_evidence),
+                "anatomical_preparation": "brain_extracted",
+            },
+        )
+    )
     mask = fixture.image(
         f["src"] / "wmseg.nii.gz", (image.get_fdata() > 0).astype("u1"), image.affine
     )
@@ -266,19 +291,23 @@ def test_guided_epi_t1_preview_binds_structural_evidence(window, qtbot, tmp_path
         ImportRequest(
             "mask",
             mask,
-            declarations={**f["a"].to_dict()["declarations"], "space_review": str(evidence)},
+            declarations={
+                **f["a"].to_dict()["declarations"],
+                "space_review": str(evidence),
+                "mask_role": "white_matter_segmentation",
+            },
         )
     )
     window.focus_registration()
     page = window.scientific
-    page.artifacts = [moving, f["a"], wm]
+    page.artifacts = [moving, f["a"], brain_artifact, wm]
     page.tool_directory = fixture.MR
     page.refresh()
     guided = page.registration.guided
     guided.select_goal("epi_t1")
     _select(guided.epi_moving, moving.id)
     _select(guided.epi_reference, f["a"].id)
-    _select(guided.t1_brain, f["a"].id)
+    _select(guided.t1_brain, brain_artifact.id)
     _select(guided.wmseg, wm.id)
     guided.output.setText(str(f["out"] / "guided-epi"))
     guided.preview.click()

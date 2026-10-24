@@ -206,6 +206,8 @@ def prepare_registration(
     result_transform = None
     if method in {"flirt", "epi_reg", "fnirt"}:
         src, dst = space(bound["moving"]), space(bound["reference"])
+        if src.image == dst.image:
+            raise ValueError("Moving and reference images must be distinct source data")
         if src.id == dst.id:
             raise ValueError("Registration source and target spaces must differ")
         if src.subject != dst.subject and src.kind != "MNI_TEMPLATE" and dst.kind != "MNI_TEMPLATE":
@@ -264,6 +266,18 @@ def prepare_registration(
                 or bound["reference"]["declarations"].get("anatomical_modality") != "T1w"
             ):
                 raise ValueError("epi_reg is EPI/b0 to T1; inverse is a separate operation")
+            if bound["t1_brain"]["path"] == bound["reference"]["path"]:
+                raise ValueError(
+                    "Brain-extracted T1 must be a distinct prepared image from the reference T1"
+                )
+            if bound["t1_brain"]["declarations"].get("anatomical_preparation") != "brain_extracted":
+                raise ValueError(
+                    "Declare and verify brain-extracted T1 preparation; a whole-head or unknown T1 is not a substitute"
+                )
+            if bound["wmseg"]["declarations"].get("mask_role") != "white_matter_segmentation":
+                raise ValueError(
+                    "Declare the binary mask as a white-matter segmentation; an arbitrary brain mask is not suitable for BBR"
+                )
             for key in ("t1_brain", "wmseg"):
                 associated(bound[key], dst.to_dict(), hashes)
                 if bound[key]["geometry"] != bound["reference"]["geometry"]:

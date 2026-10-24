@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -87,16 +88,18 @@ class GuidedRegistration(QWidget):
             QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
         )
         root.addWidget(self.inventory_notice)
-        root.addWidget(label("Imported anatomical images · inspected, not yet approved", "control"))
+        root.addWidget(
+            label("Imported registration inputs · inspected, not yet approved", "control")
+        )
         imported_row = QWidget()
         imported_layout = QHBoxLayout(imported_row)
         imported_layout.setContentsMargins(0, 0, 0, 0)
         self.imported_anatomy = QComboBox()
         self.imported_anatomy.setAccessibleName(
-            "Imported anatomical images for registration review"
+            "Imported registration inputs for eligibility review"
         )
         imported_layout.addWidget(self.imported_anatomy, 1)
-        self.review_declarations = button("Review declarations…", self._review_selected_anatomy)
+        self.review_declarations = button("Review input evidence…", self._review_selected_anatomy)
         imported_layout.addWidget(self.review_declarations)
         root.addWidget(imported_row)
         self.imported_details = label("", "caption")
@@ -194,7 +197,9 @@ class GuidedRegistration(QWidget):
         layout.addWidget(combo, 1)
         action = button(
             "Import…",
-            lambda _=False, selected=kind: self.owner.owner.browse_import(selected),
+            lambda _=False, selected=kind: self.owner.owner.browse_import(
+                selected() if callable(selected) else selected
+            ),
         )
         action.setAccessibleName(f"Import {title}")
         layout.addWidget(action)
@@ -218,6 +223,15 @@ class GuidedRegistration(QWidget):
         self.threshold.setAccessibleName("Maximum low-b threshold")
         self.threshold.valueChanged.connect(self._input_changed)
         self._input_row(form, "Preprocessed DWI", self.dwi, "dwi")
+        self.use_dwi = button("Use imported DWI in Preprocessing", self._use_imported_dwi)
+        form.addRow("Already imported a DWI?", self.use_dwi)
+        self.use_dwi_help = label(
+            "Registration import and active preprocessing input are separate. "
+            "This action revalidates the selected DWI and gradient files in Project / Preprocessing; "
+            "it does not claim correction history or start preprocessing.",
+            "caption",
+        )
+        form.addRow(self.use_dwi_help)
         form.addRow("Low-b selection", self.low_b_selection)
         form.addRow("Maximum included b-value", self.threshold)
         return page
@@ -277,7 +291,21 @@ class GuidedRegistration(QWidget):
         self.transform.setToolTip(
             "The exact source, target, convention and direction are verified during plan preview."
         )
-        self._input_row(form, "Atlas, ROI or image", self.derivative, "atlas_labels")
+        self.derivative_type = QComboBox()
+        for title, kind in (
+            ("Atlas labels", "atlas_labels"),
+            ("Binary ROI", "roi"),
+            ("Continuous scalar image", "anatomy"),
+            ("Probability image", "atlas_probability"),
+        ):
+            self.derivative_type.addItem(title, kind)
+        self._input_row(
+            form,
+            "Atlas, ROI or image",
+            self.derivative,
+            lambda: self.derivative_type.currentData(),
+        )
+        form.addRow("Type to import", self.derivative_type)
         self._input_row(form, "Reference image in target space", self.target, "anatomy")
         self._input_row(form, "Source → target transform", self.transform, "spatial_transform")
         return page
@@ -288,6 +316,9 @@ class GuidedRegistration(QWidget):
             "Open a verified output or a saved registered-atlas QC bundle. Overlay, outlines, checkerboard, reference-only and blink are in the existing Viewer. Processing success is separate from anatomical review.",
         )
         layout.addWidget(button("Inspect Current Verified Result", self.owner.open_result))
+        layout.addWidget(
+            button("Open Previous Registration Run…", self.owner.history_requested.emit)
+        )
         layout.addWidget(button("Open Saved Atlas QC…", self.owner.open_saved))
         return page
 
@@ -358,15 +389,31 @@ class GuidedRegistration(QWidget):
         selected_import = self.imported_anatomy.currentData()
         self.imported_anatomy.blockSignals(True)
         self.imported_anatomy.clear()
-        self.imported_anatomy.addItem("Select an inspected anatomical image…", None)
+        self.imported_anatomy.addItem("Select an imported registration input…", None)
         for artifact in self.owner.owner.artifacts:
-            if artifact.kind == "anatomy":
+            if artifact.kind in {
+                "dwi",
+                "anatomy",
+                "mask",
+                "atlas_labels",
+                "roi",
+                "atlas_probability",
+                "spatial_transform",
+            }:
                 self.imported_anatomy.addItem(
-                    "Imported · " + Path(artifact.payload["path"]).name,
+                    "Imported "
+                    + artifact.kind.replace("_", " ")
+                    + " · "
+                    + Path(artifact.payload["path"]).name,
                     artifact.id,
                 )
+                self.imported_anatomy.setItemData(
+                    self.imported_anatomy.count() - 1,
+                    artifact.payload["path"],
+                    Qt.ItemDataRole.ToolTipRole,
+                )
         if self.imported_anatomy.count() == 1:
-            self.imported_anatomy.setItemText(0, "No anatomical image imported yet — use Import…")
+            self.imported_anatomy.setItemText(0, "No registration input imported yet — use Import…")
         else:
             self.imported_anatomy.setCurrentIndex(
                 max(1, self.imported_anatomy.findData(selected_import))
@@ -381,9 +428,15 @@ class GuidedRegistration(QWidget):
                 if artifact.kind in kinds and self._candidate(combo, artifact):
                     name = Path(artifact.payload["path"]).name
                     combo.addItem(f"{name} · {artifact.id[:8]}", artifact.id)
+                    combo.setItemData(
+                        combo.count() - 1,
+                        artifact.payload["path"],
+                        Qt.ItemDataRole.ToolTipRole,
+                    )
             if combo.count() == 1:
                 combo.setItemText(0, "No eligible import — use Import…")
-            combo.setCurrentIndex(max(0, combo.findData(old)))
+            restored = combo.findData(old)
+            combo.setCurrentIndex(restored if restored >= 0 else 1 if combo.count() == 2 else 0)
         self._refreshing = False
         self._update_direction()
         self._explain_inventory()
@@ -394,23 +447,57 @@ class GuidedRegistration(QWidget):
         if artifact_id:
             self.owner.owner.review_anatomy_declarations(artifact_id)
 
+    def _use_imported_dwi(self):
+        artifact_id = self.imported_anatomy.currentData()
+        artifact = next((a for a in self.owner.owner.artifacts if a.id == artifact_id), None)
+        if artifact is not None and artifact.kind == "dwi":
+            self.owner.activate_dwi_requested.emit(artifact)
+
     def _show_imported_details(self, *_):
         artifact_id = self.imported_anatomy.currentData()
         artifact = next((a for a in self.owner.owner.artifacts if a.id == artifact_id), None)
         self.review_declarations.setEnabled(
             artifact is not None and self.owner.owner.thread is None
         )
+        self.use_dwi.setEnabled(
+            artifact is not None and artifact.kind == "dwi" and self.owner.owner.thread is None
+        )
         if artifact is None:
             self.imported_details.setText(
-                "Imported images remain listed here even when a registration role needs more evidence."
+                "Inspected inputs remain listed here even when a registration role needs more evidence."
             )
             return
-        if self.goal == "epi_t1":
-            role = self.epi_reference
-            title = "Reference T1"
-        else:
-            role = self.moving
-            title = "generic moving image"
+        roles = {
+            "reference": ((self.dwi, "preprocessed DWI"),),
+            "epi_t1": (
+                (self.epi_moving, "moving EPI / b0"),
+                (self.epi_reference, "Reference T1"),
+                (self.t1_brain, "brain-extracted T1"),
+                (self.wmseg, "white-matter segmentation"),
+            ),
+            "align_two": (
+                (self.moving, "generic moving image"),
+                (self.reference, "reference image"),
+            ),
+            "move": (
+                (self.derivative, "source atlas / ROI / image"),
+                (self.target, "target reference"),
+                (self.transform, "source-to-target transform"),
+            ),
+            "inspect": (),
+        }
+        applicable = [
+            (role, title)
+            for role, title in roles[self.goal]
+            if artifact.kind in dict(self._inventory_specs())[role]
+        ]
+        name = Path(artifact.payload["path"]).name
+        if not applicable:
+            self.imported_details.setText(
+                f"Imported {artifact.kind.replace('_', ' ')}: {name}. "
+                "This input type has no role in the selected goal. Choose another goal or input."
+            )
+            return
         missing_identity = [
             name
             for key, name in (
@@ -420,15 +507,19 @@ class GuidedRegistration(QWidget):
             )
             if not artifact.payload.get("declarations", {}).get(key)
         ]
-        message = (
-            f"Imported; eligible for {title} selection. Exact identity and spatial checks follow during plan validation."
-            if self._candidate(role, artifact)
-            else f"Imported; not yet eligible for {title}: {self._candidate_reason(role, artifact)}. "
-            "Review declarations using the source documentation; filename alone is insufficient."
-        )
+        lines = [f"Imported and inspected: {name} ({artifact.kind.replace('_', ' ')})."]
+        for role, title in applicable:
+            lines.append(
+                f"• {title}: eligible for selection; exact planning checks still apply."
+                if self._candidate(role, artifact)
+                else f"• {title}: {self._candidate_reason(role, artifact)}."
+            )
         if missing_identity:
-            message += " Plan validation also requires " + ", ".join(missing_identity) + "."
-        self.imported_details.setText(message)
+            lines.append("Plan validation also requires " + ", ".join(missing_identity) + ".")
+        lines.append(
+            "Review input evidence using source documentation; the filename alone does not establish identity."
+        )
+        self.imported_details.setText("\n".join(lines))
 
     def _inventory_specs(self):
         return (
@@ -447,7 +538,8 @@ class GuidedRegistration(QWidget):
     def _explain_inventory(self):
         if self.goal == "reference":
             message = (
-                "Import a preprocessed DWI with gradients and recorded correction history to prepare a low-b reference."
+                "A documented preprocessed DWI with gradients and correction history is required. "
+                "Review an imported DWI below or import the missing input."
                 if self.dwi.count() <= 1
                 else "Select the recorded DWI acquisition; its gradients determine which volumes meet the threshold."
             )
@@ -463,7 +555,9 @@ class GuidedRegistration(QWidget):
                 if control.count() <= 1
             ]
             message = (
-                "Import " + ", ".join(missing) + " before planning."
+                "Required eligible inputs: "
+                + ", ".join(missing)
+                + ". Review imported inputs below or import missing files."
                 if missing
                 else "Select the exact EPI, T1 and structural evidence associated with this subject."
             )
@@ -484,7 +578,9 @@ class GuidedRegistration(QWidget):
                 if control.count() <= 1
             ]
             message = (
-                "Import " + ", ".join(missing) + " before planning."
+                "Required eligible inputs: "
+                + ", ".join(missing)
+                + ". Review imported inputs below or import missing files."
                 if missing
                 else "Select the exact source, target and transform; matching image dimensions are insufficient."
             )
@@ -497,42 +593,68 @@ class GuidedRegistration(QWidget):
             "move": (self.derivative, self.target, self.transform),
             "inspect": (),
         }
-        hidden = []
+        hidden = {}
         for combo in roles[self.goal]:
             kinds = dict(self._inventory_specs())[combo]
             for artifact in self.owner.owner.artifacts:
                 if artifact.kind in kinds and not self._candidate(combo, artifact):
-                    hidden.append(
-                        f"{Path(artifact.payload['path']).name} ({combo.accessibleName()}): "
-                        + self._candidate_reason(combo, artifact)
-                    )
+                    hidden.setdefault(artifact.id, (artifact, set()))[1].add(combo.accessibleName())
         if hidden:
-            distinct = list(dict.fromkeys(hidden))
-            message += "\n\nImported but not eligible for this goal:\n• " + "\n• ".join(
-                distinct[:4]
+            summaries = [
+                f"{Path(artifact.payload['path']).name}: needs review for "
+                + ", ".join(sorted(names))
+                for artifact, names in hidden.values()
+            ]
+            message += (
+                "\n\nImported inputs needing review — select one below for exact requirements:\n• "
             )
-            if len(distinct) > 4:
-                message += (
-                    f"; {len(distinct) - 4} more. Inspect input records for their declarations."
-                )
+            message += "\n• ".join(summaries[:2])
+            if len(summaries) > 2:
+                message += f"\n• {len(summaries) - 2} more imported input(s)."
         self.inventory_notice.setText(message)
 
     def _candidate_reason(self, combo, artifact):
         declarations = artifact.payload.get("declarations", {})
         space = declarations.get("space_kind")
         contrast = declarations.get("anatomical_modality")
+        if combo is self.dwi:
+            missing = [
+                title
+                for key, title in (
+                    ("subject_id", "subject identity"),
+                    ("acquisition_id", "acquisition identity"),
+                    ("space_id", "specific spatial identity"),
+                )
+                if not declarations.get(key)
+            ]
+            if declarations.get("processing_state") != "preprocessed":
+                missing.append("declared preprocessed state")
+            if not declarations.get("reference_history"):
+                missing.append("correction history")
+            if not artifact.payload.get("gradients"):
+                missing.append("verified gradients")
+            return "needs " + ", ".join(missing)
         image_roles = {
-            self.epi_moving, self.epi_reference, self.t1_brain, self.wmseg,
-            self.moving, self.reference, self.derivative, self.target,
+            self.dwi,
+            self.epi_moving,
+            self.epi_reference,
+            self.t1_brain,
+            self.wmseg,
+            self.moving,
+            self.reference,
+            self.derivative,
+            self.target,
         }
         if combo in image_roles:
             missing = [
-                title for key, title in (
+                title
+                for key, title in (
                     ("subject_id", "subject identity"),
                     ("acquisition_id", "acquisition identity"),
                     ("space_kind", "coordinate-space kind"),
                     ("space_id", "specific spatial identity"),
-                ) if not declarations.get(key)
+                )
+                if not declarations.get(key)
             ]
             if missing:
                 if combo in (self.epi_reference, self.t1_brain):
@@ -542,20 +664,26 @@ class GuidedRegistration(QWidget):
                         missing.append(
                             "subject T1 structural-space declaration (T1_NATIVE; ACPC-aligned HCP T1 may qualify when documented)"
                         )
+                    if (
+                        combo is self.t1_brain
+                        and declarations.get("anatomical_preparation") != "brain_extracted"
+                    ):
+                        missing.append("reviewed brain-extracted preparation declaration")
+                elif (
+                    combo is self.wmseg
+                    and declarations.get("mask_role") != "white_matter_segmentation"
+                ):
+                    missing.append("white-matter segmentation purpose declaration")
                 elif combo in (self.moving, self.reference) and contrast not in {
-                    "T1w", "T2w", "b0", "mean_b0", "FA", "MD"
+                    "T1w",
+                    "T2w",
+                    "b0",
+                    "mean_b0",
+                    "FA",
+                    "MD",
                 }:
                     missing.append("supported image contrast declaration")
                 return "needs " + ", ".join(missing)
-        if combo is self.dwi:
-            missing = []
-            if declarations.get("processing_state") != "preprocessed":
-                missing.append("declared preprocessed state")
-            if not declarations.get("reference_history"):
-                missing.append("correction history")
-            if not artifact.payload.get("gradients"):
-                missing.append("verified gradients")
-            return "missing " + ", ".join(missing)
         if combo is self.epi_moving:
             missing = []
             if space != "DWI_NATIVE":
@@ -575,9 +703,17 @@ class GuidedRegistration(QWidget):
                     if not space
                     else f"subject T1 structural space, rather than declared {space}"
                 )
+            if (
+                combo is self.t1_brain
+                and declarations.get("anatomical_preparation") != "brain_extracted"
+            ):
+                issues.append("reviewed brain-extracted T1 preparation declaration")
             return "needs " + "; ".join(issues)
         if combo is self.wmseg:
-            return "requires T1-native space evidence"
+            return (
+                "requires white-matter segmentation purpose and T1 structural-space evidence; "
+                "an arbitrary brain mask is not a substitute"
+            )
         if combo in (self.moving, self.reference):
             if contrast not in {"T1w", "T2w", "b0", "mean_b0", "FA", "MD"}:
                 return "requires a supported image contrast declaration"
@@ -591,8 +727,14 @@ class GuidedRegistration(QWidget):
         kind = declarations.get("space_kind")
         contrast = declarations.get("anatomical_modality")
         if combo in {
-            self.epi_moving, self.epi_reference, self.t1_brain, self.wmseg,
-            self.moving, self.reference, self.derivative, self.target,
+            self.epi_moving,
+            self.epi_reference,
+            self.t1_brain,
+            self.wmseg,
+            self.moving,
+            self.reference,
+            self.derivative,
+            self.target,
         } and any(
             not declarations.get(key)
             for key in ("subject_id", "acquisition_id", "space_kind", "space_id")
@@ -600,7 +742,8 @@ class GuidedRegistration(QWidget):
             return False
         if combo is self.dwi:
             return (
-                declarations.get("processing_state") == "preprocessed"
+                all(declarations.get(k) for k in ("subject_id", "acquisition_id", "space_id"))
+                and declarations.get("processing_state") == "preprocessed"
                 and bool(declarations.get("reference_history"))
                 and bool(artifact.payload.get("gradients"))
             )
@@ -610,10 +753,18 @@ class GuidedRegistration(QWidget):
                 and contrast in {"b0", "mean_b0"}
                 and bool(declarations.get("reference_history"))
             )
-        if combo in (self.epi_reference, self.t1_brain):
+        if combo is self.epi_reference:
             return kind == "T1_NATIVE" and contrast == "T1w"
+        if combo is self.t1_brain:
+            return (
+                kind == "T1_NATIVE"
+                and contrast == "T1w"
+                and declarations.get("anatomical_preparation") == "brain_extracted"
+            )
         if combo is self.wmseg:
-            return kind == "T1_NATIVE"
+            return (
+                kind == "T1_NATIVE" and declarations.get("mask_role") == "white_matter_segmentation"
+            )
         if combo in (self.moving, self.reference):
             return contrast in {"T1w", "T2w", "b0", "mean_b0", "FA", "MD"} and (
                 kind != "DWI_NATIVE" or bool(declarations.get("reference_history"))
@@ -651,12 +802,16 @@ class GuidedRegistration(QWidget):
                 {},
             )
         if self.goal == "align_two":
+            moving = self._required(self.moving, "the moving image")
+            reference = self._required(self.reference, "the reference image")
+            if moving == reference:
+                raise ValueError("Moving and reference must be different imported images")
             return Task(
                 "registration-guided",
                 "registration.flirt",
                 {
-                    "moving": self._required(self.moving, "the moving image"),
-                    "reference": self._required(self.reference, "the reference image"),
+                    "moving": moving,
+                    "reference": reference,
                 },
                 {
                     "model": self._required(self.alignment_method, "rigid or affine registration"),
@@ -696,8 +851,17 @@ class GuidedRegistration(QWidget):
         source_name = Path(source.get("image", source.get("path", ""))).name
         target_name = Path(target.get("image", target.get("path", ""))).name
         task = payload["tasks"][0]
+        low_b = ""
+        if payload.get("operation") == "reference":
+            indices = payload.get("indices", [])
+            low_b = (
+                f"\nLow-b threshold: ≤ {payload['threshold']} s/mm²; "
+                f"selected volume indices ({len(indices)}): {', '.join(map(str, indices))}."
+            )
         self.summary.setText(
-            f"{task['algorithm']} · {source_name or 'selected DWI'} → {target_name or 'new low-b reference'}\nOutput: {payload['output_directory']}\nApproval digest: {plan.digest}\nTechnical validity is not anatomical approval."
+            f"{task['algorithm']} · {source_name or 'selected DWI'} → {target_name or 'new low-b reference'}"
+            f"{low_b}\nOutput: {payload['output_directory']}\nApproval digest: {plan.digest}"
+            "\nTechnical validity is not anatomical approval."
         )
         commands = "\n".join(c["display"] for c in payload["commands"])
         self.commands.setPlainText(commands + "\n\n" + "\n".join(payload["scientific_limits"]))
