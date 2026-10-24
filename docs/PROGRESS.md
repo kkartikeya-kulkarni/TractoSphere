@@ -7,7 +7,9 @@ tracks U1–U9: fresh Preprocessing access, scoped scientific imports and
 candidate explanations, duplicate identity-field removal, guided Batch source
 instructions/errors, Registration layout inset and Reconstruction guidance.
 Synthetic offscreen GUI/core/CLI results and the restricted Cocoa/VTK failures
-are recorded there. Native interactions on this branch remain pending; the
+are recorded there. At `62883c0`, the user's normal Mac Terminal ran the
+selected native Cocoa audit/Registration/Batch suite: **46 passed in 57.28 s,
+exit 0**. Visual layout, chooser and researcher-led review remain pending; the
 permanent 38-task scientific-validation backlog and all approval gates remain
 unchanged.
 
