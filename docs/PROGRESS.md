@@ -10,8 +10,10 @@ Results/QC reopening. Local repairs add declaration review for imported draft
 inputs, supported FA/MD/mean-b0 import choices, accurate Registration spatial
 eligibility, a T1-only 5TT generation source selector, and explicit
 Connectivity guidance when an imported atlas lacks declared registration QC.
-Native Cocoa interaction and broader scientific plan acceptance remain unverified at this
-checkpoint. The permanent 38-task backlog and Phase 7 EDDY work are unchanged.
+At code HEAD `8da3091`, the user's normal Mac Terminal ran 15 targeted native
+Cocoa GUI tests: **15 passed, exit 0**. Real-data visual interactions and
+broader scientific plan acceptance remain unverified. The permanent 38-task
+backlog and Phase 7 EDDY work are unchanged.
 
 ## 2026-10-24 — Registration anatomical declaration review
 

@@ -94,10 +94,16 @@ atlas, and no `epi_reg` plan was approved or executed.
 - Real-data checks used the application's importer, Project loader, scientific
   inventory, guided selectors, custom Batch discovery, Results and QC services.
   The detailed private register has one record per attempted operation.
-- **Native Cocoa interaction in this task: none.** The restricted command
-  environment has zero available Qt screens; prior diagnostics established
-  this before this audit. Native file pickers, actual rendering, layouts,
-  registration inspection and Viewer handoff remain unverified at these commits.
+- The user's normal Mac Terminal ran 15 targeted native Cocoa GUI tests at
+  committed HEAD `8da3091`: **15 passed in 41.27 s, exit 0**. These include
+  synthetic click-driven import/review routes for Registration, Anatomy,
+  DTI/CSD, SIFT2, Tractography and Connectivity, plus the existing scientific
+  Viewer route/state test. This is native automated GUI evidence, not a
+  researcher-led real-data visual inspection or scientific validation. The
+  user also invoked `dmri-studio gui`, but supplied no visual observations or
+  screenshot from that launch. The restricted Codex command environment
+  itself still has zero available Qt screens. Native real-data file-picker,
+  layout, registration inspection and output handoff checks remain open.
 - The current local QSettings profile contained no saved MRtrix3/FSL/ANTs
   paths. Scientific software setup and exact command approval were therefore
   not exercised. No full real-data DTI/CSD/ACT/SIFT2/Connectivity plan or
@@ -113,12 +119,14 @@ The [38-task scientific backlog](SCIENTIFIC_VALIDATION_BACKLOG.md) and
 [Phase 7 EDDY protocol](PHASE7_EDDY_SCIENTIFIC_VALIDATION.md) are unchanged.
 This usability audit does not close their scientific validation tasks. Prior
 native Cocoa results in the [post-audit handoff](USABILITY_AUDIT_FIXES_2026-10-24.md)
-apply to earlier application commits and do not verify these new repairs.
+apply to earlier application commits; the 15 tests above are targeted native
+evidence for this audit branch.
 
 ## Remaining audit work
 
-1. Run native Cocoa file-picker, real image/tractogram Viewer and layout checks
-   on this committed branch when a desktop session is available.
+1. Complete researcher-led native Cocoa file-picker, real image/tractogram
+   Viewer and layout checks on this committed branch; the 15 automated tests
+   establish only their named synthetic interactions.
 2. Establish documented subject/space/processing associations for the selected
    real reference files, then validate actual DTI/CSD/Registration/Connectivity
    plans without accepting scientific quality merely from successful commands.
