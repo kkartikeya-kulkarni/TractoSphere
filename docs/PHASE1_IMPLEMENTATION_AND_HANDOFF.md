@@ -62,6 +62,52 @@ The combined dependency/core/CLI suite in `/private/tmp/phase1-final-focused.log
 - [ ] Native GUI verification of the complete per-family setup and all workflow tabs on macOS Cocoa; this sandbox cannot initialize native VTK reliably.
 - [ ] Full BatchRunner execution and historical resume/retry against pinned MRtrix/FSL/ANTs paths outside the `psutil` sandbox restriction.
 - [ ] Physical Linux and Windows/WSL2 validation of the expanded scientific workflows. Native FSL execution on Windows remains unsupported.
-- [x] Draft PR #4 opened against the scientific development branch. CI for its new head is not yet verified.
+- [x] Draft PR #4 opened against the scientific development branch. Its initial CI results are analyzed in the Phase 1.1 section below.
 
 Do not call Phase 1 fully verified until the unchecked native and BatchRunner checks are run in a suitable environment. Do not weaken version or provenance gates to make a scan look successful. The specific next verification task is to run the full GUI and batch tests on a native macOS host with process enumeration and VTK access, then resolve only residual application failures. Phase 2 startup/navigation optimization follows only after this gate.
+
+## Phase 1.1 native verification and CI triage — 2026-10-23/24
+
+This follow-up was run locally on the same ARM64 Mac, on `development/phase1-scientific-software-2026-10-23`. PR #4 was draft and unmerged, targeting `development/scientific-toolbox-2026-10`; its pre-follow-up remote head was `ff8e639c9ed603a08220400d2410c698925cb252`, with the same tree as local `35552cf`. PR #3 remained separate and unmerged.
+
+### CI comparison and cause
+
+The PR #4 [Actions run 40046817126](https://github.com/kkartikeya-kulkarni/TractoSphere/actions/runs/40046817126) finished on all five platforms. Its core test step failed before GitHub Actions could run any GUI tests or viewer smoke tests. The preceding wheel build, archive audit, installation and dependency resolution steps passed on all five jobs. PR #3 [run 40043535129](https://github.com/kkartikeya-kulkarni/TractoSphere/actions/runs/40043535129) failed at the same step.
+
+| Job | PR #3 | PR #4 | Failed-case comparison |
+| --- | --- | --- | --- |
+| macOS ARM64 3.12 | 31 failed, 801 passed, 126 skipped | 31 failed, 803 passed, 126 skipped | Exactly the same 31 node IDs |
+| macOS Intel 3.12 | 31 failed, 801 passed, 126 skipped | 31 failed, 803 passed, 126 skipped | Exactly the same 31 node IDs |
+| Ubuntu 3.12 | 31 failed, 801 passed, 126 skipped | 31 failed, 803 passed, 126 skipped | Exactly the same 31 node IDs |
+| Ubuntu 3.13 | 31 failed, 801 passed, 126 skipped | 31 failed, 803 passed, 126 skipped | Exactly the same 31 node IDs |
+| Windows 3.12 | 36 failed, 787 passed, 135 skipped | 36 failed, 789 passed, 135 skipped | Exactly the same 36 node IDs |
+
+The shared 31 comprise 20 `tests/core/test_batch_engine.py`, three `tests/core/test_registration_batch.py`, and eight `tests/core/test_roi_filtering.py` cases. Batch and ROI fixtures hard-code `BIN = Path("/usr/local/mrtrix3/bin")`; hosted runners do not install MRtrix there. Their plans become `BLOCKED` or their resolver raises `MRtrix mrconvert was not found`, including cases whose assertions later expect execution/resume. Two registration cases set `FSLDIR = Path.home()/"fsl"`; hosted macOS traceback ends in `FileNotFoundError: /Users/runner/fsl`. The remaining registration atlas case is also blocked before its expected native failure. The five extra Windows cases already failed on PR #3. These are missing external dependencies and non-portable test fixtures, not demonstrated Phase 1 application regressions. There is no evidence that Phase 1 introduced a new failed CI test. Do not relax the scientific gates or substitute fake executables to turn these tests green. Portable fixture setup or an explicit external-software CI lane is separate work.
+
+### Actual local commands and outcomes
+
+All Python commands below used `PYTHONPATH=src` and `../application/.venv/bin/python` (Python 3.12), unless otherwise stated.
+
+| Check | Result | Verification boundary |
+| --- | --- | --- |
+| Explicit native inventory of `/usr/local/mrtrix3/bin` and `~/fsl` via `inspect_dependencies(..., search_common=False)` | MRtrix3 **ready**, ten required executables at 3.0.5; FSL **ready**, 13 component records including `eddy_cpu` 2401.2. ANTs **missing**. | Actual installed tools and metadata were queried; no real ANTs binary was found. |
+| Native QSettings/`DependencyController` round trip with a temporary INI: inventory, `apply_verified_family` for MRtrix3 and FSL, reconstruct controller and settings | Passed. Restored `/usr/local/mrtrix3/bin` and canonical `~/fsl/bin`; ANTs stayed unconfigured. | Exercises real filesystem writes and real tool verification without a GUI window. |
+| `QT_QPA_PLATFORM=offscreen ... pytest -q tests/gui/test_scientific_software_settings.py tests/gui/test_dependency_setup.py -k 'not first_run_viewer_only_during_scan_and_repeat_suppressed' --tb=short` | **20 passed, 1 deselected** in 32.71 s. | Covers synthetic MRtrix/FSL/ANTs save/restart and actual new preprocessing, registration, scientific/tracking and batch argument propagation; offscreen is not native Cocoa/VTK. |
+| `QT_QPA_PLATFORM=cocoa ... pytest -q tests/gui/test_scientific_software_settings.py::test_legacy_saved_paths_reach_new_workspaces --tb=short` | Exit **139**, segmentation fault constructing `gui/qc.py:189` VTK window. | Native GUI assertions never ran. An escalated retry was rejected by the current execution approval policy; no macOS protection was bypassed. |
+| `pytest -q tests/core/test_batch_engine.py::test_actual_execution_and_resume_no_duplicate tests/core/test_batch_engine.py::test_tool_change_blocks_reuse_without_rerun tests/core/test_registration_batch.py::test_actual_batch_registration_qc_resume --tb=short` | **3 failed** in 0.59 s, all at `BatchRunner.orphan_check()` before a job runs. | `psutil.process_iter()` calls macOS `sysctl`, which returns `PermissionError: [Errno 1] Operation not permitted` in this sandbox. Resume/retry is unverified here. |
+| Strengthened `test_reopened_approved_batch_keeps_recorded_toolchain` | **1 passed** in 1.33 s, offscreen. | Approved plan JSON, including nonempty executable paths and SHA-256 records, is unchanged after the global default changes. This does not execute a historical batch. |
+
+The first round-trip assertion incorrectly expected the FSL root string to remain `~/fsl`; the controller intentionally saves the verified canonical executable directory `~/fsl/bin`. Re-running with that expected path passed. This was a verification-script expectation error, not an application failure. `ruff check` and `ruff format --check` on the strengthened test plus `git diff --check` passed after formatting. Phase 1.1 did not change scientific execution code.
+
+### Phase 1.1 acceptance and next task
+
+- [x] Real installed MRtrix3 and FSL verified and persisted across a fresh local QSettings/controller construction.
+- [x] Synthetic ANTs save/restart and cross-workspace reuse covered by offscreen GUI tests; real ANTs native verification is unavailable because ANTs is not installed.
+- [x] Historical approved-plan executable paths and SHA-256 records proved unchanged by a global default change, without running the batch.
+- [x] PR #3 versus PR #4 failed test names and logs compared on all five CI jobs; no new failing node IDs.
+- [ ] Native Cocoa/VTK GUI workflow verification: blocked by segmentation fault before test body; permission escalation unavailable.
+- [ ] BatchRunner native resume/retry and historical tool revalidation: blocked before processing by sandbox `sysctl` denial.
+- [ ] Native ANTs verification: no installed ANTs 2.6.5 binary on this Mac.
+- [ ] Passing PR #4 CI: pre-existing external-tool fixtures block the core step and all downstream GUI steps.
+
+**Native Phase 1 acceptance has not passed in full.** The precise next task is to run the native GUI suite and BatchRunner resume/retry in a Mac session with VTK window-service access and process enumeration, with MRtrix3/FSL/ANTs installations available, then distinguish any actual failures from these restrictions. Do not start Phase 2 until those native checks pass or the remaining risk is explicitly accepted.
