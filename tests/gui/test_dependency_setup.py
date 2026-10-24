@@ -138,3 +138,16 @@ def test_real_app_entry_opens_studio_without_setup_modal(window, qtbot, monkeypa
     assert window.dependencies.thread is None
     window.focus_dependencies()
     assert window.workspace.currentWidget() is window.dependency_host
+
+def test_batch_reads_saved_mrtrix_location_without_asking_again(window):
+    """A new batch workspace reuses the application-level installation path."""
+    from dmri_studio.gui.batch import BatchPage
+
+    location = "/example/verified/mrtrix3/bin"
+    window.settings.set("dependencies/MRtrix3", location)
+    page = BatchPage(window.theme, settings=window.settings)
+    try:
+        assert page.mrtrix_directory.text() == location
+    finally:
+        page.timer.stop()
+        page.deleteLater()
