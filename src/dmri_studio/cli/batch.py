@@ -48,6 +48,12 @@ def add_command(commands):
     plan.add_argument("--output-directory", type=Path, required=True)
     plan.add_argument("--plan", type=Path, required=True)
     plan.add_argument("--mrtrix-directory", type=Path)
+    plan.add_argument(
+        "--acquisition-key",
+        action="append",
+        default=None,
+        help="exact discovered acquisition key; repeat to plan a subset",
+    )
     plan.add_argument("--limits", default="{}", help="JSON resource budgets")
     execute = sub.add_parser("execute")
     execute.add_argument("--plan", type=Path, required=True)
@@ -122,6 +128,7 @@ def run(args):
                 read_json(args.workflow.read_text()),
                 args.output_directory,
                 tool_directory=args.mrtrix_directory,
+                selected_keys=args.acquisition_key,
                 limits=read_json(args.limits),
                 progress=lambda s: print(s, file=sys.stderr),
             )

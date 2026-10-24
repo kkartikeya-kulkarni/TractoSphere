@@ -319,12 +319,19 @@ def build_batch_plan(
     fsl_directory=None,
     ants_directory=None,
     limits=None,
+    selected_keys=None,
     cancelled=lambda: False,
     progress=lambda _: None,
 ):
     """Read-only dry run: version/help probes only, no scientific commands or output mkdir."""
     if not study.acquisitions:
         raise ValueError("No acquisitions discovered; an empty batch cannot execute")
+    all_keys = {a.key for a in study.acquisitions}
+    selected = None if selected_keys is None else tuple(selected_keys)
+    if selected is not None and (
+        not selected or len(selected) != len(set(selected)) or set(selected) - all_keys
+    ):
+        raise ValueError("Select one or more unique acquisitions from this study")
     ordered = workflow_order(workflow)
     if set(workflow.get("overrides", {})) - {a.key for a in study.acquisitions}:
         raise ValueError("Override references an unknown acquisition")
@@ -353,6 +360,8 @@ def build_batch_plan(
         raise ValueError("Invalid resource limits")
     rows = []
     for acquisition in study.acquisitions:
+        if selected is not None and acquisition.key not in selected:
+            continue
         progress("Reviewing " + acquisition.key)
         for original in ordered:
             node = read_json(json.dumps(original))
@@ -512,28 +521,31 @@ def build_batch_plan(
                     cancelled=cancelled,
                 )
             )
-    return ExecutionPlan(
-        dict(
-            kind="tractosphere_batch_plan",
-            schema=1,
-            study=study.to_dict(),
-            workflow=workflow,
-            output_directory=str(output),
-            tool_directory=str(tool_directory) if tool_directory else None,
-            fsl_directory=str(fsl_directory) if fsl_directory else None,
-            ants_directory=str(ants_directory) if ants_directory else None,
-            limits=configured,
-            rows=rows,
-            scientific_acceptance="unassigned",
-            deferred_tools=deferred_tools,
-            scientific_implementation_hashes={
-                str(p.relative_to(Path(__file__).parents[1])): hash_file(p)
-                for p in Path(__file__).parents[1].glob("**/*.py")
-                if "batch" not in p.parts
-            },
-            orchestration_hashes={p.name: hash_file(p) for p in Path(__file__).parent.glob("*.py")},
-        )
+    payload = dict(
+        kind="tractosphere_batch_plan",
+        schema=1,
+        study=study.to_dict(),
+        workflow=workflow,
+        output_directory=str(output),
+        tool_directory=str(tool_directory) if tool_directory else None,
+        fsl_directory=str(fsl_directory) if fsl_directory else None,
+        ants_directory=str(ants_directory) if ants_directory else None,
+        limits=configured,
+        rows=rows,
+        scientific_acceptance="unassigned",
+        deferred_tools=deferred_tools,
+        scientific_implementation_hashes={
+            str(p.relative_to(Path(__file__).parents[1])): hash_file(p)
+            for p in Path(__file__).parents[1].glob("**/*.py")
+            if "batch" not in p.parts
+        },
+        orchestration_hashes={p.name: hash_file(p) for p in Path(__file__).parent.glob("*.py")},
     )
+    # Keep old approved plan payloads byte-for-byte compatible. New subsets are
+    # bound into the plan digest and cannot silently gain study acquisitions.
+    if selected is not None:
+        payload["selected_acquisition_keys"] = sorted(selected)
+    return ExecutionPlan(payload)
 
 
 def compile_node(acquisition, node, artifacts, tasks, output, **kwargs):
