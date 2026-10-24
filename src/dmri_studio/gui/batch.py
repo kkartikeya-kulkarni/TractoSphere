@@ -20,8 +20,10 @@ from PySide6.QtWidgets import (
     QListWidget,
     QPlainTextEdit,
     QScrollArea,
+    QSizePolicy,
     QSpinBox,
     QSplitter,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -69,13 +71,18 @@ class BatchPage(QWidget):
         self.ants_directory = None
         self.historical_toolchain = False
         self.historical_plan = None
+        self._plan_generation = 0
+        self._pending_plan_generation = None
+        self._pending_discovery_generation = None
         self.processing_available = lambda: True
         self.kind = ""
         self.rows = []
         self.products = []
         self.registration_reviews = {}
         self._journal_signature = None
-        root = QVBoxLayout(self)
+        self.guided_selection = None
+        advanced = QWidget(self)
+        root = QVBoxLayout(advanced)
         root.addWidget(label("Batch Processing", "title"))
         root.addWidget(
             label(
@@ -301,7 +308,32 @@ class BatchPage(QWidget):
         for spin in (self.max_subjects, self.max_processes, self.threads, self.memory):
             spin.valueChanged.connect(self.invalidate)
         self.method.currentIndexChanged.connect(self.invalidate)
+        from .batch_guided import GuidedBatch
+
+        display = QVBoxLayout(self)
+        mode = QHBoxLayout()
+        self.mode_label = label("Guided batch setup", "caption")
+        mode.addWidget(self.mode_label)
+        mode.addStretch()
+        self.mode_button = button("Advanced Settings", self.toggle_mode)
+        mode.addWidget(self.mode_button)
+        display.addLayout(mode)
+        self.display_stack = QStackedWidget()
+        self.display_stack.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.guided = GuidedBatch(self)
+        self.display_stack.addWidget(self.guided)
+        advanced_scroll = QScrollArea()
+        advanced_scroll.setWidgetResizable(True)
+        advanced_scroll.setWidget(advanced)
+        self.display_stack.addWidget(advanced_scroll)
+        display.addWidget(self.display_stack)
         self.update_actions()
+
+    def toggle_mode(self):
+        advanced = self.display_stack.currentIndex() == 0
+        self.display_stack.setCurrentIndex(1 if advanced else 0)
+        self.mode_button.setText("Guided Setup" if advanced else "Advanced Settings")
+        self.mode_label.setText("Advanced batch controls" if advanced else "Guided batch setup")
 
     def _update_polling(self):
         """Poll only a visible saved batch or a live operation."""
@@ -323,9 +355,12 @@ class BatchPage(QWidget):
             self._update_polling()
 
     def invalidate(self):
+        self._plan_generation += 1
         self.plan = None
         self.approval.setChecked(False)
         self.update_actions()
+        if hasattr(self, "guided"):
+            self.guided.sync_plan_state()
 
     def choose_path(self, widget):
         if widget is self.import_file:
@@ -375,6 +410,12 @@ class BatchPage(QWidget):
         )
 
     def discover(self):
+        if not self.source_root.text().strip():
+            self.status.setText("Choose an existing dataset folder before discovery.")
+            return
+        if self.method.currentIndex() in (1, 2) and not self.import_file.text().strip():
+            self.status.setText("Choose a mapping or manifest file before discovery.")
+            return
         root, name, source, method = (
             Path(self.source_root.text()),
             self.study_name.text(),
@@ -413,6 +454,10 @@ class BatchPage(QWidget):
             self.status.setText(str(exc))
             return
         study = self.study
+        selected_keys = self.guided_selection
+        fsl_directory = self.fsl_directory
+        ants_directory = self.ants_directory
+        self._pending_plan_generation = self._plan_generation
         directory = (
             Path(self.mrtrix_directory.text())
             if self.mrtrix_directory.text().strip()
@@ -425,9 +470,10 @@ class BatchPage(QWidget):
                 workflow,
                 output,
                 limits=limits,
+                selected_keys=selected_keys,
                 tool_directory=directory,
-                fsl_directory=self.fsl_directory,
-                ants_directory=self.ants_directory,
+                fsl_directory=fsl_directory,
+                ants_directory=ants_directory,
                 cancelled=cancel,
                 progress=progress,
             ),
@@ -464,6 +510,10 @@ class BatchPage(QWidget):
         )
 
     def selected_keys(self):
+        if hasattr(self, "guided") and self.display_stack.currentIndex() == 0:
+            guided = self.guided.selected_stage_keys()
+            if guided:
+                return guided
         return [
             self.table.item(index.row(), 0).data(Qt.ItemDataRole.UserRole)
             for index in self.table.selectionModel().selectedRows()
@@ -520,8 +570,25 @@ class BatchPage(QWidget):
     def result(self, _, result, error):
         if error:
             self.status.setText(error)
+            if hasattr(self, "guided"):
+                self.guided.operation_error(error)
             return
         if self.kind in {"discover", "study"}:
+            if (
+                self.kind == "discover"
+                and self._pending_discovery_generation is not None
+                and self._pending_discovery_generation != self.guided._data_generation
+            ):
+                self.status.setText(
+                    "Dataset choice changed during discovery. Discover the current folder again."
+                )
+                self.guided.operation_error(self.status.text())
+                self._pending_discovery_generation = None
+                return
+            self._pending_discovery_generation = None
+            saved_study_path = None
+            if self.kind == "study" and isinstance(result, tuple):
+                result, saved_study_path = result
             self.historical_toolchain = False
             self.historical_plan = None
             self.mrtrix_directory.setReadOnly(False)
@@ -543,6 +610,10 @@ class BatchPage(QWidget):
                 for a in result.acquisitions
             ]
             self.render()
+            if hasattr(self, "guided"):
+                self.guided.study_loaded(result)
+            if saved_study_path is not None:
+                self.remember_study(saved_study_path)
             self.status.setText(
                 f"{len(result.acquisitions)} acquisitions discovered. Scientific eligibility has not yet been assessed."
             )
@@ -577,8 +648,17 @@ class BatchPage(QWidget):
             self.status.setText(
                 "Saved batch reopened with its pinned approved toolchain. Resume verifies identities before reuse."
             )
+            if hasattr(self, "guided"):
+                self.guided.history_loaded()
 
         elif self.kind == "plan":
+            if self._pending_plan_generation != self._plan_generation:
+                self.status.setText(
+                    "Configuration changed while planning. Validate the current choices again."
+                )
+                if hasattr(self, "guided"):
+                    self.guided.operation_error(self.status.text())
+                return
             self.plan = result
             self.folder = None
             self.rows = result.to_dict()["rows"]
@@ -589,6 +669,8 @@ class BatchPage(QWidget):
             self.status.setText(
                 "Dry run finished. Review eligible, blocked and deferred stages before approval."
             )
+            if hasattr(self, "guided"):
+                self.guided.plan_loaded(result)
         elif self.kind == "registration-qc":
             states = {r["key"]: r for r in result}
             for row in self.rows:
@@ -611,13 +693,22 @@ class BatchPage(QWidget):
             )
             self.details.setPlainText(json.dumps(result, indent=2))
             self.status.setText("Result hashes verified; scientific acceptance remains unassigned.")
+            if hasattr(self, "guided"):
+                self.guided.inspected()
         elif self.kind == "export":
             self.status.setText("Report saved: " + str(result))
+        elif self.kind == "review":
+            self.refresh()
+            self.status.setText("Scientific review recorded separately from execution completion.")
+            if hasattr(self, "guided"):
+                self.guided.set_stage(6)
         else:
             self.refresh()
             self.status.setText(
                 "Batch state: " + result.get("state", "loaded") + ". Scientific QC requires review."
             )
+            if hasattr(self, "guided"):
+                self.guided.execution_loaded()
 
     def new_batch(self):
         """Leave the historical approval intact and start a distinct configuration."""
@@ -638,6 +729,8 @@ class BatchPage(QWidget):
         self.mrtrix_directory.setText(str(self.tool_directory or ""))
         self.invalidate()
         self.status.setText("New batch uses current saved software; review and approve a new plan.")
+        if hasattr(self, "guided"):
+            self.guided.new_batch()
 
     def finished(self):
         thread, worker = self.thread, self.worker
@@ -696,6 +789,8 @@ class BatchPage(QWidget):
             )
             self.render()
             self._journal_signature = signature
+            if hasattr(self, "guided"):
+                self.guided.journal_loaded(journal)
         except (ValueError, OSError):
             return
 
@@ -854,23 +949,66 @@ class BatchPage(QWidget):
         if self.study:
             name, _ = QFileDialog.getSaveFileName(self, "Save study", "", "JSON (*.json)")
             if name:
-                self.safe(lambda: _publish_json(Path(name), self.study.to_dict()))
+
+                def save():
+                    _publish_json(Path(name), self.study.to_dict())
+                    self.remember_study(Path(name))
+
+                self.safe(save)
 
     def open_study(self):
         name, _ = QFileDialog.getOpenFileName(self, "Open study", "", "JSON (*.json)")
         if name:
-            self.start(
-                "study", lambda cancel, progress: Study.from_dict(read_json(Path(name).read_text()))
+            self.open_study_path(Path(name))
+
+    def open_study_path(self, path):
+        self.start(
+            "study",
+            lambda cancel, progress: (
+                Study.from_dict(read_json(Path(path).read_text())),
+                Path(path),
+            ),
+        )
+
+    def remember_study(self, path):
+        if not self.settings:
+            return
+        paths = [str(path)] + [
+            old for old in self.settings.get("batch/recent_studies", []) if old != str(path)
+        ]
+        self.settings.set("batch/recent_studies", paths[:30])
+        try:
+            metadata = read_json(self.settings.get("batch/recent_study_metadata", "{}"))
+            if not isinstance(metadata, dict):
+                metadata = {}
+        except ValueError:
+            metadata = {}
+        if self.study:
+            metadata[str(path)] = dict(
+                study_id=self.study.study_id,
+                root=self.study.root,
+                acquisitions=len(self.study.acquisitions),
             )
+        self.settings.set(
+            "batch/recent_study_metadata",
+            json.dumps({p: metadata.get(p, {}) for p in paths[:30]}),
+        )
+        self.settings.store.sync()
+        if hasattr(self, "guided"):
+            self.guided.refresh_recent_studies()
 
     def load_workflow(self):
         name, _ = QFileDialog.getOpenFileName(self, "Open workflow", "", "JSON (*.json)")
         if name:
-            self.safe(
-                lambda: self.workflow.setPlainText(
-                    json.dumps(read_json(Path(name).read_text()), indent=2)
-                )
-            )
+            loaded = []
+
+            def apply():
+                self.workflow.setPlainText(json.dumps(read_json(Path(name).read_text()), indent=2))
+                loaded.append(True)
+
+            self.safe(apply)
+            return bool(loaded)
+        return False
 
     def save_workflow(self):
         name, _ = QFileDialog.getSaveFileName(self, "Save workflow", "", "JSON (*.json)")
@@ -936,6 +1074,8 @@ class BatchPage(QWidget):
         if self.settings:
             self.settings.set("batch/history", paths[:30])
             self.settings.store.sync()
+        if hasattr(self, "guided"):
+            self.guided.refresh_recent_batches()
 
     def open_recent(self, index):
         path = self.history.itemData(index)
@@ -955,7 +1095,7 @@ class BatchPage(QWidget):
         data = plan.to_dict()
         lines = [
             f"Study: {data['study']['study_id']}",
-            f"Acquisitions: {len(data['study']['acquisitions'])}",
+            f"Selected acquisitions: {len(data.get('selected_acquisition_keys', data['study']['acquisitions']))}",
             f"Output: {data['output_directory']}",
             "MRtrix3: " + str(data.get("tool_directory") or "not selected"),
             "FSL: "
