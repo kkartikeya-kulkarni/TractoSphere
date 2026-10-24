@@ -1,5 +1,20 @@
 # Outstanding Scientific Verification and Release Blockers
 
+## 2026-10-24 — Viewer-to-Tractography filtering integration
+
+The [tractography filtering repair handoff](TRACTOGRAPHY_FILTER_VIEWER_REPAIR_2026-10-24.md)
+records the confirmed display-versus-scientific-inventory gap and a focused
+Viewer **Filter These Tracks…** handoff. The selected full source and reference
+are reused only through matching imported records or explicit evidence review;
+display caps and edits never become silent processing inputs. A bounded local
+real-data TCK/reference/two-ROI check imported, selected, planned and executed
+a four-track technical derivative with unchanged source hashes and scientific
+review still required. Synthetic TRK-to-TCK conversion verifies exact reference
+geometry and complete streamline coordinates; no real research TRK was found
+in the authorized bounded roots. Native Cocoa/VTK button, picker, rendering
+and filtered-result interactions await the normal Mac walkthrough. The 38-task
+scientific backlog and separate Phase 7 EDDY work retain their statuses.
+
 ## 2026-10-24 — Native Registration low-b summary follow-up
 
 The user's native Cocoa suite at `87b8043` returned **19 passed, 1 failed**:
