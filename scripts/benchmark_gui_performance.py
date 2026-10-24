@@ -1,4 +1,10 @@
-"""Temporary pre-change TractoSphere GUI profiler. No scientific processing."""
+"""Repeatable offscreen/native shell profiler with synthetic data only.
+
+Run with the application environment, ``PYTHONPATH=src`` and the desired
+``QT_QPA_PLATFORM``. Set ``BENCH_LOADED=1`` to load a tiny generated NIfTI
+through the real GUI worker before measuring navigation. No scientific
+processing is launched. Each invocation uses isolated temporary settings.
+"""
 
 import json
 import os
