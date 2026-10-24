@@ -395,7 +395,6 @@ class RegistrationPanel(QScrollArea):
             if good
             else result["status"] + " · " + result.get("error", "")
         )
-        self.guided.result_ready(result, verified=good)
         if good:
             for row in result["validation"]["products"]:
                 if "artifact" in row:
@@ -403,6 +402,9 @@ class RegistrationPanel(QScrollArea):
                     if all(old.id != a.id for old in self.owner.artifacts):
                         self.owner.artifacts.append(a)
             self.owner.refresh()
+        # Refresh must first invalidate the old runnable plan. Then present the
+        # completed, read-only plan from its execution record in the guided UI.
+        self.guided.result_ready(result, verified=good)
 
     def failed(self, message, cancelled=False):
         self.invalidate()

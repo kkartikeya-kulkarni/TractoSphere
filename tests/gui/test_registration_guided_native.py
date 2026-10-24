@@ -276,9 +276,26 @@ def test_native_guided_low_b_reference_uses_gradients(window, qtbot, tmp_path, m
     _select(guided.low_b_selection, "mean_low_b")
     guided.threshold.setValue(50)
     guided.output.setText(str(f["out"] / "guided-low-b"))
-    _run_guided(page, qtbot)
+    guided.preview.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=20000)
+    plan = page.registration.plan
+    assert plan is not None, page.status.text()
+    payload = plan.to_dict()
+    assert payload["indices"] == [1, 3]
+    assert payload["threshold"] == 50
+    argv = payload["commands"][0]["argv"]
+    assert argv[argv.index("-coord") + 1 : argv.index("-coord") + 3] == ["3", "1,3"]
+    assert "selected volume indices (2): 1, 3" in guided.summary.text()
+    guided.approval.setChecked(True)
+    guided.run_button.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=60000)
+    assert page.registration.manifest["status"] == "validated_pending_qc", page.status.text()
+    assert page.registration.manifest["plan"]["indices"] == [1, 3]
+    assert page.registration.plan is None
+    assert not guided.run_button.isEnabled()
     assert page.registration.manifest["validation"]["checks"]["selected_indices"] == [1, 3]
     assert "selected volume indices (2): 1, 3" in guided.summary.text()
+    assert page.registration.manifest["approval"]["digest"] in guided.summary.text()
     result = Path(page.registration.manifest["plan"]["output_directory"]) / "mean-b0.nii.gz"
     np.testing.assert_allclose(nib.load(result).get_fdata(), base * 5)
     reference_artifact = next(a for a in page.artifacts if a.payload["path"] == str(result))

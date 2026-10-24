@@ -845,7 +845,11 @@ class GuidedRegistration(QWidget):
         self.update_actions()
 
     def plan_ready(self, plan):
-        payload = plan.payload
+        self._show_plan(plan.payload, plan.digest, "Validated plan · awaiting approval")
+        self.update_actions()
+
+    def _show_plan(self, payload, digest, heading):
+        """Render the exact preview or recorded execution without restoring approval."""
         source = payload.get("source", payload.get("dwi", {}))
         target = payload.get("reference", {})
         source_name = Path(source.get("image", source.get("path", ""))).name
@@ -859,15 +863,24 @@ class GuidedRegistration(QWidget):
                 f"selected volume indices ({len(indices)}): {', '.join(map(str, indices))}."
             )
         self.summary.setText(
+            f"{heading}\n"
             f"{task['algorithm']} · {source_name or 'selected DWI'} → {target_name or 'new low-b reference'}"
-            f"{low_b}\nOutput: {payload['output_directory']}\nApproval digest: {plan.digest}"
+            f"{low_b}\nOutput: {payload['output_directory']}\nApproval digest: {digest}"
             "\nTechnical validity is not anatomical approval."
         )
         commands = "\n".join(c["display"] for c in payload["commands"])
         self.commands.setPlainText(commands + "\n\n" + "\n".join(payload["scientific_limits"]))
-        self.update_actions()
 
     def result_ready(self, result, *, verified):
+        # Publishing a verified derivative refreshes the shared inventory and
+        # correctly invalidates the old runnable plan. Restore only its
+        # read-only explanation from the immutable execution record.
+        if result.get("plan") and result.get("approval", {}).get("digest"):
+            self._show_plan(
+                result["plan"],
+                result["approval"]["digest"],
+                "Executed plan · no active approval",
+            )
         self.result.setText(
             "Processing completed; technical validation recorded. Anatomical review remains required."
             if verified

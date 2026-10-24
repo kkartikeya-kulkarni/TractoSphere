@@ -235,6 +235,92 @@ def test_guided_real_rigid_preview_uses_exact_approved_plan(window, qtbot, tmp_p
     assert panel.plan is None and not guided.run_button.isEnabled()
 
 
+def test_guided_low_b_preview_survives_verified_product_refresh(
+    window, qtbot, tmp_path, monkeypatch
+):
+    import nibabel as nib
+    import numpy as np
+
+    from dmri_studio.core.scientific import ImportRequest, import_artifact
+
+    spec = importlib.util.spec_from_file_location(
+        "reg_fixture", Path(__file__).parents[1] / "test_registration.py"
+    )
+    fixture = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fixture)
+    f = fixture.fixture.__wrapped__(tmp_path, monkeypatch)
+    source = nib.load(f["s"].image)
+    base = np.asarray(source.dataobj) + 10
+    values = np.stack([base * 2, base * 3, base * 5, base * 7], axis=-1).astype("f4")
+    dwi = fixture.image(f["src"] / "dwi.nii.gz", values, source.affine)
+    bval = f["src"] / "bval"
+    bvec = f["src"] / "bvec"
+    bval.write_text("1000 0 1000 20")
+    bvec.write_text("1 0 0 0\n0 0 1 0\n0 0 0 0")
+    imported = import_artifact(
+        ImportRequest(
+            "dwi",
+            dwi,
+            bval=bval,
+            bvec=bvec,
+            declarations=dict(
+                subject_id="synthetic",
+                session_id="01",
+                acquisition_id="acq1",
+                space_id="native-dwi",
+                processing_state="preprocessed",
+                reference_history="Controlled processed fixture",
+            ),
+        )
+    )
+    window.focus_registration()
+    page = window.scientific
+    page.artifacts = [imported]
+    page.tool_directory = fixture.MR
+    page.refresh()
+    panel = page.registration
+    guided = panel.guided
+    guided.select_goal("reference")
+    _select(guided.dwi, imported.id)
+    _select(guided.low_b_selection, "mean_low_b")
+    guided.threshold.setValue(50)
+    guided.output.setText(str(f["out"] / "guided-low-b"))
+    guided.preview.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=20000)
+    assert panel.plan is not None, page.status.text()
+    exact_plan = panel.plan.to_dict()
+    assert exact_plan["indices"] == [1, 3]
+    assert exact_plan["threshold"] == 50
+    argv = exact_plan["commands"][0]["argv"]
+    assert argv[argv.index("-coord") + 1 : argv.index("-coord") + 3] == ["3", "1,3"]
+    assert "selected volume indices (2): 1, 3" in guided.summary.text()
+    assert panel.plan.digest in guided.summary.text()
+    guided.approval.setChecked(True)
+    guided.threshold.setValue(60)
+    assert panel.plan is None
+    assert not guided.approval.isChecked()
+    assert not guided.run_button.isEnabled()
+    guided.threshold.setValue(50)
+    guided.preview.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=20000)
+    assert panel.plan is not None, page.status.text()
+    assert panel.plan.to_dict()["indices"] == [1, 3]
+    guided.approval.setChecked(True)
+    guided.run_button.click()
+    qtbot.waitUntil(lambda: page.thread is None, timeout=60000)
+    assert panel.manifest["status"] == "validated_pending_qc", page.status.text()
+    assert panel.manifest["plan"]["indices"] == [1, 3]
+    assert panel.manifest["validation"]["checks"]["selected_indices"] == [1, 3]
+    assert panel.plan is None
+    assert not guided.run_button.isEnabled()
+    assert "selected volume indices (2): 1, 3" in guided.summary.text()
+    assert panel.manifest["approval"]["digest"] in guided.summary.text()
+    assert "1,3" in guided.commands.toPlainText()
+    guided.threshold.setValue(60)
+    assert "No approved plan" in guided.summary.text()
+    assert not guided.run_button.isEnabled()
+
+
 def test_guided_epi_t1_preview_binds_structural_evidence(window, qtbot, tmp_path, monkeypatch):
     import nibabel as nib
 
