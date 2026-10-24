@@ -47,9 +47,10 @@ from dmri_studio.core.scientific.records import restore_selection, save_selectio
 from dmri_studio.core.scientific.registry import Algorithm
 from dmri_studio.core.workflow import ProcessingHistory
 
-from .components import button, label
+from .components import Disclosure, button, label
 from .execution import ProcessingWorker
 from .operation_state import OperationState, State
+from .scientific_guidance import input_description, input_label
 from .theme import Theme
 from .workstation import PageHeader
 
@@ -82,12 +83,21 @@ class ImportDialog(QDialog):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
-        form = QFormLayout(content)
+        content_layout = QVBoxLayout(content)
+        form = QFormLayout()
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        content_layout.addLayout(form)
         scroll.setWidget(content)
         root.addWidget(scroll, 1)
-        self.kind = choice(KINDS)
+        self.kind = QComboBox()
+        self.kind.addItem("Choose the kind of data…", None)
+        for kind in KINDS:
+            self.kind.addItem(input_label(kind), kind)
         form.addRow("Input type", self.kind)
+        self.purpose = label(
+            "Choose a scientific input type to see what evidence it needs.", "caption"
+        )
+        content_layout.addWidget(self.purpose)
         self.paths = {}
         self.path_rows = {}
         for name, title in (
@@ -121,6 +131,12 @@ class ImportDialog(QDialog):
         form.addRow("Subject identity", self.subject)
         form.addRow("Space association", self.space)
         form.addRow("Provenance statement", self.provenance)
+        conventions = QWidget()
+        convention_form = QFormLayout(conventions)
+        convention_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        content_layout.addWidget(
+            Disclosure("Scientific identity and format declarations", conventions)
+        )
         self.declarations = {}
         self.declaration_rows = {}
         specs = (
@@ -253,12 +269,12 @@ class ImportDialog(QDialog):
             field = choice(values) if values else QLineEdit()
             field.setAccessibleName(title)
             self.declarations[key] = field
-            form.addRow(title, field)
-            self.declaration_rows[key] = (field, form.labelForField(field), kinds)
+            convention_form.addRow(title, field)
+            self.declaration_rows[key] = (field, convention_form.labelForField(field), kinds)
         self.registration_reviewed = QCheckBox(
             "Historical registration declaration (does not confer approval)"
         )
-        form.addRow(self.registration_reviewed)
+        convention_form.addRow(self.registration_reviewed)
         self.kind.currentIndexChanged.connect(self.update_fields)
         self.update_fields()
         self.error = label("", "caption")
@@ -289,6 +305,12 @@ class ImportDialog(QDialog):
             title.setVisible(kind in kinds)
         self.state.setEnabled(kind == "dwi")
         self.registration_reviewed.setVisible(kind == "atlas_labels")
+        self.purpose.setText(
+            input_description(kind)
+            + " Technical inspection does not establish scientific acceptance. Open scientific declarations when the selected type requires identity or convention evidence."
+            if kind
+            else "Choose a scientific input type to see what evidence it needs."
+        )
 
     def request(self) -> ImportRequest:
         """Return scientific declarations separately from verified measurements."""
@@ -507,16 +529,38 @@ class ScientificPlanningPage(QWidget):
             actions.addWidget(b)
         actions.addStretch()
         root.addLayout(actions)
+        self.task_intro = label(
+            "Choose a supported task below; imported inputs are shared across scientific workspaces.",
+            "caption",
+        )
+        root.addWidget(self.task_intro)
+        task_actions = QHBoxLayout()
+        self.model_dti = button(
+            "Fit diffusion tensor", lambda: self.tabs.setCurrentWidget(self.dti)
+        )
+        self.model_csd = button("Estimate FOD", lambda: self.tabs.setCurrentWidget(self.csd))
+        self.model_inputs = button(
+            "Review imported inputs", lambda: self.tabs.setCurrentWidget(self.input_page)
+        )
+        for action in (self.model_dti, self.model_csd, self.model_inputs):
+            task_actions.addWidget(action)
+        task_actions.addStretch()
+        root.addLayout(task_actions)
         self.tabs = QTabWidget()
         root.addWidget(self.tabs, 1)
         self.inputs = QListWidget()
         self.inputs.setAccessibleName("Scientific input inventory")
+        self.input_search = QLineEdit()
+        self.input_search.setPlaceholderText("Search imported data by file, type or subject…")
+        self.input_search.setAccessibleName("Search scientific input inventory")
+        self.input_search.textChanged.connect(self.filter_inputs)
         self.input_details = label(
             "Import DWI, tensor, FOD or tractogram independently. Scientific conventions must be declared explicitly."
         )
         self.input_details.setMinimumWidth(0)
         self.input_page = QWidget()
         layout = QVBoxLayout(self.input_page)
+        layout.addWidget(self.input_search)
         split = QSplitter()
         split.addWidget(self.inputs)
         details = QWidget()
@@ -530,7 +574,7 @@ class ScientificPlanningPage(QWidget):
         split.setSizes([360, 480])
         layout.addWidget(split, 1)
         row = QHBoxLayout()
-        self.remove_input = button("Remove entry", self.remove_artifact)
+        self.remove_input = button("Remove inventory reference", self.remove_artifact)
         self.inspect = button("Inspect selected input", self.inspect_input)
         row.addWidget(self.remove_input)
         row.addWidget(self.inspect)
@@ -554,7 +598,7 @@ class ScientificPlanningPage(QWidget):
         self.add_button = button("Configure task…", self.add_task)
         layout.addWidget(self.add_button)
         self.algorithms.currentRowChanged.connect(self.show_algorithm)
-        self.tabs.addTab(self.algorithm_page, "Algorithms")
+        self.tabs.addTab(self.algorithm_page, "Advanced algorithms")
         self.graph_page = QWidget()
         layout = QVBoxLayout(self.graph_page)
         self.task_list = QListWidget()
@@ -655,6 +699,17 @@ class ScientificPlanningPage(QWidget):
         self.tabs.setTabVisible(self.tabs.indexOf(self.sift2), stage == "tractography")
         self.tabs.setTabVisible(self.tabs.indexOf(self.connectome), stage == "connectivity")
         self.tabs.setTabVisible(self.tabs.indexOf(self.registration), stage == "registration")
+        self.model_dti.setVisible(stage == "models")
+        self.model_csd.setVisible(stage == "models")
+        self.model_inputs.setVisible(stage in {"models", "connectivity"})
+        self.task_intro.setText(
+            {
+                "models": "Choose Fit diffusion tensor or Estimate FOD. Import or reuse verified inputs; exact commands and scientific approval remain in each task.",
+                "connectivity": "Build a matrix from a compatible tractogram and registered atlas. Review atlas nodes and exact commands before execution.",
+                "tractography": "Choose Generate, Filter or Density in the guided Tractography task. Imported ROIs and streamlines remain shared.",
+                "registration": "Choose a guided alignment, transformation or inspection task. Moving and reference image roles remain explicit.",
+            }[stage]
+        )
         if stage == "registration":
             self.tabs.setCurrentWidget(self.registration)
         if stage == "connectivity":
@@ -668,11 +723,21 @@ class ScientificPlanningPage(QWidget):
 
     def refresh(self) -> None:
         """Present declared and inspected states separately; invalidate stale proposals."""
+        current_item = self.inputs.currentItem()
+        selected_id = current_item.data(Qt.ItemDataRole.UserRole) if current_item else None
         self.inputs.clear()
-        for a in self.artifacts:
+        for index, a in enumerate(self.artifacts):
+            declarations = a.payload.get("declarations", {})
+            identity = declarations.get("subject_id") or "Subject not declared"
             self.inputs.addItem(
-                f"{Path(a.payload['path']).name}\n{a.kind} · {a.id[:12]} · inspected, scientific review required"
+                f"{Path(a.payload['path']).name}\n{input_label(a.kind)} · {identity} · technically inspected, scientific review required"
             )
+            self.inputs.item(index).setData(Qt.ItemDataRole.UserRole, a.id)
+        if selected_id:
+            self.inputs.setCurrentRow(
+                next((i for i, a in enumerate(self.artifacts) if a.id == selected_id), -1)
+            )
+        self.filter_inputs(self.input_search.text())
         self.task_list.clear()
         for task in self.tasks:
             self.task_list.addItem(
@@ -698,6 +763,13 @@ class ScientificPlanningPage(QWidget):
         )
         self.update_actions()
 
+    def filter_inputs(self, query: str) -> None:
+        """Filter presentation only; artifact IDs and task bindings never change."""
+        needle = query.casefold().strip()
+        for index in range(self.inputs.count()):
+            item = self.inputs.item(index)
+            item.setHidden(needle not in item.text().casefold())
+
     def show_input(self, row: int) -> None:
         """Readable summary; complete hashes remain in the saved scientific selection."""
         if not 0 <= row < len(self.artifacts):
@@ -711,7 +783,7 @@ class ScientificPlanningPage(QWidget):
         # not synchronously rehash a potentially multi-GB DWI on the GUI thread.
         text = [
             Path(data["path"]).name,
-            f"Type: {data['kind']}",
+            f"Type: {input_label(data['kind'])} ({data['kind']})",
             f"Content ID: {data['id']}",
             "Last inspected registration eligibility (rechecked during preview): "
             + json.dumps(meta.get("registration_eligibility", "not applicable")),
