@@ -304,6 +304,12 @@ class BatchRunner:
                 tool_directory=Path(self.plan["tool_directory"])
                 if self.plan["tool_directory"]
                 else None,
+                fsl_directory=Path(self.plan["fsl_directory"])
+                if self.plan.get("fsl_directory")
+                else None,
+                ants_directory=Path(self.plan["ants_directory"])
+                if self.plan.get("ants_directory")
+                else None,
                 cancelled=cancel.is_set,
                 progress=lambda s: self.log(key, s),
             )

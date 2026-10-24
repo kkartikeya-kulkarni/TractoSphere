@@ -202,6 +202,7 @@ class AnatomyPanel(QScrollArea):
                 output,
                 nthreads=threads,
                 tool_directory=self.owner.tool_directory,
+                fsl_directory=self.owner.fsl_directory,
                 cancelled=cancel,
                 progress=progress,
             ),

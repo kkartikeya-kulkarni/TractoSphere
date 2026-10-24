@@ -151,19 +151,23 @@ def tissue_statistics(path, cancelled=lambda: False):
         )
 
 
-def _fsl_environment(environment, cancelled):
+def _fsl_environment(environment, cancelled, fsl_directory=None):
     """Use the existing dependency manager to locate FSL; bind native helpers/data.
 
     No installer is invoked. FIRST subprocesses remain local (FSLPARALLEL=0), in
     the shared runner's process group so cancellation reaches all descendants.
     """
-    from ..dependencies import inspect_dependencies
+    from ..dependencies import fsl_root, inspect_dependencies
 
-    inventory = inspect_dependencies(cancelled=cancelled)
+    root = fsl_root(fsl_directory)
+    inventory = inspect_dependencies(
+        directories={"FSL": str(root)} if fsl_directory and root else None,
+        search_common=not bool(fsl_directory),
+        cancelled=cancelled,
+    )
     # FSLDIR is verified against the discovered FAST executable, never inferred
     # from a subject directory or an arbitrary executable basename.
-    root = Path(os.environ.get("FSLDIR", ""))
-    if not root.is_absolute() or not (root / "etc/fslversion").is_file():
+    if root is None or not root.is_absolute() or not (root / "etc/fslversion").is_file():
         raise ValueError("Set FSLDIR to the installed FSL root; segmentation is unavailable")
     if os.name == "nt":
         raise ValueError(
@@ -294,6 +298,7 @@ def prepare_anatomy(
     *,
     nthreads=2,
     tool_directory=None,
+    fsl_directory=None,
     cancelled=lambda: False,
     progress=lambda _: None,
 ):
@@ -358,7 +363,7 @@ def prepare_anatomy(
     fsl = None
     software_hashes = {}
     if generation:
-        fsl, software_hashes = _fsl_environment(environment, cancelled)
+        fsl, software_hashes = _fsl_environment(environment, cancelled, fsl_directory)
         lib = Path(tools["5ttgen"]["path"]).parent.parent / "lib/mrtrix3"
         if not (lib / "_5ttgen/fsl.py").is_file():
             raise ValueError("Installed FSL 5ttgen implementation is unavailable")
