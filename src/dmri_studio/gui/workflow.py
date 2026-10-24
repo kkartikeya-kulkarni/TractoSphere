@@ -159,6 +159,8 @@ class WorkflowPage(QWidget):
         self.operation_list.setTextElideMode(Qt.TextElideMode.ElideNone)
         self.operation_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.operation_pages = QStackedWidget()
+        self.operation_purpose = label("", "caption")
+        operation_card.body.addWidget(self.operation_purpose)
         browser = QSplitter()
         browser.addWidget(self.operation_list)
         browser.addWidget(self.operation_pages)
@@ -166,6 +168,7 @@ class WorkflowPage(QWidget):
         browser.setStretchFactor(1, 3)
         operation_card.body.addWidget(browser, 1)
         self.operation_list.currentRowChanged.connect(self.operation_pages.setCurrentIndex)
+        self.operation_list.currentRowChanged.connect(self.show_operation_purpose)
         self.selections, self.method_statuses, self.method_details = {}, {}, {}
         for operation, title in OPERATIONS.items():
             selection = button("Select · " + title)
@@ -182,7 +185,6 @@ class WorkflowPage(QWidget):
             operation_layout = QVBoxLayout(detail_page)
             operation_layout.setContentsMargins(16, 4, 4, 4)
             operation_layout.addWidget(label(title, "section"))
-            operation_layout.addWidget(label(OPERATION_GUIDANCE[operation], "caption"))
             operation_layout.addWidget(selection)
             self.operation_pages.addWidget(detail_page)
             status = label("Confirm history to assess eligibility.", "caption")
@@ -266,6 +268,13 @@ class WorkflowPage(QWidget):
         """Stage navigation never confirms history or authorizes execution."""
         self.previous_stage.setEnabled(self.steps.currentIndex() > 0)
         self.next_stage.setEnabled(self.steps.currentIndex() < self.steps.count() - 1)
+
+    def show_operation_purpose(self, row: int) -> None:
+        """Reuse one explanation widget when researchers inspect different stages."""
+        operation = tuple(OPERATIONS)[row] if 0 <= row < len(OPERATIONS) else None
+        self.operation_purpose.setText(
+            OPERATION_GUIDANCE[operation] if operation else "Choose a supported operation."
+        )
 
     def resizeEvent(self, event: object) -> None:
         """Stack cards at narrow widths, without squeezing labels or controls."""

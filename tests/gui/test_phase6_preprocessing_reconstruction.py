@@ -26,6 +26,8 @@ def test_preprocessing_stage_review_retains_proposal(window, qtbot, dataset_fold
     page = window.workflow
     assert set(OPERATION_GUIDANCE) == set(OPERATIONS)
     page.template.setCurrentIndex(2)
+    page.operation_list.setCurrentRow(list(OPERATIONS).index("denoise"))
+    assert "MP-PCA" in page.operation_purpose.text()
     page.source.setText("Synthetic raw acquisition")
     page.confirm.click()
     page.selections["denoise"].setChecked(True)
