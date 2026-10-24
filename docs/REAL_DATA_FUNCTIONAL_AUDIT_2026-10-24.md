@@ -85,6 +85,12 @@ atlas, and no `epi_reg` plan was approved or executed.
 - Core/offscreen: 40 input-recovery, Batch discovery and scientific-foundation
   tests passed before the Anatomy change; the affected GUI tests were rerun
   afterward.
+- Final integrated offscreen gate at application code `d825d9c`:
+  **87 passed, 1 deselected in 108.41 s** across the focused GUI, Batch
+  discovery and scientific-foundation files. The deselected test constructs a
+  native VTK Viewer. An initial broader run reached that test and exited 139
+  in `QVTKRenderWindowInteractor` under offscreen Qt; the excluded native
+  rendering behavior is unverified, not a demonstrated application regression.
 - Real-data checks used the application's importer, Project loader, scientific
   inventory, guided selectors, custom Batch discovery, Results and QC services.
   The detailed private register has one record per attempted operation.
