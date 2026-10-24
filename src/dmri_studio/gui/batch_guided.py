@@ -883,7 +883,7 @@ class GuidedBatch(QWidget):
     def inspected(self):
         self.results_detail.setPlainText(self.owner.details.toPlainText())
         self.products.clear()
-        self.products.addItems([p.get("label", Path(p["path"]).name) for p in self.owner.products])
+        self.products.addItems([self.owner.product_label(p) for p in self.owner.products])
 
     def _open_product(self):
         self.owner.products_list.setCurrentRow(self.products.currentRow())
@@ -903,6 +903,7 @@ class GuidedBatch(QWidget):
             self.set_stage(5)
 
     def new_batch(self):
+        self.products.clear()
         self.notice.setText(
             "New batch uses current saved software. Validate a new plan before running."
         )

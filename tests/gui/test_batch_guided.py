@@ -268,3 +268,28 @@ def test_guided_batch_fits_minimum_window_and_themes(qapp, qtbot, appearance):
     assert page.width() == 960 and page.height() == 640
     assert page.guided.pages.width() > 800
     assert page.guided.progress.text() == "1 of 7 · Select Data"
+
+
+def test_verified_dwi_output_without_path_uses_shared_loader_route(window, monkeypatch):
+    page = window.batch
+    product = {
+        "label": "Converted diffusion output",
+        "paths": {
+            "dwi": "/synthetic/dwi.nii",
+            "bval": "/synthetic/dwi.bval",
+            "bvec": "/synthetic/dwi.bvec",
+        },
+        "sha256": {"dwi": "one", "bval": "two", "bvec": "three"},
+        "source_manifest": "/synthetic/manifest.json",
+        "source_sha256": "manifest-hash",
+        "history": {"confirmed": True},
+    }
+    page.kind = "inspect"
+    page.result(0, {"products": [product], "handoff": {"native_record": "old"}}, "")
+    assert page.products_list.item(0).text() == product["label"]
+    assert page.guided.products.item(0).text() == product["label"]
+    contexts = []
+    monkeypatch.setattr(window, "load_saved_result", contexts.append)
+    page.guided.products.setCurrentRow(0)
+    page.guided.open_product_button.click()
+    assert contexts == [{"product": product, "handoff": {"native_record": "old"}}]

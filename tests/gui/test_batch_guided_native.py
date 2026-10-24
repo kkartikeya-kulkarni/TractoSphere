@@ -115,7 +115,9 @@ def test_native_guided_execution_results_qc_and_history(qapp, qtbot, tmp_path):
     page.product_requested.connect(opened.append)
     page.guided.products.setCurrentRow(0)
     page.guided.open_product_button.click()
-    assert opened and Path(opened[0]["path"]).is_file()
+    assert opened
+    output = opened[0].get("path") or opened[0].get("paths", {}).get("dwi")
+    assert output and Path(output).is_file()
     page.guided._show_qc()
     assert "unassigned" in page.guided.results_detail.toPlainText()
     historical_folder = page.folder

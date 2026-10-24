@@ -456,13 +456,7 @@ class MainWindow(QMainWindow):
             page = BatchPage(self.theme, settings=self.settings)
             self._batch = page
             self.workspace.addWidget(page)
-            page.product_requested.connect(
-                lambda product: (
-                    self.open_dti_product(product)
-                    if product["kind"] == "dti_vector"
-                    else self.open_scientific_product(product)
-                )
-            )
+            page.product_requested.connect(self.open_batch_product)
             page.busy_changed.connect(self.dti_processing_busy)
             page.processing_available = lambda: (
                 self.workflow.execution.thread is None
@@ -1032,6 +1026,17 @@ class MainWindow(QMainWindow):
                         Path(product["path"]), expected_hashes={product["path"]: product["sha256"]}
                     )
                 )
+
+    def open_batch_product(self, product):
+        """Route a hash-checked batch output through its supported shared loader."""
+        if "paths" in product:
+            self.load_saved_result(
+                {"product": product, "handoff": dict(self.batch.inspected_handoff)}
+            )
+        elif product.get("kind") == "dti_vector":
+            self.open_dti_product(product)
+        else:
+            self.open_scientific_product(product)
 
     def open_scientific_product(self, product):
         """Keep FOD coefficients and responses typed; never fake scalar glyphs."""

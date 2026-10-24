@@ -78,6 +78,7 @@ class BatchPage(QWidget):
         self.kind = ""
         self.rows = []
         self.products = []
+        self.inspected_handoff = {}
         self.registration_reviews = {}
         self._journal_signature = None
         self.guided_selection = None
@@ -595,6 +596,7 @@ class BatchPage(QWidget):
             self.study, self.plan, self.folder = result, None, None
             self.details.clear()
             self.products = []
+            self.inspected_handoff = {}
             self.products_list.clear()
             self.preview.clear()
             self.approval.setChecked(False)
@@ -638,6 +640,7 @@ class BatchPage(QWidget):
             self.memory.setValue(max(1, data["limits"]["memory_bytes"] // GIB))
             self.folder, self.plan = folder, None
             self.products = []
+            self.inspected_handoff = {}
             self.products_list.clear()
             self.details.clear()
             self.approval.setChecked(False)
@@ -661,6 +664,9 @@ class BatchPage(QWidget):
                 return
             self.plan = result
             self.folder = None
+            self.products = []
+            self.inspected_handoff = {}
+            self.products_list.clear()
             self.rows = result.to_dict()["rows"]
             self.preview.setPlainText(self.describe_plan(result))
             self.approval.setChecked(False)
@@ -687,10 +693,9 @@ class BatchPage(QWidget):
             )
         elif self.kind == "inspect":
             self.products = result["products"]
+            self.inspected_handoff = result.get("handoff", {})
             self.products_list.clear()
-            self.products_list.addItems(
-                [p.get("label", Path(p["path"]).name) for p in self.products]
-            )
+            self.products_list.addItems([self.product_label(p) for p in self.products])
             self.details.setPlainText(json.dumps(result, indent=2))
             self.status.setText("Result hashes verified; scientific acceptance remains unassigned.")
             if hasattr(self, "guided"):
@@ -717,6 +722,9 @@ class BatchPage(QWidget):
         self.historical_toolchain = False
         self.historical_plan = None
         self.folder = None
+        self.products = []
+        self.inspected_handoff = {}
+        self.products_list.clear()
         self._journal_signature = None
         self._update_polling()
         self.output.clear()
@@ -915,7 +923,21 @@ class BatchPage(QWidget):
     def open_product(self):
         index = self.products_list.currentRow()
         if 0 <= index < len(self.products):
-            self.product_requested.emit(self.products[index])
+            product = self.products[index]
+            if "paths" not in product and not {"kind", "path"} <= set(product):
+                self.status.setText("This verified output has no supported opening route.")
+                return
+            self.product_requested.emit(product)
+
+    @staticmethod
+    def product_label(product):
+        if product.get("label"):
+            return str(product["label"])
+        if product.get("path"):
+            return Path(product["path"]).name
+        if product.get("paths", {}).get("dwi"):
+            return Path(product["paths"]["dwi"]).name
+        return "Verified output record"
 
     def show_qc(self):
         if self.folder:
