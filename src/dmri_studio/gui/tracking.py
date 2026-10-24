@@ -1005,7 +1005,14 @@ class TrackingExecutionPanel(QScrollArea):
         )
         if row is None:
             return
-        source = row["source"]
+        # The planner's primary source is the reference image for tckedit.
+        # The full tractogram has its own explicit input binding.
+        source = row.get("input_bindings", {}).get("tracts")
+        if source is None:
+            self.owner.status.setText(
+                "This historical filter record has no bound tractogram; the original cannot be verified."
+            )
+            return
         digest = next(
             (
                 item["sha256"]

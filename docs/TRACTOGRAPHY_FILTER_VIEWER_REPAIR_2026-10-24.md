@@ -115,14 +115,15 @@ The added native Cocoa walkthrough test uses the actual Viewer button with two
 loaded tract groups, assigns synthetic Include/Exclude ROIs, checks exact
 command inputs and approval, executes a small `tckedit`, opens the verified
 filtered result, and reopens the original. The user's normal-Mac run at
-`4c8245c` returned **6 passed, 1 failed**. The new case passed source selection,
-filter execution and filtered-result Viewer opening, then timed out waiting
-for **View Original Tracks** to select the original source. This is a genuine
-unresolved native handoff failure; neither the full workflow nor original
-reopening is marked verified. A focused follow-up test now records the page
-status, Viewer status, emitted product, loaded groups, selected row and pending
-Viewer tasks at that point so the cause can be repaired. Native file-picker
-layout, atlas selection,
+`4c8245c` returned **6 passed, 1 failed**. Source selection, filtering and
+filtered-result Viewer opening passed; **View Original Tracks** timed out. A
+targeted Cocoa diagnostic at `070e555` showed that the action passed
+`reference.nii.gz` to the Viewer as a tractogram. The filter planner's primary
+`source` is its reference image; the tractogram is the explicit
+`input_bindings["tracts"]`. The action now selects that binding and verifies its
+recorded hash. Synthetic regression fixtures now match the real plan shape and
+test source/reference tampering. Offscreen handoff tests pass; the corrected
+Viewer reopening still needs a native rerun. Native file-picker layout, atlas selection,
 Viewer preservation, real TRK conversion, and real anatomical correspondence
 remain explicit follow-ups.
 
@@ -142,8 +143,9 @@ and any native failure outside the repository with private data.
 
 ## Commits and remaining work
 
-Application/test commit: `4bcb813`; focused cancellation-test commit:
-`ad09f14`; initial documentation commit: `336b6f6`.
+Application/test baseline commit: `4bcb813`; focused cancellation-test commit:
+`ad09f14`; initial documentation commit: `336b6f6`. The original-track
+binding correction is recorded in the subsequent local commit.
 The native Cocoa walkthrough and researcher-led anatomical review are pending;
 the Registration full native suite remains independently pending. The 38-task
 scientific-validation backlog is unchanged. Phase 7 must integrate this branch

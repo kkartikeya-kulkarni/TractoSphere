@@ -14,8 +14,11 @@ geometry and complete streamline coordinates; no real research TRK was found
 in the authorized bounded roots. The user's first normal-Mac Cocoa suite at
 `4c8245c` returned **6 passed, 1 failed**: the new case selected and filtered
 the intended source and opened the verified output, but **View Original Tracks**
-timed out. A focused diagnostic and repair remain pending; the complete native
-workflow is not verified. The 38-task
+timed out. A targeted Cocoa diagnostic at `070e555` showed that it sent the
+reference NIfTI as a tractogram. The action now uses the explicit tractogram
+binding and source hash; corrected offscreen handoff tests pass. Native
+reopening remains pending at the new commit, so the complete native workflow
+is not yet verified. The 38-task
 scientific backlog and separate Phase 7 EDDY work retain their statuses.
 
 ## 2026-10-24 — Native Registration low-b summary follow-up

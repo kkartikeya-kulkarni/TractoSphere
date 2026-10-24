@@ -279,14 +279,20 @@ def test_original_tracks_action_rechecks_source_and_reference_hashes(window, tmp
                 {
                     "algorithm": "tckedit",
                     "source": {
-                        "path": str(source / "tracks.tck"),
+                        "path": str(source / "reference.nii.gz"),
                         "declarations": declarations,
-                        "sources": [
-                            {
-                                "path": str(source / "tracks.tck"),
-                                "sha256": hash_file(source / "tracks.tck"),
-                            }
-                        ],
+                    },
+                    "input_bindings": {
+                        "tracts": {
+                            "path": str(source / "tracks.tck"),
+                            "declarations": declarations,
+                            "sources": [
+                                {
+                                    "path": str(source / "tracks.tck"),
+                                    "sha256": hash_file(source / "tracks.tck"),
+                                }
+                            ],
+                        },
                     },
                     "outputs": {"reference": reference.name},
                 }
@@ -310,6 +316,9 @@ def test_original_tracks_action_rechecks_source_and_reference_hashes(window, tmp
 
     with pytest.raises(ValueError, match="Verified reference changed"):
         panel.open_original()
+    (source / "tracks.tck").write_bytes(b"changed")
+    with pytest.raises(ValueError, match="Original tractogram changed"):
+        panel.open_original()
 
 
 def test_original_tracks_handoff_emits_after_worker_finishes(window, qtbot, tmp_path):
@@ -330,14 +339,20 @@ def test_original_tracks_handoff_emits_after_worker_finishes(window, qtbot, tmp_
                 {
                     "algorithm": "tckedit",
                     "source": {
-                        "path": str(source / "tracks.tck"),
-                        "sources": [
-                            {
-                                "path": str(source / "tracks.tck"),
-                                "sha256": hash_file(source / "tracks.tck"),
-                            }
-                        ],
+                        "path": str(source / "reference.nii.gz"),
                         "declarations": declarations,
+                    },
+                    "input_bindings": {
+                        "tracts": {
+                            "path": str(source / "tracks.tck"),
+                            "sources": [
+                                {
+                                    "path": str(source / "tracks.tck"),
+                                    "sha256": hash_file(source / "tracks.tck"),
+                                }
+                            ],
+                            "declarations": declarations,
+                        },
                     },
                     "outputs": {"reference": reference.name},
                 }
