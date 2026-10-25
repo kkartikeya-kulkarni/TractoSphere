@@ -302,12 +302,10 @@ class QCPage(QWidget):
                 self.scale_figure()
                 self.figure_zoom.show()
                 self.figure_scroll.show()
-                self.text.hide()
                 QTimer.singleShot(0, self.scale_figure)
             else:
                 self.figure_zoom.hide()
                 self.present_measurements(result)
-                self.text.show()
                 self.figure_scroll.hide()
             self.status.setText("Showing existing evidence; no analysis was rerun.")
         elif self.kind == "comparison":
@@ -427,7 +425,6 @@ class QCPage(QWidget):
                 f"{entry['label']}\n{self.catalog.artifact_path(entry)}\nSHA256: {entry['sha256']}\nUse the action above to open this artifact."
             )
             self.figure_scroll.hide()
-            self.text.show()
             self.review_tabs.setCurrentWidget(self.text)
             return
         catalog = self.catalog
