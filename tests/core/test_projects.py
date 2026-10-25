@@ -70,12 +70,15 @@ def fixture(root):
 
 
 def test_two_runs_one_subject_and_shared_calibration(tmp_path):
-    rows = discover_acquisitions(fixture(tmp_path))
+    root = fixture(tmp_path)
+    rows = discover_acquisitions(root)
     assert len(rows) == 2 and not any(r["issues"] for r in rows)
     assert rows[0]["identity"]["sub"] == rows[1]["identity"]["sub"] == "01"
     assert rows[0]["identity"]["run"] != rows[1]["identity"]["run"]
     assert rows[0]["references"][0]["path"] == rows[1]["references"][0]["path"]
-    assert rows[0]["acquisition"]["field_sources"]["EchoTime"].endswith("/dwi.json")
+    assert Path(rows[0]["acquisition"]["field_sources"]["EchoTime"]).resolve() == (
+        root / "dwi.json"
+    ).resolve()
     project = new_project("Separate runs")
     for r in rows:
         project = add_acquisition(
