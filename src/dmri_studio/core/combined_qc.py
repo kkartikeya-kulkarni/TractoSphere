@@ -57,14 +57,15 @@ def discover_catalogs(folder: Path, *, cancelled: Callable[[], bool] = lambda: F
             raise ValueError("Folder scan exceeded 10,000 directories; choose a smaller run folder")
         depth = len(Path(current).relative_to(folder).parts)
         directories[:] = sorted(d for d in directories if not d.startswith(".") and depth < 8)
-        if "qc-catalog.json" in files:
-            found.append(Path(current) / "qc-catalog.json")
-            if len(found) > MAX_CATALOGS:
-                raise ValueError(
-                    f"More than {MAX_CATALOGS} QC catalogs found; choose a smaller folder"
-                )
+        for name in ("qc-catalog.json", "failure-qc-catalog.json"):
+            if name in files:
+                found.append(Path(current) / name)
+                if len(found) > MAX_CATALOGS:
+                    raise ValueError(
+                        f"More than {MAX_CATALOGS} QC catalogs found; choose a smaller folder"
+                    )
     if not found:
-        raise ValueError("No qc-catalog.json files found under this folder")
+        raise ValueError("No QC catalog files found under this folder")
     return sorted(found)
 
 
