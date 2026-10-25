@@ -110,6 +110,11 @@ def add_commands(commands: object) -> None:
     qc.add_argument("--decision", choices=("accepted", "rejected"), required=True)
     qc.add_argument("--reason", required=True)
     qc.add_argument("--reviewer", required=True)
+    combined = commands.add_parser(
+        "combined-qc", help="build one dataset QC document from saved processing evidence"
+    )
+    combined.add_argument("--folder", type=Path, required=True)
+    combined.add_argument("--output", type=Path, required=True)
 
 
 def read_json(path: Path) -> dict:
@@ -203,6 +208,11 @@ def processing_main(args: argparse.Namespace) -> int:
         if args.command == "qc":
             saved = record_qc(args.run, args.decision, args.reason, reviewer=args.reviewer)
             print(f"Human QC recorded: {saved}")
+            return 0
+        if args.command == "combined-qc":
+            from dmri_studio.core.combined_qc import build_combined_report_from_folder
+
+            print(build_combined_report_from_folder(args.folder, args.output))
             return 0
         if args.command == "prepare":
             history_before = args.history.read_bytes()

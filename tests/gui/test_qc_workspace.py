@@ -5,6 +5,47 @@ import json
 from dmri_studio.core.qc import artifact
 
 
+def test_dataset_document_action_collects_saved_steps(window, qtbot, tmp_path, monkeypatch):
+    from dmri_studio.gui import qc as qc_module
+
+    attempt = tmp_path / "dti-attempt"
+    attempt.mkdir()
+    report = attempt / "report.html"
+    report.write_text("<html>Saved DTI findings</html>")
+    (attempt / "qc-catalog.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "kind": "dmri_qc_catalog",
+                "identity": {"subject": "sub-01"},
+                "stages": [
+                    {
+                        "id": "dti",
+                        "execution": "completed",
+                        "technical": "passed",
+                        "automated_qc": "pending",
+                        "scientific_review": "required",
+                        "findings": ["Review FA map"],
+                        "artifacts": [artifact(report, "report", "DTI QC")],
+                    }
+                ],
+            }
+        )
+    )
+    destination = tmp_path / "dataset-QC.html"
+    monkeypatch.setattr(qc_module.QFileDialog, "getExistingDirectory", lambda *_: str(tmp_path))
+    monkeypatch.setattr(
+        qc_module.QFileDialog, "getSaveFileName", lambda *_: (str(destination), "HTML (*.html)")
+    )
+    monkeypatch.setattr(qc_module.QDesktopServices, "openUrl", lambda *_: True)
+    window.focus_qc()
+    assert window.qc.combined_button.isEnabled()
+    window.qc.combined_button.click()
+    qtbot.waitUntil(lambda: window.qc.thread is None and destination.exists(), timeout=10000)
+    assert "Review FA map" in destination.read_text()
+    assert "Scientific review" in destination.read_text()
+
+
 def test_saved_metrics_and_missing_evidence(window, qtbot, tmp_path):
     metrics = tmp_path / "metrics.json"
     metrics.write_text('{"focal_anomalies": 6}')

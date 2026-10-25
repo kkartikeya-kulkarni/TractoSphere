@@ -409,7 +409,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         return gui_main()
     if args.command == "plan":
         return _plan_main(args)
-    if args.command in {"prepare", "execute", "qc", "inspect-run", "inspect-review", "project"}:
+    if args.command in {
+        "prepare",
+        "execute",
+        "qc",
+        "combined-qc",
+        "inspect-run",
+        "inspect-review",
+        "project",
+    }:
         from .execution import processing_main
 
         return processing_main(args)
