@@ -164,6 +164,10 @@ def inspect_run(path: Path, *, cancelled=lambda: False, progress=lambda _: None)
             )
             if output is None or source_hash != output["sha256"]:
                 raise ValueError("Anatomy product identity differs from verified output")
+            role_label = {
+                "five_tt": "Five-tissue image",
+                "gmwmi": "GM–WM interface",
+            }.get(row["role"], row["role"].replace("_", " ").title())
             products.append(
                 dict(
                     kind="scalar"
@@ -171,7 +175,7 @@ def inspect_run(path: Path, *, cancelled=lambda: False, progress=lambda _: None)
                     else artifact["kind"],
                     path=str(product_path),
                     sha256=source_hash,
-                    label=f"{row['role'].replace('_', ' ').title()} · {product_path.name}",
+                    label=f"{role_label} · {product_path.name}",
                     artifact=artifact,
                 )
             )

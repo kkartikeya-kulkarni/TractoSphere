@@ -55,7 +55,7 @@ def test_saved_gmwmi_run_offers_exact_verified_viewer_product(window, qtbot, tmp
     assert product["kind"] == "scalar"
     assert product["artifact"]["kind"] == "gmwmi"
     assert product["path"] == str(tmp_path / "attempt/interface-gmwmi.nii.gz")
-    assert page.products.itemText(0).startswith("Gmwmi ·")
+    assert page.products.itemText(0).startswith("GM–WM interface ·")
     assert page.open_qc.isEnabled()
 
     page.load_requested.disconnect(window.load_saved_result)
