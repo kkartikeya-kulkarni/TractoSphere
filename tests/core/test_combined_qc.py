@@ -136,3 +136,21 @@ def test_documented_cli_uses_same_exporter(tmp_path):
     destination = tmp_path / "full-QC.html"
     assert main(["combined-qc", "--folder", str(tmp_path), "--output", str(destination)]) == 0
     assert "Review map" in destination.read_text()
+
+
+def test_failure_catalog_is_included_in_dataset_document(tmp_path):
+    attempt = tmp_path / "failed-dti"
+    attempt.mkdir()
+    report = attempt / "failure-report.html"
+    report.write_text("<html>Failed attempt</html>")
+    catalog = _catalog(
+        attempt,
+        "sub-01",
+        "dti",
+        ["DTI processing failed; inspect the attempt log"],
+        [artifact(report, "report", "Failure QC")],
+    )
+    catalog.rename(attempt / "failure-qc-catalog.json")
+    destination = tmp_path / "dataset-QC.html"
+    build_combined_report_from_folder(tmp_path, destination)
+    assert "DTI processing failed; inspect the attempt log" in destination.read_text()
