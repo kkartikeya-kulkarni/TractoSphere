@@ -2,10 +2,6 @@
 
 **A desktop research toolbox for diffusion MRI, tractography and connectomics.**
 
-![TractoSphere 3D Viewer showing real public brain anatomy and two colored tractography bundles](docs/screenshots/tractography-hero.png)
-
-*Native TractoSphere development GUI with a public TractoInferno T1 image and tractography bundles. This is a visualization example, not an anatomical or biological validation result.*
-
 **Start with the [illustrated Read the Docs guide](https://tractosphere.readthedocs.io/en/latest/).** If diffusion MRI is new to you, read [Diffusion MRI basics](https://tractosphere.readthedocs.io/en/latest/user-guide/dmri-basics/), check [which files you need](https://tractosphere.readthedocs.io/en/latest/user-guide/files/), then follow [one participant from import to connectome](https://tractosphere.readthedocs.io/en/latest/user-guide/walkthrough/). The site also explains [ROI tract filtering](https://tractosphere.readthedocs.io/en/latest/user-guide/tract-filtering/), [connectome generation](https://tractosphere.readthedocs.io/en/latest/user-guide/connectivity/) and [QC review](https://tractosphere.readthedocs.io/en/latest/user-guide/qc-runs/) with native GUI screenshots.
 
 This **development branch** contains scientific workflows added after the public v0.1.1-alpha release. The release and its tags remain separate. TractoSphere has a Python processing core, command-line interface and PySide6/VTK desktop application. It is for research use, not clinical decisions; successful processing does not establish anatomical or biological validity.

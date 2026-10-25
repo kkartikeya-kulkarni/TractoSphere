@@ -1,11 +1,6 @@
 {
   "schema": "tractosphere.release-assets/1",
   "assets": {
-    "docs/screenshots/tractography-hero.png": {
-      "sha256": "d2359630c35f09aec48df1d42c87c7b25f9819670c5a342046058e3854621230",
-      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
-      "source": "https://openneuro.org/datasets/ds003900/versions/1.1.1; actual TractoSphere development GUI capture using public TractoInferno sub-1006"
-    },
     "src/dmri_studio/gui/assets/fonts/Inter-Regular.otf": {
       "sha256": "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799",
       "license": "SIL-OFL-1.1",
