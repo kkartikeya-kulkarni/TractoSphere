@@ -95,7 +95,10 @@ SHA-256, and `accepted_tissue_review` revalidated the new record against that
 same 5TT. The review reason contains only KK's observation and this limited
 use decision. It does not authenticate reviewer identity or accept DTI, FOD,
 tractography, SIFT2 or connectome outputs. Exact files, hashes and commands
-are in the private local audit register, outside the repository.
+are in the private local audit register, outside the repository. The actual
+offscreen QC page reopened the catalog and saved review and displayed
+`Scientific review · accepted (local record)`; this is not a native Cocoa
+visual inspection or authenticated reviewer identity.
 
 Using the existing aligned reference and WM FOD, three **new, exclusive,
 bounded derivative attempts** ran through the shared scientific planner and
@@ -113,7 +116,11 @@ session failed during the native-app pipe startup. Thus actual Cocoa clicks,
 file pickers, Viewer result handoff, three-plane fiber navigation, light/dark
 layout and GUI approval remain **UNTESTED**. The private native acceptance
 guide supplies exact existing files and saved scientific selections; it is
-intentionally not committed. A focused offscreen GUI set passed **4/4**.
+intentionally not committed. After KK requested direct Mac control, a second
+attempt to connect to the TractoSphere desktop failed with the same native
+pipe startup error before any window or screenshot could be reached. No
+desktop interaction or native rendering is claimed. A focused offscreen GUI
+set passed **4/4**.
 The real GM–WM manifest exposed a saved-results defect: its typed anatomy
 product lacked the display label and handoff shape assumed by Runs & Reports,
 raising a Qt event-loop `KeyError`. Commit `f9d410e` normalizes verified
@@ -123,7 +130,12 @@ including rejection of a tampered synthetic product identity; five core
 saved-run tests passed. The real GM–WM, ACT and SIFT2 manifests then reopened
 in the offscreen Results page with **1, 2 and 1** selectable products, working
 QC actions and **19, 25 and 24** verified hashes respectively. Native result
-click-through remains untested.
+click-through remains untested. The historical real 5TT segmentation manifest
+also reopened in the offscreen application: its verified product appeared as
+“Five-tissue image,” and Load output restored the exact typed 5TT artifact to
+the scientific inventory. This confirms the saved-run import route, not native
+Viewer display or a new tissue QC decision. A further focused Results/core run
+passed **10/10** after the product-label correction.
 The focused ACT/SIFT2 core set returned **57 passed, 2 failed** in 94.27 s:
 both real-child cancellation tests completed before their resource-sampling
 cancellation signal, returning `validated_pending_qc`. This is not evidence
