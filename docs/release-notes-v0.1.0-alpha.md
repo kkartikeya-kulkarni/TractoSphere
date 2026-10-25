@@ -62,7 +62,7 @@ and verified actual native GUI startup/shutdown, real 65-volume DWI, TCK/TRK,
 
 The final release rebuild changes repository links and documentation, with targeted
 installation/source-integrity checks. No scientific algorithms changed and no
-lengthy MRI processing was rerun. See [validation](validation.md).
+lengthy MRI processing was rerun. See the [historical alpha validation record](https://github.com/kkartikeya-kulkarni/TractoSphere/blob/2a0d339233eb256665ef86b4947d22ed9b44e74d/docs/validation.md).
 
 This small validation scope does not establish clinical suitability or universal
 scientific readiness. Known limits include nonlinear atlas registration, automatic

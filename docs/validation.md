@@ -1,141 +1,35 @@
-# Alpha validation record
+# Check each result before using it
 
-PUBLIC ALPHA · RESEARCH USE ONLY · SCIENTIFIC VALIDATION ONGOING
+Use this page while working through one participant. It explains what to inspect **after each GUI operation** and which file to carry to the next step. For the exact buttons and input fields, follow the linked task page. A saved output and a successful command are useful evidence, but the next operation may also need matching source files, acquisition metadata, spatial correspondence or a recorded scientific review.
 
-## Phase 3 update — 2026-10-14
+## The same review sequence for every operation
 
-The latest cross-platform results are in [Phase 3 validation](cross_platform_validation_phase3.md).
-Public candidate: 762 passed / 2 optional skips on native macOS; 749 passed /
-15 external-tool skips on Ubuntu 24.04 ARM64 VM. These supersede earlier suite
-counts below. Native Windows/Intel Mac and remote CI remain unverified.
+1. **Confirm the input.** Check participant, session, acquisition, image space and processing history in **Import data** or **Projects**. For DWI, keep its matching `.bval`, `.bvec` and available acquisition metadata together. [Import guide](user-guide/import-projects.md)
+2. **Read Data Validation.** Open the DWI input report. Expand warnings, failures and skipped checks; inspect volume and gradient counts. This report checks the imported input, not the result of a later command. [Data Validation guide](user-guide/data-validation.md)
+3. **Preview the operation.** In the task screen, select the exact files and parameters, choose a new output folder, and click **Preview commands** or **Validate and Preview Plan**. Read the eligibility message, input/output paths, command, software choice and any scientific limitation. Change an incorrect selection before approving.
+4. **Run and inspect the result.** After approving the exact plan, wait for completion. Open the saved image, tracks, atlas or matrix in its Viewer or result inspector. Check more than one slice or measurement where the task requires it.
+5. **Open the saved QC.** In **Quality Control → Open Report…**, select that attempt's `qc-catalog.json` or task-specific QC bundle. Read **Findings**, **Figures**, **Measurements** and **Source details**. A green execution state does not erase an automated QC warning. [QC guide](user-guide/qc-runs.md#open-a-qc-catalog)
+6. **Check the run record.** In **Runs & Reports**, open that attempt's `manifest.json`; verify the recorded inputs, output hashes, commands and processing step states. Load a verified derivative with its history if you need it for the next operation. [Saved runs guide](user-guide/qc-runs.md)
+7. **Record the scientific decision when required.** A qualified reviewer should inspect the exact evidence and save an observation and decision of `accepted`, `needs_review` or `rejected`. Keep the review with the result it identifies. If the input or output changes, review the new derivative separately.
 
-## What was actually tested
+## What to check at each stage
 
-2026-10-14, macOS Apple Silicon on an Apple M5 workstation with 16 GB RAM.
-Python 3.12.15; fresh venv with system packages disabled. The GUI extra was
-installed from the public candidate source using pip, not borrowed from the
-existing research environment. Dependency checks passed. The companion macOS helper also installed the release wheel into a second new isolated venv and passed pip checks/version verification. The checksum-verified installed wheel was launched through its actual dmri-studio view entry point.
+| Stage | Open and inspect | Carry forward only after checking |
+| --- | --- | --- |
+| **Raw DWI import** | DWI volumes, matching gradients, orientation, acquisition metadata and every Data Validation warning or skipped check | The correct imported DWI and companions; do not infer missing phase-encoding or readout values. [How to import](user-guide/import-projects.md) |
+| **Preprocessing** | Denoising residuals, Gibbs output, masks, distortion/motion diagnostics and any bias field for the operations actually run | The verified DWI derivative and its corrected gradients/history. A partially processed input must have its earlier steps declared. [How to preprocess](user-guide/preprocessing.md) |
+| **DTI and scalar maps** | Tensor fit QC and the FA, MD, AD and RD maps in anatomical views; read nonfinite, negative or out-of-range findings | Only maps appropriate to the intended analysis. Do not treat an automatically generated FA map as accepted solely because a file exists. [Model guide](user-guide/models.md) |
+| **CSD and FOD** | Shell/response selection, tissue responses, WM FOD coverage and reconstruction QC | The FOD associated with the exact DWI, gradients and mask used for tractography or SIFT2. [Model guide](user-guide/models.md) |
+| **T1, registration and atlas** | Brain extraction, moving → fixed transform direction, registered image over the fixed reference in axial, coronal and sagittal views, atlas parcel IDs and boundaries | The reviewed T1/low-b association, registered atlas and its exact QC record. An already registered atlas can be reviewed without registering it again. [Anatomy and registration guide](user-guide/anatomy-registration.md) |
+| **5TT and GM–WM interface** | Cortical GM, subcortical GM, WM and CSF compartments over the matching anatomy in all three planes, especially the cortical GM–WM border | An exact 5TT with a recorded tissue-boundary review before ACT-dependent operations. A colored overlay alone is not a review decision. [5TT guide](user-guide/anatomy-registration.md#five-tissue-anatomy-and-gmwm-seeds) |
+| **Tractography and density** | Source FOD, seed/mask, ACT choice, generated track count, track locations, length distribution and density image | The full saved `.tck`, not merely the display subset in 3D. [Generate tracks](user-guide/tractography.md) |
+| **ROI filtering** | Source tract count, each actual ROI mask or atlas ID, ALL/ANY/order/endpoints rule, retained count and tracks over the original reference image | The new filtered `.tck` plus its rule and QC; preserve the unfiltered source. [Filter two or three regions](user-guide/tract-filtering.md) |
+| **SIFT2** | Exact tractogram–FOD binding, processing mask policy, weight count/distribution and warnings | The saved weights with their binding record; a bare vector is insufficient for a later weighted matrix. [SIFT2 guide](user-guide/connectivity.md#compute-sift2-weights) |
+| **Connectome** | Registered atlas and node table, assignment rule, selected metrics, missing nodes, assigned/unassigned streamlines and matrix cells | The connectome bundle JSON, matrix CSVs, node mapping, assignment records and QC together. [Build and inspect a matrix](user-guide/connectivity.md#build-a-connectome) |
+| **Batch processing** | Every participant's input pairing, per-item eligibility, generated plans, individual failures and saved attempt folders | Only verified outputs from each participant; a successful batch summary does not review every image. [Batch guide](user-guide/batch.md) |
 
-- Original private development checkout: **751 passed / 127.54 seconds**.
-- Cleaned public candidate with dependency setup: **724 passed, 2 skipped / 152.39 seconds**.
-- The two skips require a verified local MRtrix/ANTs installation and the verified
-  FSL/MRtrix/pinned HCP combination helper. They are not claimed as fresh-install
-  execution passes. No lengthy EDDY or full preprocessing run was launched.
-- Private study-only scripts and their tests were excluded from the public tree.
-  Their original source/tests/results remain preserved locally. An independent
-  Gibbs-axis acquisition test was retained. No application verification threshold
-  or scientific acceptance rule was weakened.
-- Native installed alpha GUI: actual public TractoInferno sub-1006 T1, 65-volume
-  DWI, real AF_L TCK (18,375 fibers) and PYT_L TRK (65,734 fibers), linked position,
-  multiple actual tissue-region surfaces, morphology/undo, volumetric ROI roles,
-  dark/light screenshots and unchanged original SHA-256 checks.
-- The existing native ROI/Tracts button audit covers color/opacity, selection,
-  draw/erase/polygon, morphology, editing/undo/redo, export, coordinate checks,
-  workspace restoration and control accessibility. The release audit completed in 67.75 seconds while another native inspection was open.
-- Previously verified JHU discrete/probabilistic atlas tests: 50 positive labels
-  in the installed discrete file; 20 probability maps at 0.25, 13 nonempty at 0.50;
-  names/IDs, opacity/color, multiple surfaces, source hashes and MNI/native refusal.
-  Those FSL assets and their screenshots are not redistributed.
-- Wheel/source archive and macOS helper are checked for MRI arrays, credentials,
-  private records and inappropriate absolute paths. Installation artifacts and
-  exact private logs are retained outside the published tree.
+## If a step is blocked or looks wrong
 
-## First-run dependency setup verification
+Read the exact message on that task's screen and its saved **Findings**. Common causes are a DWI separated from its gradients, missing correction metadata, a tool path that has not been verified, an atlas without exact registration evidence, or a derivative whose source history is unknown. Return to the relevant input or review screen and correct the evidence. Do not relabel a file, invent a processing step or approve an image simply to make the next button available. [Troubleshooting guide](user-guide/troubleshooting.md)
 
-The updated alpha wheel was checksum-verified and installed by the macOS helper
-into a new, non-editable Python 3.12.15 venv with system packages disabled. Pip
-reported no broken requirements. This is a **clean application installation on an
-existing macOS host**, not a freshly reinstalled OS or a second physical Mac.
-Independent physical-Mac verification remains pending and is disclosed for this alpha.
-
-- Actual GUI entry point and welcome Enter interaction opened the first-run dialog.
-- A controlled child PATH and disabled common-folder search hid all scientific
-  tools: all 24 executables were reported missing, viewer-only continuation worked,
-  and real CC0 MRI/TCK loaded successfully. Setup choice suppressed the dialog on
-  a subsequent window. Source hashes stayed unchanged; native audit: 19.25 seconds.
-- Normal installed-tool discovery used the same installed wheel and passed the
-  native flow. MRtrix3 3.0.5 and FSL component/build records were detected. N4 absent
-  from normal PATH was reported missing, rather than guessed from research history.
-- A separately selected existing ANTs directory was read-only inventoried with
-  N4 2.6.5. EDDY component 2401.2 was distinguished from suite 6.0.7.18 and its
-  actual binary from its FSL launcher. No scientific commands were run by setup.
-- 14 new setup tests cover version/provenance gates, missing/unrecognized/mixed
-  installations, explicit path precedence, query timeout/cancellation, responsive
-  workers, viewer-only continuation, repeat suppression, unchanged active-run
-  configuration, stale-scan rejection, safe close and accessible official links.
-- After the final console/build display refinements, the 15-test focused dependency
-  and command-palette set passed in 16.35 seconds; Ruff passed. Version gates and
-  scientific processing settings were not relaxed.
-
-![First-run missing-tool setup](screenshots/dependency-setup.png)
-![First-run setup, light theme](screenshots/dependency-setup-light.png)
-![Real MRI/TCK in viewer-only mode](screenshots/viewer-only-setup.png)
-
-## Screenshots and data
-
-![Real TCK/TRK and MRI](screenshots/viewer-dark.png)
-![Native labeled tissue regions](screenshots/atlas-dark.png)
-![4D diffusion navigation](screenshots/diffusion-dark.png)
-![Light theme](screenshots/viewer-light.png)
-
-These are captures of the real application, not generated mockups. The native
-three-tissue label fixture comes from the subject's supplied, disjoint WM/GM/CSF
-masks. It is not a new cortical parcellation or a transformed JHU atlas.
-Source: https://openneuro.org/datasets/ds003900 (CC0).
-
-## What is not established
-
-Tests establish bounded software behavior and numerical contracts. They do not
-establish universal preprocessing readiness or scientific acceptance. Historical
-research comparators are not ground truth. No clinical validation, cross-platform
-native GUI acceptance, exhaustive GPU benchmark, notarized standalone app or
-large-scale cohort validation is claimed.
-
-GitHub CI is configured for future public headless matrix tests and macOS GUI
-checks. Configured jobs are not reported as completed results. Private-repository
-runs are gated off to avoid consuming paid private Actions allowance.
-
-Scientific interpretation of masks, registration, CNR/prediction failures,
-partial-Fourier artifacts and bias fields still requires expert review. See
-limitations.md and THIRD_PARTY_NOTICES.md.
-
-## Guided installation extension, 2026-10-14
-
-Reuses the existing detector/worker. Public regression: 746 passed, 2 optional
-external-tool skips / 176.05 seconds. New focused guidance/GUI set: 22 passed
-/ 16.99 seconds. A native real Qt audit opened all three guided dialogs in dark
-and light themes, verified the existing ANTs 2.6.5 version, configured only
-test-owned preferences and preserved the executable hash. No installer, privilege
-request, quarantine removal or MRI processing was executed. Official MRtrix
-3.0.5 archive was inspected (universal Intel/ARM header and complete lib sources);
-that inspection is not a publisher signature or a new-install execution claim.
-
-Mocked browser/externally-created synthetic install folders cover consent, missing,
-compatible/incompatible, incorrect/custom folders, user-reported external failure,
-cancellation/close, browser launch failure, low disk space, permissions, settings
-write rollback, persistence and archive size/digest failures. These are not claims
-of live installation/network/WSL verification. Independent Mac installation remains pending. This public repository uses a separately audited fresh history; private development history is excluded. No automated scientific
-installer is enabled.
-
-![Software Dependencies](screenshots/guided-software-dependencies-dark.png)
-![Guided MRtrix setup](screenshots/guided-mrtrix3-guide-light.png)
-![Guided ANTs setup](screenshots/guided-ants-guide-dark.png)
-![Guided FSL setup](screenshots/guided-fsl-guide-light.png)
-
-## Phase 5/6 release verification — 2026-10-14
-
-The audited wheel passed a new isolated Python 3.12.15 installation on macOS 26.3
-Apple Silicon (Apple M5, 16 GiB), with system site packages disabled and installed
-module paths verified. All 156 package files matched wheel bytes. Actual native
-Qt/VTK checks passed for startup/shutdown, real 65-volume public MRI, linked views,
-real TCK/TRK, atlas regions, surfaces, ROI morphology/undo/filtering, dark/light
-rendering, first-run viewer-only continuation, guided setup and saved MRtrix/FSL/
-ANTs paths. Original public-data hashes remained unchanged. A relative-path
-assertion in an optional setup harness was resolved by supplying an absolute path;
-no application change was needed. Independent physical Mac remains pending.
-
-The public release uses a fresh Git snapshot with noreply metadata. Only repository
-links/documentation and packaging metadata changed for Phase 6; prior scientific,
-GUI and cross-platform evidence is reused. Security checks and targeted wheel
-installation are repeated on final artifacts. No external scientific executables
-or MRI arrays are distributed.
+For a full example from first import to matrix inspection, follow [One participant, start to finish](user-guide/walkthrough.md). For the current scope of real-data testing, see [Testing phase and coverage](user-guide/status.md).

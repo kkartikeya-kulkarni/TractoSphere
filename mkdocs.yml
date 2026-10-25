@@ -50,4 +50,4 @@ nav:
       - Atlas and ROI details: atlas.md
       - Dependencies: dependency_setup.md
       - Known limitations: limitations.md
-      - Validation scope: validation.md
+      - Check each result: validation.md

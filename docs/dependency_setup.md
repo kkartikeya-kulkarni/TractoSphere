@@ -113,8 +113,8 @@ FSL is inspected through installed package ownership records; TOPUP and EDDY are
 never executed just to obtain a version. Scanning is asynchronous; shutdown
 cancels remaining probes and waits safely for the current bounded query.
 
-See [installation](installation.md) and [validation](validation.md) for the exact
-tested environment and remaining platform limitations.
+See [installation](installation.md) for setup and [platform support](platforms.md)
+for remaining platform limitations.
 
 ## Guided Install / Setup
 
@@ -189,7 +189,7 @@ dmri-studio doctor --path-only --setup ANTs --destination /new/user-owned/tools
 
 Python: `dmri_studio.core.software_setup.installation_guide`, `destination_check`
 and `verify_archive` reuse existing inventory records without importing Qt.
-See [platform support](platforms.md) and [validation scope](validation.md).
+See [platform support](platforms.md) and [how to check each result](validation.md).
 
 Research sources inspected 2026-10-14:
 [MRtrix 3.0.5 release](https://github.com/MRtrix3/mrtrix3/releases/tag/3.0.5),

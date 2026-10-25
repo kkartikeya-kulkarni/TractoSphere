@@ -80,7 +80,7 @@ parcellation or registered MNI atlas. Real AF_L/other bundle files come from the
 same subject. No MRI or tractogram arrays are distributed with the application.
 FSL JHU atlases were used for local validation only; their arrays and figures are
 excluded from the public release. Historical HCP/HCD images and private research
-reports are excluded. See docs/validation.md for the tested scope.
+reports are excluded. See docs/user-guide/status.md for the current testing phase.
 
 ## Phase 4 source and asset verification
 

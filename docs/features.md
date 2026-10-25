@@ -35,5 +35,5 @@ explicit source identity and conventions remain required. Specialist controls
 are available under Advanced. Saved Runs and Projects offer explicit recent
 record actions; neither loads private data automatically at startup. Processing
 completion, technical output checks and human scientific review are distinct.
-See [validation scope](validation.md) and [known limitations](limitations.md)
+See [how to check each result](validation.md), [testing phase and coverage](user-guide/status.md), and [known limitations](limitations.md)
 for test coverage and native verification limits.

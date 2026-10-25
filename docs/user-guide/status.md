@@ -1,6 +1,6 @@
 # Testing phase and coverage
 
-TractoSphere's scientific toolbox is being tested with real public diffusion MRI data. This page summarizes the routes exercised as of 24 October 2026 and highlights where testing or scientific review continues. The separate [public alpha validation record](../validation.md) describes an older release; this development branch has a wider feature set.
+TractoSphere's scientific toolbox is being tested with real public diffusion MRI data. This page summarizes the routes exercised as of 24 October 2026 and highlights where testing or scientific review continues. For the checks to perform while using the toolbox, see [Check each result](../validation.md).
 
 | Area | Evidence established in the local public-data audit | Still requiring care |
 | --- | --- | --- |
