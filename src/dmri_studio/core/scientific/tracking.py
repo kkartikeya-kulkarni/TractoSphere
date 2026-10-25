@@ -852,6 +852,29 @@ def verify_step(folder, plan, command, cancelled):
     return dict(status="command_completed; cross-checks recorded in final QC")
 
 
+_EXACT_IMAGE_DECLARATIONS = frozenset(
+    {
+        "reference_record",
+        "qc_association",
+        "space_review",
+        "registration_manifest",
+        "registration_qc",
+        "registration_record",
+        "registration_diagnostic",
+        "registration_reviewed",
+        "anatomical_review",
+        "tissue_review",
+        "alignment_evidence",
+        "weight_record",
+    }
+)
+
+
+def _derivative_declarations(source: dict) -> dict:
+    """Carry source identity without claiming exact-image evidence for new bytes."""
+    return {key: value for key, value in source.items() if key not in _EXACT_IMAGE_DECLARATIONS}
+
+
 def verify_tracking(folder, plan, cancelled=lambda: False, progress=lambda _: None):
     """Independent measurement/report layer; never scientific acceptance."""
     for name, text in plan["generated_text"].items():
@@ -985,6 +1008,11 @@ def verify_tracking(folder, plan, cancelled=lambda: False, progress=lambda _: No
     from .imports import import_artifact
 
     products = []
+    # Image-specific reviews and records authenticate the *input* bytes. A
+    # copied reference or new tractogram has different bytes, even when its
+    # voxel values/space are preserved. The approved plan retains and verifies
+    # the original records; product imports keep identity without inheriting a
+    # false exact-image claim.
     for row in plan["bindings"]:
         for role, name in row["outputs"].items():
             if role == "density_nifti":
@@ -1000,7 +1028,7 @@ def verify_tracking(folder, plan, cancelled=lambda: False, progress=lambda _: No
                 ImportRequest(
                     kind,
                     folder / name,
-                    declarations=row["source"]["declarations"],
+                    declarations=_derivative_declarations(row["source"]["declarations"]),
                     provenance="TractoSphere MRtrix derivative; execution and numerical verification completed, scientific review and acceptance remain pending.",
                 ),
                 cancelled=cancelled,
