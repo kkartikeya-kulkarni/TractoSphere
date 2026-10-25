@@ -189,7 +189,10 @@ class ResultsPage(QWidget):
             code = "" if row["return_code"] is None else f" · exit {row['return_code']}"
             self.steps.addItem(f"{row['step']} · {row['status']}{timing}{code}")
         for product in result["products"]:
-            self.products.addItem(product["label"])
+            source = product.get("path") or product.get("artifact", {}).get("path")
+            self.products.addItem(
+                product.get("label") or (Path(source).name if source else "Verified output")
+            )
         recovery = result.get("recovery")
         self.recovery_summary.setText(
             "Verified checkpoint: "

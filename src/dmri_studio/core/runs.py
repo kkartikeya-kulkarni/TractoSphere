@@ -146,9 +146,39 @@ def inspect_run(path: Path, *, cancelled=lambda: False, progress=lambda _: None)
                 )
             ]
         return result
+    if kind == "mrtrix_anatomy_execution_plan":
+        products = []
+        for row in record["validation"]["products"]:
+            artifact = row["artifact"]
+            product_path = Path(artifact["path"]).resolve(strict=True)
+            if not product_path.is_relative_to(folder):
+                raise ValueError("Anatomy product escapes its recorded attempt")
+            output = record["outputs"].get(product_path.name)
+            source_hash = next(
+                (
+                    source["sha256"]
+                    for source in artifact["sources"]
+                    if Path(source["path"]).resolve() == product_path
+                ),
+                None,
+            )
+            if output is None or source_hash != output["sha256"]:
+                raise ValueError("Anatomy product identity differs from verified output")
+            products.append(
+                dict(
+                    kind="scalar"
+                    if artifact["kind"] in {"gmwmi", "tissue_scalar"}
+                    else artifact["kind"],
+                    path=str(product_path),
+                    sha256=source_hash,
+                    label=f"{row['role'].replace('_', ' ').title()} · {product_path.name}",
+                    artifact=artifact,
+                )
+            )
+        result["products"] = products
+        return result
     if kind in {
         "mrtrix_connectome_execution_plan",
-        "mrtrix_anatomy_execution_plan",
         "mrtrix_sift2_execution_plan",
     }:
         result["products"] = record["validation"]["products"]

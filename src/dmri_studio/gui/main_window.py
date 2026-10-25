@@ -1178,6 +1178,28 @@ class MainWindow(QMainWindow):
 
     def open_scientific_product(self, product):
         """Keep FOD coefficients and responses typed; never fake scalar glyphs."""
+        if product["kind"] == "5tt":
+            from dmri_studio.core.scientific import Artifact
+
+            self.focus_models()
+            self.scientific.tabs.setCurrentWidget(self.scientific.anatomy)
+
+            def verify(cancel, progress):
+                from dmri_studio.core.execution import hash_file
+
+                artifact = Artifact(product["artifact"])
+                path = Path(product["path"])
+                if (
+                    artifact.kind != "5tt"
+                    or Path(artifact.payload["path"]).resolve() != path.resolve()
+                    or hash_file(path, cancel) != product["sha256"]
+                ):
+                    raise ValueError("Saved five-tissue product identity changed")
+                artifact.assert_current(cancel)
+                return artifact
+
+            self.scientific.start("import-product", verify)
+            return
         if product["kind"] in {"registration_qc", "registration_alignment"}:
             self.show_scene("image", auto_image=False)
             self.scientific_viewer.load_registration_product(product)
@@ -1585,6 +1607,7 @@ class MainWindow(QMainWindow):
             "fod",
             "response",
             "tissue_scalar",
+            "5tt",
             "tractogram",
             "connectome",
         }:
