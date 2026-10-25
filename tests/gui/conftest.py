@@ -65,8 +65,11 @@ def window(qapp: object, qtbot: object, tmp_path: Path) -> MainWindow:
     qtbot.waitUntil(activate_native_window, timeout=10000)
     yield instance
     instance.close()
-    qtbot.waitUntil(
-        lambda: instance.load_thread is None and instance.page.preview.thread is None, timeout=10000
-    )
-    instance.close()
+    # closeEvent refuses to destroy the window while *any* GUI worker is active,
+    # including scientific, batch, QC and viewer reads. Wait for that accepted
+    # close instead of checking only the loader and preview threads: otherwise
+    # deleteLater can retire a previous test's QObjects during the next test's
+    # background slice read.
+    qtbot.waitUntil(lambda: not instance.isVisible(), timeout=30000)
     instance.deleteLater()
+    qtbot.wait(10)
