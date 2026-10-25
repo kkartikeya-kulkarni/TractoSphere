@@ -2,7 +2,13 @@
 
 PUBLIC ALPHA · RESEARCH USE ONLY · SCIENTIFIC VALIDATION ONGOING
 
-## Actual verification scope (updated for v0.1.1-alpha, 2026-10-14)
+The v0.2.0-alpha package adds scientific workflows beyond the earlier viewer-focused
+release. Native scientific GUI testing remains centered on Apple Silicon macOS;
+hosted cross-platform package and GUI checks do not establish scientific
+acceptance on other platforms. See [testing phase](user-guide/status.md) and
+[known limitations](limitations.md).
+
+## Platform verification baseline (v0.1.1-alpha, 2026-10-14)
 
 | Platform | Installation and GUI evidence | Scientific tools | Alpha support |
 | --- | --- | --- | --- |

@@ -45,6 +45,7 @@ nav:
       - Every advanced scientific algorithm: user-guide/advanced-algorithms.md
   - Solve a problem: user-guide/troubleshooting.md
   - Testing phase and coverage: user-guide/status.md
+  - Release notes: release-notes-v0.2.0-alpha.md
   - Scientific and technical reference:
       - Feature inventory: features.md
       - Atlas and ROI details: atlas.md

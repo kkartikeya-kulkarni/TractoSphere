@@ -5,8 +5,8 @@ title: "TractoSphere: Diffusion MRI Research Studio"
 authors:
   - family-names: Kulkarni
     given-names: Kartikeya
-version: 0.1.1-alpha
-date-released: 2026-10-14
+version: 0.2.0-alpha
+date-released: 2026-10-25
 license: MIT
 repository-code: "https://github.com/kkartikeya-kulkarni/TractoSphere"
 url: "https://github.com/kkartikeya-kulkarni/TractoSphere"

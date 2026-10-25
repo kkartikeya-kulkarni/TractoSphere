@@ -4,11 +4,10 @@ PUBLIC ALPHA · RESEARCH USE ONLY · NOT FOR CLINICAL USE · SCIENTIFIC VALIDATI
 
 - Native GUI verification is on macOS Apple Silicon. Linux/Windows are experimental;
   CI results, when available, are software checks rather than scientific validation.
-- The published v0.1.1-alpha did not claim reconstruction/model fitting, new
-  tractography generation, connectome analysis or tensor/FOD glyphs. This
-  current source on `main` implements bounded versions of those workflows, with the
-  scientific validation gaps listed below and in the 38-item backlog. Complete
-  DSI Studio feature parity is not claimed.
+- The v0.2.0-alpha package implements bounded reconstruction/model fitting, new
+  tractography generation, connectome analysis and tensor/FOD glyph workflows.
+  Their scientific validation gaps are listed below and in the 38-item backlog.
+  Complete DSI Studio feature parity is not claimed.
 - No automatic multi-run/joint multi-shell assembly or interrupted EDDY recovery.
   Multi-shell handling requires compatible, independently verified acquisition setup.
 - TinyTrack (.tt.gz) conversion remains disabled after failed spatial round-trip checks.

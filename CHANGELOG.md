@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.2.0-alpha — 2026-10-25
+
+Python package version: 0.2.0a0. Packages the scientific toolbox previously
+available on `main` and its illustrated Read the Docs guide. The v0.1.1-alpha
+downloads remain available for reproducibility.
+
+### Added
+
+- Shared scientific input inventory, eligible workflow planning and exact command
+  approval across preprocessing, diffusion models, registration and connectivity.
+- Guided tensor maps, CSD/FOD, anatomy and registration, streamline generation,
+  filtering, density, SIFT2, connectome matrices, batch processing and saved QC.
+- Review an existing registered atlas against its exact native reference without
+  repeating registration, with provenance-bound QC and separate human review.
+- Public real-data GUI guidance for import through connectome, including files,
+  screenshots, operation-specific prerequisites and limitations.
+
+### Fixed
+
+- Connect imported files and verified derivatives to processing eligibility and
+  actionable review evidence; preserve source data and exact association gates.
+- Improve tractogram indexing, bounded display and ROI filtering feedback.
+- Resolve GUI state, installer/version and cross-platform test issues found during
+  the public scientific-toolbox audit.
+
+### Limitations
+
+Research alpha; successful execution is not scientific acceptance. ACT/GMWMI
+requires a separately accepted exact-5TT tissue review. Scientific workflows are
+primarily tested on Apple Silicon macOS; independent platform and large-run
+validation remains open. The package does not bundle MRtrix3, FSL or ANTs and is
+not a notarized standalone Mac application. See docs/limitations.md.
+
 ## v0.1.1-alpha — 2026-10-14
 
 Python package version: 0.1.1a0. Updated downloads include the Windows fixes and
