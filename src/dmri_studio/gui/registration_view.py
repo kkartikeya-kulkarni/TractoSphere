@@ -68,16 +68,33 @@ class RegistrationView:
             reviews.addWidget(control)
         layout.insertLayout(5, reviews)
         exports = QHBoxLayout()
-        exports.addWidget(button("Snapshot…", self.registration_snapshot))
+        self.registration_snapshot_button = button("Snapshot…", self.registration_snapshot)
+        exports.addWidget(self.registration_snapshot_button)
         self.registration_report_button = button("QC report", self.registration_report)
         self.registration_report_button.setEnabled(False)
         exports.addWidget(self.registration_report_button)
         layout.insertLayout(6, exports)
+        self.registration_controls = [
+            self.registration_info,
+            self.registration_mode,
+            self.registration_mode_info,
+            self.registration_blink,
+            self.registration_regions,
+            *self.registration_review_buttons,
+            self.registration_snapshot_button,
+            self.registration_report_button,
+        ]
+        self._show_registration_controls(False)
         self.image_loaded.connect(self.registration_background_ready)
         self.pending_registration = None
         self.registration_restore = None
         self.theme.changed.connect(self.registration_indicator_style)
         self.registration_indicator_style()
+
+    def _show_registration_controls(self, visible):
+        """Registration decisions must not appear on ordinary scalar overlays."""
+        for control in self.registration_controls:
+            control.setVisible(visible)
 
     def explain_registration_mode(self, *_):
         descriptions = {
@@ -146,7 +163,11 @@ class RegistrationView:
     def registration_background_ready(self):
         pending = self.pending_registration
         self.pending_registration = None
-        if pending is None or self.reference.path.resolve() != Path(pending["reference"]).resolve():
+        if pending is None:
+            self._show_registration_controls(False)
+            return
+        if self.reference.path.resolve() != Path(pending["reference"]).resolve():
+            self._show_registration_controls(False)
             return
         ref = self.reference
 
@@ -175,6 +196,7 @@ class RegistrationView:
             )
             self.registration_layer = layer
             self.registration_bundle = pending
+            self._show_registration_controls(True)
             self.registration_review_state = pending.get("review_state", "NEEDS_REVIEW")
             review_available = pending["bundle"] is not None
             for control in self.registration_review_buttons:

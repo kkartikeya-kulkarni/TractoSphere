@@ -7,6 +7,26 @@ from pathlib import Path
 import pytest
 
 
+def test_plain_scalar_overlay_hides_registration_decisions(window, qtbot, tmp_path):
+    import nibabel as nib
+    import numpy as np
+
+    source = tmp_path / "reference.nii.gz"
+    overlay = tmp_path / "fraction.nii.gz"
+    image = nib.Nifti1Image(np.ones((5, 6, 7), dtype="f4"), np.eye(4))
+    image.header.set_xyzt_units("mm")
+    nib.save(image, source)
+    nib.save(image, overlay)
+    window.focus_scientific_viewer()
+    viewer = window.scientific_viewer
+    assert all(control.isHidden() for control in viewer.registration_controls)
+    viewer.load_image(source)
+    qtbot.waitUntil(lambda: viewer.reference is not None and not viewer.tasks, timeout=10000)
+    viewer.load_layer(overlay)
+    qtbot.waitUntil(lambda: len(viewer.layers) == 1 and not viewer.tasks, timeout=10000)
+    assert all(control.isHidden() for control in viewer.registration_controls)
+
+
 def core_fixture(tmp_path, monkeypatch):
     spec = importlib.util.spec_from_file_location(
         "reg_fixture", Path(__file__).parents[1] / "test_registration.py"
