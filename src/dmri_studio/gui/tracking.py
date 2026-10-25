@@ -704,6 +704,16 @@ class TrackingExecutionPanel(QScrollArea):
             if not self.output.text().strip():
                 raise ValueError("Choose a new derivative directory")
             task = self.selected_task()
+            if task.algorithm == "tckedit":
+                tract = next(
+                    (a for a in self.owner.artifacts if a.id == task.inputs.get("tracts")),
+                    None,
+                )
+                if tract is not None and Path(tract.payload["path"]).suffix.lower() != ".tck":
+                    raise ValueError(
+                        "Scientific tract filtering accepts TCK only. Convert this TRK "
+                        "with verified coordinates before planning."
+                    )
             context = self.viewer_filter_context
             if context is not None and task.algorithm == "tckedit":
                 selected = next(

@@ -1,6 +1,7 @@
 """Task-oriented import and hierarchical project presentation contracts."""
 
 import shutil
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 
@@ -36,7 +37,7 @@ def test_project_tree_identity_and_search(window, qtbot, dataset_folder, tmp_pat
     for subject, session, run in [("S1", "V1", "01"), ("S1", "V2", "02"), ("S2", "V1", "03")]:
         folder = tmp_path / f"input-{subject}-{session}"
         shutil.copytree(dataset_folder, folder)
-        separate_paths = {k: str(folder / v.rsplit("/", 1)[-1]) for k, v in paths.items()}
+        separate_paths = {k: str(folder / Path(v).name) for k, v in paths.items()}
         project = add_acquisition(
             project,
             separate_paths,

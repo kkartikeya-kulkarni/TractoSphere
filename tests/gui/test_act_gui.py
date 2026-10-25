@@ -9,6 +9,14 @@ import pytest
 
 from dmri_studio.gui.operation_state import State
 
+native_mrtrix = pytest.mark.skipif(
+    not all(
+        (Path("/usr/local/mrtrix3/bin") / name).is_file()
+        for name in ("mrconvert", "5ttcheck", "5tt2vis", "tckgen")
+    ),
+    reason="Native MRtrix3 is required for ACT and 5TT execution",
+)
+
 
 def configure(window, tmp_path):
     """Reuse explicit analytic tissue/fiber definitions from the core tests."""
@@ -64,6 +72,7 @@ def test_act_controls_typed_task_and_mode_switch(window, qtbot, tmp_path, appear
     assert not page.operation_state.busy and not window.toast.isVisible()
 
 
+@native_mrtrix
 def test_native_act_approval_run_qc_viewer(window, qtbot, tmp_path):
     page, p, _ = configure(window, tmp_path)
     p.preview.click()
@@ -89,6 +98,7 @@ def test_native_act_approval_run_qc_viewer(window, qtbot, tmp_path):
     assert not window.toast.isVisible()
 
 
+@native_mrtrix
 def test_native_tissue_panel_and_compartment_handoff(window, qtbot, tmp_path):
     page, _, art = configure(window, tmp_path)
     p = page.anatomy
@@ -115,6 +125,7 @@ def test_native_tissue_panel_and_compartment_handoff(window, qtbot, tmp_path):
     assert not page.operation_state.busy
 
 
+@native_mrtrix
 def test_anatomy_failure_recovery_clears_active_state(window, qtbot, tmp_path):
     page, p, art = configure(window, tmp_path)
     from dmri_studio.core.scientific import ImportRequest, import_artifact

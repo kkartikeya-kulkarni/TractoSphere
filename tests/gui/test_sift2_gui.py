@@ -15,6 +15,14 @@ from dmri_studio.core.execution import hash_file
 from dmri_studio.core.scientific import ImportRequest, import_artifact
 from dmri_studio.gui.operation_state import State
 
+native_mrtrix = pytest.mark.skipif(
+    not all(
+        (Path("/usr/local/mrtrix3/bin") / name).is_file()
+        for name in ("mrconvert", "tcksift2", "tck2connectome")
+    ),
+    reason="Native MRtrix3 is required for SIFT2 and weighted connectome execution",
+)
+
 
 def configure(window, tmp_path):
     """Known fibers/tissue; no real subject data embedded in automated tests."""
@@ -67,6 +75,7 @@ def test_sift2_controls_native_defaults_and_state(window, qtbot, tmp_path, appea
     assert p.canvas.isHidden()
 
 
+@native_mrtrix
 def test_native_gui_sift2_approval_histogram_reopen_and_viewer(window, qtbot, tmp_path):
     page, p, tract = configure(window, tmp_path)
     p.preview.click()
@@ -144,6 +153,7 @@ def test_weighted_connectome_gui_controls(window, qtbot, tmp_path):
     assert c.metric.count() == 8
 
 
+@native_mrtrix
 def test_native_weighted_gui_six_metrics_and_subset_weights(window, qtbot, tmp_path, monkeypatch):
     from test_connectome_gui import configure as configure_matrix
 
@@ -219,6 +229,7 @@ def test_native_weighted_gui_six_metrics_and_subset_weights(window, qtbot, tmp_p
     np.testing.assert_allclose(group.weights, [0.2, 1.8], atol=1e-7, rtol=0)
 
 
+@native_mrtrix
 def test_gui_sift2_cancellation_is_neutral_and_partial_not_reusable(window, qtbot, tmp_path):
     page, p, _ = configure(window, tmp_path)
     p.settings["min_iters"].setText("10000")

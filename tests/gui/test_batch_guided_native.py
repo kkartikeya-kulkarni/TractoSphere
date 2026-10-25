@@ -5,6 +5,7 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
+import pytest
 from PySide6.QtCore import QSettings, Qt
 
 from dmri_studio.core.batch.engine import read_journal
@@ -13,6 +14,10 @@ from dmri_studio.gui.settings import Settings
 from dmri_studio.gui.theme import Theme
 
 BIN = Path("/usr/local/mrtrix3/bin")
+pytestmark = pytest.mark.skipif(
+    not all((BIN / name).is_file() for name in ("mrconvert", "tensor2metric")),
+    reason="Native MRtrix3 is required for guided batch execution",
+)
 
 
 def bids_fixture(tmp_path):

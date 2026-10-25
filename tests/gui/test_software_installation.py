@@ -76,6 +76,10 @@ def finish(wizard, qtbot):
     qtbot.waitUntil(lambda: wizard.controller.thread is None, timeout=10000)
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Native Windows scientific software configuration is unsupported",
+)
 def test_guided_external_success_rescan_configures_only_selected_family(
     wizard, window, qtbot, monkeypatch, tmp_path
 ):
@@ -232,6 +236,10 @@ def test_unsupported_Windows_guidance_blocks_test(window, qtbot, monkeypatch):
     dialog.reject()
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Native Windows scientific software configuration is unsupported",
+)
 def test_verified_settings_write_failure_preserves_configuration(
     wizard, qtbot, tmp_path, monkeypatch
 ):

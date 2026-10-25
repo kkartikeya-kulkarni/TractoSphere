@@ -11,6 +11,14 @@ from test_tracking_gui import configure as configure_tracking
 from dmri_studio.core.scientific import ImportRequest, import_artifact
 from dmri_studio.core.scientific.records import restore_selection, save_selection
 
+pytestmark = pytest.mark.skipif(
+    not all(
+        (Path("/usr/local/mrtrix3/bin") / name).is_file()
+        for name in ("mrconvert", "tckgen", "tcksift2")
+    ),
+    reason="Native MRtrix3 is required for executed parameter and provenance tests",
+)
+
 
 def capture(window, name):
     target = os.environ.get("TRACTOSPHERE_STAGE_A_EVIDENCE")

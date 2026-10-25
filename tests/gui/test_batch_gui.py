@@ -8,6 +8,14 @@ import pytest
 
 from dmri_studio.core.batch.engine import control, read_journal
 
+pytestmark = pytest.mark.skipif(
+    not all(
+        (Path("/usr/local/mrtrix3/bin") / name).is_file()
+        for name in ("mrconvert", "tensor2metric")
+    ),
+    reason="Native MRtrix3 is required for batch plan and execution tests",
+)
+
 
 def configure(window, tmp_path):
     spec = importlib.util.spec_from_file_location(

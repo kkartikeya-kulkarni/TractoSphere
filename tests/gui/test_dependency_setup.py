@@ -1,5 +1,6 @@
 """First-run continuation and shared setup UI use real Qt signals and workers."""
 
+import platform
 import time
 from pathlib import Path
 
@@ -67,6 +68,11 @@ def test_shared_report_and_explicit_default_paths(window, qtbot, monkeypatch, tm
     widget.scan()
     settled(window, qtbot)
     assert widget.tree.topLevelItemCount() == 3
+    if platform.system() == "Windows":
+        # Scientific command execution is deliberately unsupported here even
+        # if a synthetic inventory row reports a matching version.
+        assert not widget.save.isEnabled()
+        return
     assert widget.save.isEnabled()
     window.workflow.execution.plan = object()
     widget.apply()
@@ -142,11 +148,11 @@ def test_real_app_entry_opens_studio_without_setup_modal(window, qtbot, monkeypa
     assert window.workspace.currentWidget() is window.dependency_host
 
 
-def test_batch_reads_saved_mrtrix_location_without_asking_again(window):
+def test_batch_reads_saved_mrtrix_location_without_asking_again(window, tmp_path):
     """A new batch workspace reuses the application-level installation path."""
     from dmri_studio.gui.batch import BatchPage
 
-    location = "/example/verified/mrtrix3/bin"
+    location = str(tmp_path / "verified" / "mrtrix3" / "bin")
     window.settings.set("dependencies/MRtrix3", location)
     page = BatchPage(window.theme, settings=window.settings)
     try:

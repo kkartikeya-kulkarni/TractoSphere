@@ -1,6 +1,7 @@
 """Saved scientific software is an application default, not a command approval."""
 
 import importlib.util
+import platform
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -24,7 +25,8 @@ def test_settings_survive_restart_and_empty_never_means_cwd(tmp_path):
     assert {family: str(fresh.location(family)) for family in fresh.locations()} == {
         family: str(tmp_path / family / "bin") for family in first.locations()
     }
-    assert all(fresh.state(family) == "incomplete" for family in fresh.locations())
+    expected_state = "unsupported" if platform.system() == "Windows" else "incomplete"
+    assert all(fresh.state(family) == expected_state for family in fresh.locations())
     first.replace("ANTs", None)
     assert (
         ScientificSoftwareSettings(Settings(QSettings(str(file), QSettings.IniFormat))).location(
@@ -131,8 +133,9 @@ def test_verify_and_save_requires_compatible_family(
     qtbot.waitUntil(lambda: window.dependencies.thread is None, timeout=10000)
     qtbot.waitUntil(lambda: widget.pending_family is None, timeout=10000)
     saved = window.dependencies.saved_directories()["ANTs"]
-    assert (saved == str(directory)) is expected_saved
-    if expected_saved:
+    can_save = expected_saved and platform.system() != "Windows"
+    assert (saved == str(directory)) is can_save
+    if can_save:
         assert window.workflow.execution.bias_inputs["ants_directory"].text() == saved
         directory.rename(tmp_path / "moved")
         assert window.dependencies.software.state("ANTs") == "missing"
@@ -149,7 +152,9 @@ def test_verify_and_save_requires_compatible_family(
         assert window.dependencies.saved_directories()["ANTs"] == str(replacement)
         assert window.workflow.execution.bias_inputs["ants_directory"].text() == str(replacement)
     else:
-        assert "incompatible" in widget.status.text()
+        assert (
+            "unsupported" if platform.system() == "Windows" else "incompatible"
+        ) in widget.status.text()
 
 
 def test_remove_updates_defaults_and_keeps_active_plan(window, tmp_path):
@@ -205,6 +210,13 @@ def test_historical_batch_is_not_replaced_by_new_global_default(window, tmp_path
     assert page.mrtrix_directory.text() == current
 
 
+@pytest.mark.skipif(
+    not all(
+        (Path("/usr/local/mrtrix3/bin") / name).is_file()
+        for name in ("mrconvert", "tensor2metric")
+    ),
+    reason="Native MRtrix3 is required to create the approved batch fixture",
+)
 def test_reopened_approved_batch_keeps_recorded_toolchain(window, qtbot, tmp_path):
     from dmri_studio.core.batch.engine import create_batch
     from dmri_studio.core.batch.planning import GIB, build_batch_plan

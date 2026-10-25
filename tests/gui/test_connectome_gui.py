@@ -11,6 +11,14 @@ from PySide6.QtWidgets import QFileDialog
 from dmri_studio.core.scientific.records import restore_selection, save_selection
 from dmri_studio.gui.operation_state import State
 
+native_connectome = pytest.mark.skipif(
+    not all(
+        (Path("/usr/local/mrtrix3/bin") / name).is_file()
+        for name in ("mrconvert", "tck2connectome")
+    ),
+    reason="Native MRtrix3 is required for connectome plan and execution tests",
+)
+
 
 def configure(window, tmp_path):
     spec = importlib.util.spec_from_file_location(
@@ -125,6 +133,7 @@ def test_matrix_display_selection_and_nonfinite_states(window, qtbot, tmp_path, 
     assert not p.extract.isEnabled()
 
 
+@native_connectome
 def test_connectome_invalid_input_recovery_and_approval(window, qtbot, tmp_path):
     page, p, a = configure(window, tmp_path)
     p.fa.setCurrentIndex(0)
@@ -244,6 +253,7 @@ def test_mean_comparison_keeps_undefined_edges_and_cannot_extract(window, qtbot,
     assert p.matrix.occupancy[1, 1] == 1
 
 
+@native_connectome
 def test_connectome_cancel_is_terminal_and_no_success(window, qtbot, tmp_path):
     page, p, _ = configure(window, tmp_path)
     p.preview.click()

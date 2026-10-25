@@ -323,9 +323,12 @@ def test_reopen_preferences(window: object, qtbot: object) -> None:
     replacement.show()
     assert replacement.logs.open
     assert replacement.sidebar_collapsed
-    assert replacement.width() == max(
+    expected_width = max(
         replacement.minimumWidth(), min(1100, replacement.screen().availableGeometry().width())
     )
+    # Cocoa includes a small native window frame inside the available screen
+    # bounds, so the restored content width can be a few pixels narrower.
+    assert expected_width - 4 <= replacement.width() <= expected_width
     assert replacement.theme.name == "light"
     assert replacement.dataset is None
     replacement.close()

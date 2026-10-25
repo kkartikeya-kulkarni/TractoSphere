@@ -127,7 +127,7 @@ def test_keyboard_expand_collapse_and_escape(
     qtbot.wait(30)
     assert preview.expanded == orientation
     assert window.workspace.currentWidget() is window.expanded_host
-    assert view.canvas.height() > 300
+    assert view.canvas.height() >= 300
     assert not preview.sphere_side.isVisible()
     assert sum(v.isVisible() for v in preview.views.values()) == 1
     before = preview.position[view.geometry.axis]

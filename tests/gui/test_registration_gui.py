@@ -6,6 +6,15 @@ from pathlib import Path
 
 import pytest
 
+native_registration = pytest.mark.skipif(
+    not (
+        (Path("/usr/local/mrtrix3/bin") / "mrconvert").is_file()
+        and (Path.home() / "fsl/bin/flirt").is_file()
+        and (Path.home() / "fsl/bin/fast").is_file()
+    ),
+    reason="Native MRtrix3 and FSL are required for registration execution",
+)
+
 
 def test_plain_scalar_overlay_hides_registration_decisions(window, qtbot, tmp_path):
     import nibabel as nib
@@ -37,6 +46,7 @@ def core_fixture(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("appearance", ["light", "dark"])
+@native_registration
 def test_native_registration_preview_approval_alignment(
     window, qtbot, tmp_path, monkeypatch, appearance
 ):
@@ -93,6 +103,7 @@ def test_native_registration_preview_approval_alignment(
 
 
 @pytest.mark.parametrize("appearance", ["light", "dark"])
+@native_registration
 def test_native_atlas_qc_regions_navigation_and_reopen(
     window, qtbot, tmp_path, monkeypatch, appearance
 ):
@@ -198,6 +209,7 @@ def test_native_atlas_qc_regions_navigation_and_reopen(
             assert viewer.grab().save(str(destination))
 
 
+@native_registration
 def test_native_batch_registration_approval_qc_table(window, qtbot, tmp_path, monkeypatch):
     import json
 

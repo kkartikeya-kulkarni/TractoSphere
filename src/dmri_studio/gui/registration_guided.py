@@ -100,6 +100,7 @@ class GuidedRegistration(QWidget):
         imported_layout = QHBoxLayout(imported_row)
         imported_layout.setContentsMargins(0, 0, 0, 0)
         self.imported_anatomy = QComboBox()
+        self._compact_combo(self.imported_anatomy)
         self.imported_anatomy.setAccessibleName(
             "Imported registration inputs for eligibility review"
         )
@@ -190,8 +191,20 @@ class GuidedRegistration(QWidget):
         layout.addLayout(form)
         return page, layout, form
 
+    @staticmethod
+    def _compact_combo(combo):
+        # Imported filenames and long method names must not set the minimum
+        # width of the whole Registration scroll area on smaller displays.
+        combo.setMinimumContentsLength(12)
+        combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
+        combo.setMinimumWidth(0)
+        combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        return combo
+
     def _input(self, name):
-        combo = QComboBox()
+        combo = self._compact_combo(QComboBox())
         combo.setAccessibleName(name)
         combo.currentIndexChanged.connect(self._input_changed)
         return combo
@@ -218,7 +231,7 @@ class GuidedRegistration(QWidget):
             "Only an identified preprocessed DWI with verified gradients and recorded correction history can supply low-b measurements. This prepares a reference; it does not register images.",
         )
         self.dwi = self._input("Preprocessed DWI and gradients")
-        self.low_b_selection = QComboBox()
+        self.low_b_selection = self._compact_combo(QComboBox())
         self.low_b_selection.addItem("Choose how to combine low-b measurements…", None)
         self.low_b_selection.addItem("Mean of all selected low-b measurements", "mean_low_b")
         self.low_b_selection.addItem("First measurement that meets the threshold", "first_low_b")
@@ -264,12 +277,12 @@ class GuidedRegistration(QWidget):
         )
         self.moving = self._input("Moving image")
         self.reference = self._input("Fixed reference image")
-        self.alignment_method = QComboBox()
+        self.alignment_method = self._compact_combo(QComboBox())
         self.alignment_method.addItem("Choose a registration method…", None)
         self.alignment_method.addItem("Rigid · rotation and translation", "rigid")
         self.alignment_method.addItem("Affine · may scale and shear", "affine")
         self.alignment_method.currentIndexChanged.connect(self._input_changed)
-        self.cost = QComboBox()
+        self.cost = self._compact_combo(QComboBox())
         self.cost.addItem("Choose an image similarity measure…", None)
         for key, title in (
             ("mutualinfo", "Mutual information"),
@@ -297,7 +310,7 @@ class GuidedRegistration(QWidget):
         self.transform.setToolTip(
             "The exact source, target, convention and direction are verified during plan preview."
         )
-        self.derivative_type = QComboBox()
+        self.derivative_type = self._compact_combo(QComboBox())
         for title, kind in (
             ("Atlas labels", "atlas_labels"),
             ("Binary ROI", "roi"),

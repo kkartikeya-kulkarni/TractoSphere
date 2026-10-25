@@ -115,6 +115,11 @@ class CustomMappingDialog(QDialog):
         actions.accepted.connect(self.save_mapping)
         actions.rejected.connect(self.reject)
         root.addWidget(actions)
+        # Scroll-area children do not always inherit construction-order tab
+        # navigation on Xvfb. Keep the three folder patterns adjacent in the
+        # keyboard sequence on every platform.
+        QWidget.setTabOrder(self.subject_pattern, self.session_pattern)
+        QWidget.setTabOrder(self.session_pattern, self.acquisition_pattern)
 
     def add_role(self, role: str, title: str | None = None):
         if role in self.role_patterns:
