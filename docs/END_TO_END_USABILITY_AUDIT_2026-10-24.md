@@ -5,7 +5,8 @@ This is an **in-progress audit**, not product or scientific acceptance. Baseline
 Work is isolated on `audit/end-to-end-usability-2026-10-24`. The prior
 Registration, Tractography, Phase 7 EDDY, public-development and release branches
 remain in place. No research source was changed; no EDDY, TOPUP, 10M-streamline,
-ACT, real registration or real connectome processing was started.
+real registration or real connectome processing was started at baseline. A
+later bounded ACT continuation is recorded below.
 
 The local Phase 1–7, real-data, Registration and Viewer-filter branch tips are
 all ancestors of this audit branch; no older checkout replaced their work.
@@ -83,6 +84,52 @@ hash-bound association. Its anatomical decision is still pending. The legacy
 review says `spatial_review=reviewed`, notes no transform applied or header
 rewrite in that inspection, and leaves scientific acceptance unassigned.
 
+## Bounded 5TT/ACT continuation — 24 October 2026
+
+KK explicitly accepted the existing five-tissue anatomy QC **for bounded ACT
+use**, reporting only that its GM–WM boundary is correct. A new local-user
+declaration was saved through TractoSphere's `record_review`/`load_review`
+workflow against the existing anatomy QC catalog. The catalog's technical
+stage passed, its tissue metrics identify the exact unchanged 5TT path and
+SHA-256, and `accepted_tissue_review` revalidated the new record against that
+same 5TT. The review reason contains only KK's observation and this limited
+use decision. It does not authenticate reviewer identity or accept DTI, FOD,
+tractography, SIFT2 or connectome outputs. Exact files, hashes and commands
+are in the private local audit register, outside the repository.
+
+Using the existing aligned reference and WM FOD, three **new, exclusive,
+bounded derivative attempts** ran through the shared scientific planner and
+execution engine with exact digest approval and two threads:
+
+| Step | Actual technical result | QC and remaining boundary |
+| --- | --- | --- |
+| GM–WM interface | `5ttcheck` and `5tt2gmwmi`; 0.91 s; verified image output and unchanged source hash | `validated_pending_qc`; scientific acceptance unassigned. Native Anatomy GUI result opening untested. |
+| ACT iFOD2 | 100 selected tracks, at most 10,000 seeds; `-act`, `-seed_gmwmi`, backtracking and endpoint cropping; 2.42 s; 100 tracks/7,042 saved vertices, no endpoints outside the field, and unchanged inputs | `validated_pending_qc`; scientific acceptance unassigned. A private six-panel static plot placed saved vertices over the exact-grid diffusion reference and aligned T1 without an obvious gross displacement in those slices. Native VTK Viewer inspection and expert tract review remain untested. |
+| ACT-related SIFT2 | `tckinfo`, `5ttcheck`, `tcksift2 -act`; 39.46 s; 100 finite exact-order weights verified against this tractogram; unchanged inputs | `validated_pending_qc`, automated QC completed with findings, scientific acceptance unassigned. This tiny tractogram has sparse fixel coverage and cannot support quantitative SIFT2 claims. No connectome weighting was performed. |
+
+All three saved manifests reopened with verified hashes and their anatomy,
+tractography or SIFT2 QC catalog. Direct native desktop control in this
+session failed during the native-app pipe startup. Thus actual Cocoa clicks,
+file pickers, Viewer result handoff, three-plane fiber navigation, light/dark
+layout and GUI approval remain **UNTESTED**. The private native acceptance
+guide supplies exact existing files and saved scientific selections; it is
+intentionally not committed. A focused offscreen GUI set passed **4/4**.
+The real GM–WM manifest exposed a saved-results defect: its typed anatomy
+product lacked the display label and handoff shape assumed by Runs & Reports,
+raising a Qt event-loop `KeyError`. Commit `f9d410e` normalizes verified
+anatomy products for the saved-results route and preserves the exact 5TT
+artifact for typed inventory reuse. Two focused offscreen regressions passed,
+including rejection of a tampered synthetic product identity; five core
+saved-run tests passed. The real GM–WM, ACT and SIFT2 manifests then reopened
+in the offscreen Results page with **1, 2 and 1** selectable products, working
+QC actions and **19, 25 and 24** verified hashes respectively. Native result
+click-through remains untested.
+The focused ACT/SIFT2 core set returned **57 passed, 2 failed** in 94.27 s:
+both real-child cancellation tests completed before their resource-sampling
+cancellation signal, returning `validated_pending_qc`. This is not evidence
+that a requested cancellation was ignored. The known ACT cancellation
+classification task remains open, and neither failure is counted as a pass.
+
 ## Operation acceptance matrix
 
 Each row names the acceptance path and present evidence/gap. Synthetic test
@@ -100,7 +147,7 @@ passes only cover the particular test, not all controls or real anatomy.
 | N4/bias and correction QC | Correct pre-N4 image and mask/history required | Exact plan; reject repeat correction | Field, mask, numerical and anatomical review | Synthetic coverage; real scientific acceptance **UNTESTED**. |
 | DTI fit and existing tensor metrics | DWI/gradients or six-component tensor conventions visible | Exact `dwi2tensor`/`tensor2metric` preview; separate approval | FA/MD/AD/RD images, numerical QC, provenance | Existing real tensor preview **PRIOR**; real metric execution/output **UNTESTED**. |
 | Response estimation and CSD/FOD | Shells, WM/GM/CSF responses, SH convention and masks associated | Exact native commands and reviewed output directory | FOD QC, Viewer glyphs and provenance | Real selections technically eligible **PRIOR**; scientific output validation **UNTESTED**. |
-| Anatomy/5TT/ACT | T1 contrast, segmentation, tissue channels and source correspondence | Exact plan; no FA-as-T1 substitution | Tissue QC and anatomical review before tracking | Eligibility repair **PRIOR**; no reviewed real 5TT/ACT in bounded set, therefore real workflow **BLOCKED**. |
+| Anatomy/5TT/ACT | T1 contrast, segmentation, tissue channels and source correspondence | Exact plan; no FA-as-T1 substitution | Tissue QC and anatomical review before tracking | **PASS** exact 5TT QC acceptance for bounded ACT use and technical GM–WM/100-track ACT attempts above; native Viewer/anatomical tract review **UNTESTED**, broad scientific validation open. |
 | Registration: create diffusion reference | Preprocessed DWI, validated gradients and correction history | Low-b indices/threshold shown before approval; new reference only | Recorded indices, hashes, immutable result | Synthetic native regression **PRIOR**; real DWI correction history missing for this new attempt, so **BLOCKED**. |
 | Registration: EPI to T1 | Distinct EPI, T1, brain-extracted T1, WM segmentation, identities | Exact direction/cost/software; approve | Three-plane alignment and human review | Real T1 selectable after documented declaration **PRIOR**; distinct structural evidence missing, **BLOCKED**. |
 | Registration: two images | Distinct identified 3D moving/fixed images | Rigid/affine plan and approval | Transform provenance and native overlay review | Synthetic tests; real contrast/space relation **UNTESTED**. |
@@ -108,10 +155,10 @@ passes only cover the particular test, not all controls or real anatomy.
 | Registration: advanced nonlinear/BBR | Required fixed/moving anatomy, masks and tool-specific warp/segmentation contracts | FNIRT/BBR parameters, exact native commands and approval | Jacobian/coverage checks plus visual registration review | Controlled synthetic/core routes pass; real HCP prerequisites and native result inspection **UNTESTED**. |
 | Registration: advanced transform import/invert/compose/convert | Exact source/target images, direction, convention, software/version and evidence | Typed plan; reject same-image or ambiguous transforms | Immutable transform record, reverse/chain direction and output checks | Core distinct-image guard retained; historical matrix alone remains **BLOCKED**. Native advanced-dialog and real interoperability **UNTESTED**. |
 | Registration: existing registered atlas QC | Exact atlas plus verified low-b reference and hash-bound producer or association | QC-only plan has **zero registration commands**; approval yields new immutable bundle | Full-slice overlay, reviewer decision, current hashes; review can become stale | Guided route added on this branch. Existing Stage 8a native bundle and reference record verified (46 evidence files); anatomical decision **NEEDS_REVIEW**. Reuse the saved bundle. |
-| Tractography generate | FOD, mask/ACT/GMWMI, geometry and source identity | Exact `tckgen` plan; bounded approval and async execution | Tract count, geometry, QC, Viewer | Synthetic and targeted native prior coverage; real generation and 10M scale **UNTESTED**. |
+| Tractography generate | FOD, mask/ACT/GMWMI, geometry and source identity | Exact `tckgen` plan; bounded approval and async execution | Tract count, geometry, QC, Viewer | **PASS** bounded 100-track ACT technical run with unchanged inputs; native Viewer and scientific tract review **UNTESTED**. 10M scale **UNTESTED**. |
 | Tractography filter and ROI constraints | Selected Viewer group maps to full original TCK/TRK source; compatible ROIs | TRK conversion explicit; exact `tckedit` preview/approval | Filtered/original Viewer, QC, hashes and cancellation | **PASS** current bounded real 1,000-source-track/5-output-track technical run and verified reopen; targeted Cocoa Viewer suite passed. Real anatomical ROI review remains **UNTESTED**. |
 | Tract density/statistics | Compatible full tractogram/reference | Exact density/stat plan and approval | Density Viewer scene preservation, QC | Synthetic coverage; native scene preservation and real mapping **UNTESTED**. |
-| SIFT2 | Exact tractogram and FOD, mask/ACT evidence | `tcksift2` preview, approval and new weights | Weight distribution, hash-bound source, QC | No reviewed real weights in bounded set; scientific test **BLOCKED**. |
+| SIFT2 | Exact tractogram and FOD, mask/ACT evidence | `tcksift2` preview, approval and new weights | Weight distribution, hash-bound source, QC | **PASS** bounded 100-track ACT-related technical weighting and exact-order binding; sparse coverage warning, native GUI and scientific quantitative review **UNTESTED**. |
 | Connectivity count/length/FA/weighted metrics | Tracts, atlas, reference, optional FA and exact weights; nodes inspectable | Plan requires current atlas registration eligibility; separate approval and execution | Matrix, occupancy, edge extraction, QC, provenance | Real atlas's 23 nodes visible **PRIOR**; saved selection is **BLOCKED** because it does not link to the existing native QC bundle, whose human decision remains **NEEDS_REVIEW**. No real connectome run in this audit. |
 | Batch BIDS/custom discovery and mapping | One HCP-style custom acquisition found **PRIOR**; incomplete roles surfaced | Per-subject plan, pinned tool paths and consent | Journal, pause/cancel/retry/resume, Viewer/QC handoff | Synthetic/core coverage; real discovery only, native seven-step walkthrough **UNTESTED**. |
 | Runs, reports and QC reopen | Saved manifests/products verified by hashes | No new computation for inspection | Review status persists; report and export checked | Existing tract run and 11 hashes/QC **PRIOR**; current native end-to-end reopen **UNTESTED**. |

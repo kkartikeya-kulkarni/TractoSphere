@@ -107,7 +107,7 @@ The owner-reported 13 October 2026 correspondence from Professor Jesper Andersso
 - **Origin / priority / status / subsystem:** Phase 4 and scientific roadmap; P0; Implemented, unverified for real-data scientific acceptance; 5TT, tracking, backtracking and termination.
 - **Acceptance:** On suitable independently reviewed anatomy/FOD data, verify 5TT tissue identity and alignment, ACT prerequisites, GMWMI seeding where supported, backtracking, termination and endpoint cropping against documented MRtrix behavior; inspect anatomical plausibility, exact commands, QC and unchanged source hashes. Incompatible data must block.
 - **Environment:** Native Mac with compatible MRtrix, approved real anatomy/diffusion data, Viewer and expert anatomical review.
-- **Evidence:** Phase 4 targeted synthetic native Generate/Filter/Density tests passed at `f9fc8ba`; they did not perform real ACT/5TT validation. Phase 0 lists implemented ACT routes.
+- **Evidence:** Phase 4 targeted synthetic native Generate/Filter/Density tests passed at `f9fc8ba`; they did not perform real ACT/5TT validation. Phase 0 lists implemented ACT routes. The 24 October bounded local continuation recorded KK's hash-bound 5TT QC acceptance for bounded ACT use, then technically verified a GM–WM interface and 100-track ACT run with unchanged inputs. A limited static diffusion/T1 overlay was inspected; native Viewer and expert tract review remain untested. See [end-to-end audit](END_TO_END_USABILITY_AUDIT_2026-10-24.md).
 - **Remaining / dependencies and blockers:** Acquire suitable data and ground-truth/review protocol. Depends on `SV-C01` for spatial association and `SV-MOD01` for FOD validity.
 
 ### SV-CON01 — Validate SIFT2 and connectomics scientifically
@@ -115,7 +115,7 @@ The owner-reported 13 October 2026 correspondence from Professor Jesper Andersso
 - **Origin / priority / status / subsystem:** Scientific roadmap and Phase 0; P0; Implemented, unverified for broad scientific acceptance; SIFT2, atlas assignment and connectivity matrices.
 - **Acceptance:** Validate tract/FOD/atlas associations, SIFT2 weight identity and stability, matrix assignment/count/length/FA calculations, expected symmetry/edge cases, QC/review status and provenance against independent references. State clearly that weights and streamline counts are not axon counts.
 - **Environment:** Compatible MRtrix, synthetic known-answer graph/tract fixtures and permitted real datasets with expert review.
-- **Evidence:** Phase 0 lists implementation and bounded tests; README/limitations describe scientific limits. No current full biological validation is claimed.
+- **Evidence:** Phase 0 lists implementation and bounded tests; README/limitations describe scientific limits. The 24 October bounded ACT-related SIFT2 run produced 100 exact-order weights with source hashes unchanged, but QC flagged sparse fixel coverage and scientific acceptance remains unassigned. No connectome weighting or full biological validation is claimed.
 - **Remaining / dependencies and blockers:** Requires validated FOD, ACT/tractogram and atlas routes (`SV-MOD01`, `SV-ACT01`, `SV-C01`).
 
 ### SV-ROI01 — Verify real anatomical ROI/tractogram correspondence
@@ -189,7 +189,7 @@ The owner-reported 13 October 2026 correspondence from Professor Jesper Andersso
 - **Origin / priority / status / subsystem:** Phase 0 and Phase 2; P1; In progress; ACT worker/process retirement and output publication.
 - **Acceptance:** Reproduce `test_real_act_child_cancellation_does_not_publish` in a process-permitted environment with timing/resource evidence, classify fixture race versus actual cancellation defect, and ensure cancelled work never publishes a validated output. Add deterministic regression coverage for any defect.
 - **Environment:** Normal Mac Terminal or equivalent allowed process enumeration with real small ACT child; synthetic data and valid compatible tools.
-- **Evidence:** Phase 0/2 restricted runs returned `validated_pending_qc` instead of `cancelled` when resource sampling could not observe the child. Phase 4 native **tracking** real-child cancellation passed at `7053b2a`, but that is a different test and does not classify ACT.
+- **Evidence:** Phase 0/2 restricted runs returned `validated_pending_qc` instead of `cancelled` when resource sampling could not observe the child. Phase 4 native **tracking** real-child cancellation passed at `7053b2a`, but that is a different test and does not classify ACT. On the 24 October bounded continuation, the ACT and SIFT2 process-cancellation tests both completed before their resource-sampling cancellation signal (57 other focused core tests passed); process enumeration was unavailable in this command environment. No actual requested-cancellation failure has been established.
 - **Remaining / dependencies and blockers:** Run the exact ACT test natively with captured HEAD and logs; do not mark it an app defect or a sandbox-only issue without this comparison.
 
 ### SV-PERF05 — Preserve startup/navigation gains across phases
