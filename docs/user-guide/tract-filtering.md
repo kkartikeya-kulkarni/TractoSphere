@@ -57,4 +57,12 @@ The native MRtrix filtering checks saved streamline vertices against ROI voxels.
 
 Open the same verified reference NIfTI first, then the filtered TCK. Choose **Four views** so axial, coronal, sagittal and 3D views are visible together. Select the filtered tract group in the Inspector; check the retained count and compare it with the full source. If the 3D panel shows tracks without a brain outline, open the intended NIfTI again and adjust **Volume rendering** or a suitable anatomical surface. Those display changes do not alter the filter. The **Display limit** may show only a subset in 3D; the processing plan and QC use the complete source file.
 
+![Current GUI showing the public-data 42-track result over its mean low-b reference in four views](../screenshots/user-guide/28-filtered-42-on-brain.png)
+
+*A saved public-data filter result is open over the matching mean low-b image. The tract group reports 42 source fibers and 42 drawn; this is the already filtered TCK, so open the original full source separately when comparing retention. The screenshot shows viewing, not a biological pathway approval.*
+
+![The same filtered tracks and anatomical volume in the current 3D Viewer](../screenshots/user-guide/29-filtered-42-3d.png)
+
+*Switch the layout to **3D scene** to enlarge the context. Here the base image is ray cast at low opacity and tract line width is increased to make the relationship visible; neither setting changes the image or tracks on disk.*
+
 If zero tracks remain, check ROI location and source/reference identity, whether you accidentally chose ALL instead of ANY, whether endpoints-only or order was intended, and the QC's ROI observations. Do not enlarge or move a mask only to make a nonzero result without documenting a new scientific ROI decision.

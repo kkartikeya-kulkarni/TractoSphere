@@ -49,6 +49,30 @@ If the atlas is already in the participant's DWI space, **do not rerun registrat
 
 Open **Advanced Registration Tools** for exact typed tasks: create a reference, FLIRT rigid/affine, EPI-to-T1 `epi_reg`, supported FNIRT, transform inversion, composition or conversion, and resampling of scalar images, atlas labels, ROIs and probability maps. Select the operation, choose **Select inputs and parameters…** or **Import existing transform…**, then review exact source/target identity and format. For an imported transform, provide its original file, software/version, direction/image-association evidence and a **new** record JSON. Unsupported transform conventions or wrong source grids should remain blocked. Advanced tools are not a shortcut around human QC.
 
+### Run an advanced registration operation
+
+1. Expand **Advanced Registration Tools** in Registration and choose the operation by its displayed name. Click **Select inputs and parameters…**. The dialog lists the input *types* required for that operation; select the exact imported items, fill every required parameter and read any disabled candidate's reason. If an item is missing, import it first with correct subject and space declarations.
+2. For an existing external transform, choose **Import existing transform…**. Supply the original transform file, original software and version (or documented unknown), native coordinate format, moving/source image, fixed/target image, and written direction/image-association evidence. Choose a **new transform record JSON** path. This records provenance and does not apply or anatomically approve the transform.
+3. Choose a **new immutable output directory** and the allowed thread count. Click **Validate inputs and preview commands**. Read the entire selection, transform direction, source/target spaces, interpolation policy, generated file names and installed tool version. Do not transpose a source and target simply because the two images have the same shape.
+4. Check **I reviewed the exact inputs, transform direction, interpolation, resources and commands**, then choose **Run approved operation**. Watch the log. After completion use **Inspect alignment / atlas QC**, **Open saved atlas QC…** or **Technical QC** as relevant; open the result over the fixed image in three planes and record a separate anatomical review.
+
+| Advanced choice | Supply in the task dialog | Particular decision to check in preview and QC |
+| --- | --- | --- |
+| **Derive preprocessed low-b reference** | One eligible DWI with gradients; low-b threshold and mean/first policy | Which volumes are selected; the output is a reference image, not a registration. |
+| **Registered atlas QC on preprocessed diffusion** | Already registered discrete atlas and exact verified diffusion reference | Creates only atlas/reference QC; preserve original registration provenance. |
+| **Rigid / affine registration** | Moving 3D image, fixed 3D image; optional verified initial transform; rigid/affine model and similarity cost | Moving → fixed direction; rigid versus scaling/shearing; inspect overlay and saved transform. |
+| **EPI to T1 boundary registration** | Moving EPI/b0, fixed T1, brain-extracted T1 and associated WM segmentation | EPI → T1 direction and boundary alignment; do not use its matrix as T1 → EPI without a verified inverse. |
+| **Structural nonlinear registration** | Moving/fixed structural images and a verified initial transform; iterations and warp resolution | Initial alignment, warp plausibility, local distortion and matching subject/template spaces. |
+| **Invert verified transform** | One typed spatial transform | The output maps target → source. Verify format and exact image association before using it. |
+| **Compose matched transform chain** | First and second typed transforms with adjoining spaces | The first target must equal the second source; inspect the resulting source → final target direction. |
+| **Convert linear transform to MRtrix** | One verified linear transform | Conversion changes representation; source/target physical meaning must remain the same. |
+| **Resample scalar** | Continuous moving image, fixed reference and correct-direction transform | Continuous interpolation and intensity behavior. |
+| **Resample labels** | Integer atlas labels, fixed reference and correct-direction transform | Nearest-neighbor treatment and survival of original parcel IDs. |
+| **Resample ROI** | Binary ROI, fixed reference and correct-direction transform | Boundary and voxel occupancy after resampling; inspect the resulting mask. |
+| **Resample probability** | Probability atlas, fixed reference and correct-direction transform | Continuous probabilities and channel/label association; do not treat it as a discrete atlas. |
+
+An **Inspect a Registration** guided goal opens saved alignment evidence and Viewer comparison without running a thirteenth algorithm. Use it to compare the moving result with its exact fixed image and to record the human decision.
+
 ## Five-tissue anatomy and GM–WM seeds
 
 ![Current Anatomy and five-tissue task with structural input and review fields](../screenshots/user-guide/09-five-tissue.png)
