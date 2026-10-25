@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from dmri_studio.core.combined_qc import build_combined_report_from_folder
 from dmri_studio.core.comparison import validate_comparison
 from dmri_studio.core.dataset import DatasetPaths
 from dmri_studio.core.execution import hash_file
@@ -73,6 +74,11 @@ class QCPage(QWidget):
         top = QHBoxLayout()
         self.open_button = button("Open Report…", self.browse)
         top.addWidget(self.open_button)
+        self.combined_button = button("Create dataset QC document…", self.create_combined)
+        self.combined_button.setToolTip(
+            "Collect verified evidence for the steps run in one dataset folder into a single HTML document."
+        )
+        top.addWidget(self.combined_button)
         self.identity = label("No QC catalog loaded", "control")
         top.addWidget(self.identity, 1)
         root.addLayout(top)
@@ -81,7 +87,10 @@ class QCPage(QWidget):
         self.empty = EmptyState(
             "No QC report open",
             "Open a saved QC report to review processing evidence.",
-            [("Open Report…", self.browse)],
+            [
+                ("Open Report…", self.browse),
+                ("Create dataset QC document…", self.create_combined),
+            ],
         )
         root.addWidget(self.empty, 1)
         split = QSplitter()
@@ -262,6 +271,8 @@ class QCPage(QWidget):
         self.status.setText(
             "Reading existing evidence…"
             if kind in {"catalog", "artifact", "comparison"}
+            else "Building dataset QC document…"
+            if kind == "combined"
             else "Saving review/export…"
         )
         self.thread.start()
@@ -349,6 +360,13 @@ class QCPage(QWidget):
         elif self.kind == "browser":
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(result)))
             self.status.setText("Opened verified existing report in your browser.")
+        elif self.kind == "combined":
+            opened = QDesktopServices.openUrl(QUrl.fromLocalFile(str(result)))
+            self.status.setText(
+                f"Dataset QC document saved: {result}. "
+                + ("Opened in your browser." if opened else "Open the file in your browser.")
+            )
+            self.notification.emit(self.status.text(), "success")
         else:
             self.status.setText(f"Saved: {result}")
             self.notification.emit(self.status.text(), "success")
@@ -497,6 +515,7 @@ class QCPage(QWidget):
         for action in self.empty.actions:
             action.setEnabled(idle)
         self.open_button.setEnabled(idle)
+        self.combined_button.setEnabled(idle)
         self.stages.setEnabled(idle)
         self.artifacts.setEnabled(idle)
         self.open_report.setEnabled(idle and report)
@@ -525,6 +544,31 @@ class QCPage(QWidget):
         )
         if path:
             self.start("export", lambda _: export_report(catalog, entry, Path(path)))
+
+    def create_combined(self) -> None:
+        """Build one report for the steps present under a chosen dataset run folder."""
+        starting_folder = str(self.catalog.path.parent.parent) if self.catalog is not None else ""
+        folder = QFileDialog.getExistingDirectory(
+            self, "Choose one dataset's saved processing folder", starting_folder
+        )
+        if not folder:
+            return
+        destination, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save dataset QC document",
+            str(Path(folder) / "dataset-QC.html"),
+            "HTML (*.html)",
+        )
+        if destination:
+            self.start(
+                "combined",
+                lambda progress: build_combined_report_from_folder(
+                    Path(folder),
+                    Path(destination),
+                    cancelled=self.cancel.is_set,
+                    progress=progress,
+                ),
+            )
 
     def save_review(self) -> None:
         """Record a user's explicit assessment separately from producer statuses."""
