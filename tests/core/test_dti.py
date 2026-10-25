@@ -39,7 +39,7 @@ def save(path, array, affine):
     return path
 
 
-def phantom(tmp_path, *, noise=0, multishell=False, affine=None, negative=False):
+def phantom(tmp_path, *, noise=0, multishell=False, affine=None, negative=False, subject_id=None):
     """Rotated anisotropic tensor and FSL-axis gradients with exact analytic signal."""
     tmp_path.mkdir(exist_ok=True)
     rng = np.random.default_rng(802)
@@ -84,7 +84,10 @@ def phantom(tmp_path, *, noise=0, multishell=False, affine=None, negative=False)
             path,
             tmp_path / "bval",
             tmp_path / "bvec",
-            declarations={"processing_state": "preprocessed"},
+            declarations={
+                "processing_state": "preprocessed",
+                **({"subject_id": subject_id} if subject_id else {}),
+            },
         )
     )
     return a, tensor
@@ -114,7 +117,7 @@ def tasks(a, fit="OLS", iterations=None, mask=None, shells=None):
 @requires_mrtrix
 @pytest.mark.parametrize("fit,iterations", [("OLS", None), ("WLS", None), ("IWLS", 2)])
 def test_actual_phantom_known_metrics_and_provenance(tmp_path, fit, iterations):
-    a, tensor = phantom(tmp_path / "source")
+    a, tensor = phantom(tmp_path / "source", subject_id="phantom-dti")
     before = {s["path"]: s["sha256"] for s in a.to_dict()["sources"]}
     plan = prepare_dti((a,), tasks(a, fit, iterations), tmp_path / "run", tool_directory=BIN)
     command = next(c["argv"] for c in plan.to_dict()["commands"] if c["step"] == "fit-fit")
@@ -141,6 +144,7 @@ def test_actual_phantom_known_metrics_and_provenance(tmp_path, fit, iterations):
     assert vector_image.header.get_intent()[0] == "vector"
     catalog = load_catalog(tmp_path / "run" / "qc-catalog.json")
     assert catalog.payload["stages"][0]["scientific_review"] == "required"
+    assert catalog.payload["identity"]["subject"] == "phantom-dti"
     assert inspect_run(tmp_path / "run" / "manifest.json")["dti_products"]
     assert all(hash_file(Path(p)) == h for p, h in before.items())
     assert all("sha256" in s for s in result["outputs"].values())

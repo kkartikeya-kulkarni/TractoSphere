@@ -737,12 +737,20 @@ def verify_dti(folder, data, cancelled=lambda: False, progress=lambda _: None):
             ("qc-metrics.json", "metrics", "Tensor metrics and residuals"),
         ]
     ]
+    subject = next(
+        (
+            artifact["declarations"].get("subject_id")
+            for artifact in data["artifacts"]
+            if artifact["declarations"].get("subject_id")
+        ),
+        "Unspecified — see source identity in run manifest",
+    )
     _publish_json(
         folder / "qc-catalog.json",
         dict(
             schema_version=1,
             kind="dmri_qc_catalog",
-            identity=dict(subject="Unspecified — see source identity in run manifest"),
+            identity=dict(subject=subject),
             stages=[
                 dict(
                     id="dti",
