@@ -24,6 +24,15 @@ def test_supported_input_choices_keep_exact_core_kind(window, qtbot):
     assert not dialog.declarations["tensor_layout"].currentData()
 
 
+def test_five_tissue_import_exposes_distinct_tissue_review(window, qtbot):
+    dialog = ImportDialog(window, initial_kind="5tt")
+    qtbot.addWidget(dialog)
+    assert not dialog.declarations["anatomical_review"].isHidden()
+    assert not dialog.declarations["tissue_review"].isHidden()
+    dialog.kind.setCurrentIndex(dialog.kind.findData("anatomy"))
+    assert dialog.declarations["tissue_review"].isHidden()
+
+
 def test_scientific_task_entry_and_inventory_search_preserve_artifact(window, qtbot, tmp_path):
     window.focus_models()
     page = window.scientific
@@ -52,5 +61,3 @@ def test_scientific_task_entry_and_inventory_search_preserve_artifact(window, qt
     assert page.inputs.currentItem().data(Qt.ItemDataRole.UserRole) == content_id
     page.remove_input.click()
     assert page.inputs.count() == 0 and path.exists()
-
-

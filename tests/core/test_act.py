@@ -10,10 +10,12 @@ import numpy as np
 import pytest
 
 from dmri_studio.core.execution import execute_plan, hash_file
+from dmri_studio.core.qc import load_catalog, record_review
 from dmri_studio.core.scientific import ImportRequest, Task, import_artifact
 from dmri_studio.core.scientific.act_qc import sample_fractions
 from dmri_studio.core.scientific.anatomy import (
     CHANNEL_DECLARATION,
+    accepted_tissue_review,
     alignment_review,
     prepare_anatomy,
     tissue_statistics,
@@ -73,6 +75,52 @@ def tissue(tmp_path):
     five = import_artifact(
         ImportRequest("5tt", save(inputs / "five.nii", data, affine), declarations=decl)
     )
+    metrics = inputs / "five-qc-metrics.json"
+    metrics.write_text(json.dumps({"products": [{"artifact": five.to_dict()}]}))
+    catalog_path = inputs / "five-qc-catalog.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "kind": "dmri_qc_catalog",
+                "identity": {"subject": "analytic"},
+                "stages": [
+                    {
+                        "id": "anatomy",
+                        "title": "Analytic five-tissue fixture",
+                        "execution": "completed",
+                        "technical": "passed",
+                        "automated_qc": "pending",
+                        "scientific_review": "required",
+                        "findings": ["Analytic fixture only; no participant anatomy is accepted"],
+                        "artifacts": [
+                            {
+                                "kind": "metrics",
+                                "label": "Analytic values",
+                                "path": metrics.name,
+                                "sha256": hash_file(metrics),
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+    tissue_review = record_review(
+        load_catalog(catalog_path),
+        "anatomy",
+        "accepted",
+        "Analytic fixture",
+        "The analytic channel boundaries are defined by this test array; no human anatomy claim",
+        inputs,
+    )
+    five = import_artifact(
+        ImportRequest(
+            "5tt",
+            inputs / "five.nii",
+            declarations={**decl, "tissue_review": str(tissue_review)},
+        )
+    )
     reference = import_artifact(ImportRequest("anatomy", refpath, declarations=decl))
     dirs = sphere_mesh(1)[0]
     coef = np.linalg.lstsq(sh_design(dirs, 8), dirs[:, 0] ** 8, rcond=None)[0]
@@ -126,6 +174,59 @@ def test_tissue_structure_and_unchanged(tissue):
     assert stats["volume_mm3"][2] == pytest.approx(12 * 16 * 16 * 8, rel=0, abs=1e-10)
     assert hash_file(Path(five.payload["path"])) == before
     assert alignment_review(five.to_dict(), ref.to_dict())[0]["subject_id"] == "analytic"
+
+
+def test_tissue_review_blocks_seeds_and_act_when_missing_or_pending(tissue, tmp_path):
+    five, ref, fod, seed = tissue
+    original = five.to_dict()
+    declarations = dict(original["declarations"])
+    review_path = Path(declarations.pop("tissue_review"))
+    unreviewed = import_artifact(
+        ImportRequest("5tt", Path(five.payload["path"]), declarations=declarations)
+    )
+    gmwmi = Task("seeds", "5tt2gmwmi", dict(five_tt=unreviewed.id, reference=ref.id))
+    with pytest.raises(ValueError, match="accepted, hash-bound 5TT"):
+        prepare_anatomy((unreviewed, ref), (gmwmi,), tmp_path / "seeds")
+    with pytest.raises(ValueError, match="accepted, hash-bound 5TT"):
+        prepare_tracking(
+            (unreviewed, ref, fod, seed),
+            (act_task(unreviewed, ref, fod, seed),),
+            tmp_path / "act",
+        )
+
+    catalog = load_catalog(Path(json.loads(review_path.read_text())["catalog"]))
+    pending_path = record_review(
+        catalog,
+        "anatomy",
+        "needs_review",
+        "Analytic fixture",
+        "GM-WM boundary remains unresolved",
+        tmp_path,
+    )
+    pending = import_artifact(
+        ImportRequest(
+            "5tt",
+            Path(five.payload["path"]),
+            declarations={**declarations, "tissue_review": str(pending_path)},
+        )
+    )
+    with pytest.raises(ValueError, match="not accepted"):
+        prepare_anatomy(
+            (pending, ref),
+            (Task("seeds", "5tt2gmwmi", dict(five_tt=pending.id, reference=ref.id)),),
+            tmp_path / "pending-seeds",
+        )
+
+
+def test_tissue_review_cannot_unlock_another_image(tissue, tmp_path):
+    five = tissue[0]
+    alternate = tmp_path / "copied-five.nii"
+    alternate.write_bytes(Path(five.payload["path"]).read_bytes())
+    imported = import_artifact(
+        ImportRequest("5tt", alternate, declarations=five.payload["declarations"])
+    )
+    with pytest.raises(ValueError, match="does not identify this exact 5TT"):
+        accepted_tissue_review(imported.to_dict())
 
 
 @pytest.mark.parametrize("fault", ["negative", "nonfinite", "sum", "channels", "empty"])

@@ -263,6 +263,12 @@ class ImportDialog(QDialog):
                 None,
                 {"anatomy", "5tt", "gmwmi"},
             ),
+            (
+                "tissue_review",
+                "Accepted exact 5TT tissue QC review JSON (ACT / GM-WM seeds)",
+                None,
+                {"5tt"},
+            ),
             ("anatomy_sha256", "Original segmentation anatomy SHA-256", None, {"5tt"}),
             ("five_tt_sha256", "Source 5TT SHA-256", None, {"gmwmi"}),
             ("alignment_evidence", "Atlas alignment evidence / review", None, {"atlas_labels"}),

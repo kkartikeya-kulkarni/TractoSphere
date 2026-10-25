@@ -267,10 +267,12 @@ def prepare_tracking(
         _association(bound)
         _validate_parameters(task, bound)
         if task.algorithm.startswith("tckgen.act_"):
-            from .anatomy import alignment_review, tissue_statistics
+            from .anatomy import accepted_tissue_review, alignment_review, tissue_statistics
 
             _, evidence = alignment_review(bound["five_tt"], bound["reference"], cancelled)
             sources.update(evidence)
+            _, tissue_evidence = accepted_tissue_review(bound["five_tt"], cancelled)
+            sources.update(tissue_evidence)
             tissue_statistics(bound["five_tt"]["path"], cancelled)
         p = dict(task.parameters)
         spec = task.algorithm

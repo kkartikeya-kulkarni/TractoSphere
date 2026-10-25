@@ -103,6 +103,23 @@ def selection(items, **settings):
     )
 
 
+def test_act_sift2_requires_exact_accepted_tissue_review(sift_inputs, tmp_path):
+    items, _ = sift_inputs
+    source = items["five_tt"]
+    declarations = dict(source.payload["declarations"])
+    declarations.pop("tissue_review")
+    items["five_tt"] = import_artifact(
+        ImportRequest("5tt", Path(source.payload["path"]), declarations=declarations)
+    )
+    with pytest.raises(ValueError, match="accepted, hash-bound 5TT"):
+        prepare_sift2(
+            tuple(items.values()),
+            (selection(items),),
+            tmp_path / "unreviewed-sift2",
+            tool_directory=BIN,
+        )
+
+
 def test_registry_and_native_defaults():
     a = ALGORITHMS["tcksift2"]
     assert a.implementation == "implemented" and a.validated_versions == ("3.0.5",)

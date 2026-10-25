@@ -29,6 +29,15 @@ PUBLIC ALPHA · RESEARCH USE ONLY · NOT FOR CLINICAL USE · SCIENTIFIC VALIDATI
   scientific acceptance. Mask coverage and alignment require anatomical review.
 - N4/registration/combination depend on bounded engine producer and review contracts;
   arbitrary historical run formats may need explicit adapters.
+- ACT, GM-WM seed generation and ACT SIFT2 require an accepted 5TT tissue QC
+  review bound to the exact five-tissue image. T1-to-DWI alignment approval and
+  successful `5ttcheck` do not accept tissue boundaries. A reported GM-WM
+  boundary problem must be resolved by qualified review before these methods run.
+- The current 5TT GUI path requires T1 and diffusion reference on one physical
+  voxel grid. Resampling a native high-resolution T1 to a coarser diffusion grid
+  before segmentation can lose anatomical detail. A validated native-resolution
+  segmentation and transform-preserving ACT path is still needed; the same-grid
+  route should not be treated as publication-ready from technical checks alone.
 - Large tractograms are indexed with bounded rendering, but complex editing/filtering
   can be slow. Ten-million-record indexing stress used repeated records, not evidence
   of rendering ten million distinct biological streamlines.

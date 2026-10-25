@@ -107,6 +107,70 @@ def alignment_review(item, reference, cancelled=lambda: False):
     return record, hashes
 
 
+def accepted_tissue_review(item, cancelled=lambda: False):
+    """Require a human QC decision bound to these exact five-tissue bytes.
+
+    Registration/alignment review cannot accept FAST/FIRST tissue boundaries.
+    The producer catalog and metrics are reverified on every plan preview.
+    """
+    from ..qc import load_catalog, load_review
+
+    path = Path(item["declarations"].get("tissue_review", ""))
+    if not path.is_file() or path.stat().st_size > 1024**2:
+        raise ValueError(
+            "GM-WM seeds and ACT require an accepted, hash-bound 5TT tissue QC review. "
+            "Open the 5TT QC catalog, inspect cortical GM/WM boundaries, save a review, "
+            "then import that review with the exact 5TT image."
+        )
+    record = read_json(path.read_text())
+    catalog_path = Path(record.get("catalog", ""))
+    catalog = load_catalog(catalog_path, cancelled=cancelled)
+    review = load_review(catalog, path, cancelled=cancelled)
+    if review["stage"] != "anatomy" or review["decision"] != "accepted":
+        raise ValueError(
+            "5TT tissue QC is not accepted; GM-WM seed generation and ACT remain blocked"
+        )
+    metrics_rows = [
+        row
+        for stage in catalog.to_dict()["stages"]
+        if stage["id"] == "anatomy"
+        for row in stage["artifacts"]
+        if row["kind"] == "metrics"
+    ]
+    expected_path = Path(item["path"]).resolve()
+    expected_hash = next(
+        source["sha256"]
+        for source in item["sources"]
+        if Path(source["path"]).resolve() == expected_path
+    )
+    hashes = {str(path.resolve()): review["review_sha256"], str(catalog.path): catalog.digest}
+    matched = False
+    for row in metrics_rows:
+        metrics_path = catalog.artifact_path(row)
+        if metrics_path.stat().st_size > 4 * 1024**2:
+            raise ValueError("5TT QC metrics exceed the bounded review size")
+        metrics = read_json(metrics_path.read_text())
+        sources = [metrics.get("reviewed_five_tt", {})]
+        sources.extend(
+            source
+            for product in metrics.get("products", [])
+            if product.get("artifact", {}).get("kind") == "5tt"
+            for source in product["artifact"].get("sources", [])
+        )
+        matched |= any(
+            Path(source.get("path", "")).resolve() == expected_path
+            and source.get("sha256") == expected_hash
+            for source in sources
+        )
+        hashes[str(metrics_path)] = row["sha256"]
+    if not matched or hash_file(expected_path, cancelled) != expected_hash:
+        raise ValueError(
+            "Accepted tissue review does not identify this exact 5TT image; "
+            "review its own generation/check catalog"
+        )
+    return review, hashes
+
+
 def tissue_statistics(path, cancelled=lambda: False):
     """Scan true fractions without repair; bound memory to one spatial slab."""
     totals = np.zeros(5, dtype="f8")
@@ -324,15 +388,17 @@ def prepare_anatomy(
     _association(bound)
     source = bound.get("anatomy", bound.get("five_tt"))
     review, extra = alignment_review(source, bound["reference"], cancelled)
+    method = task.algorithm
+    tissue_extra = accepted_tissue_review(source, cancelled)[1] if method == "5tt2gmwmi" else {}
     folder = Path(output_directory).expanduser().absolute()
     if folder.exists() or folder.is_symlink() or not folder.parent.is_dir():
         raise ValueError("Choose a NEW anatomy attempt directory with an existing parent")
     sources = {s["path"]: s["sha256"] for a in artifacts for s in a.payload["sources"]}
     sources.update(extra)
+    sources.update(tissue_extra)
     if any(folder.is_relative_to(Path(p).resolve().parent) for p in sources):
         raise ValueError("Outputs must be outside original anatomical/evidence directories")
     require_local_processing([folder, *sources])
-    method = task.algorithm
     generation = method == "5ttgen.fsl"
     input_qc = anatomical_input_qc(source, bound.get("mask")) if generation else None
     names = {"mrconvert", "5ttcheck", method.split(".")[0]}
@@ -580,6 +646,10 @@ def verify_anatomy(folder, plan, cancelled=lambda: False, progress=lambda _: Non
         scientific_review="required",
         scientific_acceptance="unassigned",
         tissue_statistics=stats,
+        reviewed_five_tt=dict(
+            path=str(Path(plan["five_tt"]).resolve()),
+            sha256=hash_file(Path(plan["five_tt"]), cancelled),
+        ),
         findings=LIMITS,
         products=products,
     )

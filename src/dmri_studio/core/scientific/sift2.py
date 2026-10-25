@@ -262,10 +262,12 @@ def prepare_sift2(
         index.close()
     sources = {s["path"]: s["sha256"] for a in artifacts for s in a.payload["sources"]}
     if "five_tt" in bound:
-        from .anatomy import alignment_review, tissue_statistics
+        from .anatomy import accepted_tissue_review, alignment_review, tissue_statistics
 
         _, evidence = alignment_review(bound["five_tt"], bound["reference"], cancelled)
         sources.update(evidence)
+        _, tissue_evidence = accepted_tissue_review(bound["five_tt"], cancelled)
+        sources.update(tissue_evidence)
         tissue_statistics(bound["five_tt"]["path"], cancelled)
     folder = Path(output_directory).expanduser().absolute()
     if folder.exists() or folder.is_symlink() or not folder.parent.is_dir():
