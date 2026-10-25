@@ -482,9 +482,9 @@
       "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
     },
     "docs/screenshots/user-guide/12-connectivity.png": {
-      "sha256": "83a79b2d2dda5081027f5a3fb620125ebb1e52771a8e344cde36a77d04d7c1ea",
-      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
-      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+      "sha256": "221610a8b4da8416991c1c19524af3483a099f8c448ae3baef757c9116570b05",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds000221/versions/1.0.0; actual TractoSphere native Cocoa GUI capture of public connectome inputs and saved matrix"
     },
     "docs/screenshots/user-guide/13-batch.png": {
       "sha256": "ccc5215729672ab94a10d9a2f86df10b071930e14dcffbe5092cc7a598332ea5",
@@ -560,6 +560,11 @@
       "sha256": "05ddc04e50060efc7dc45aaa31f2b2394e3cb6c794ce943f169f0dbf1b923698",
       "license": "CC0-1.0 dataset rendering / MIT original application artwork",
       "source": "https://openneuro.org/datasets/ds000221/versions/1.0.0; actual TractoSphere native Cocoa GUI capture using public participant data and reviewed filter derivatives"
+    },
+    "docs/screenshots/user-guide/31-connectome-matrix.png": {
+      "sha256": "f7a93495959991cdb962b8207c01361d1aebf1be6374ecbfcf1532191a6a7f0a",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds000221/versions/1.0.0; actual TractoSphere native Cocoa GUI capture of public connectome inputs and saved matrix"
     }
   }
 }
