@@ -1,8 +1,14 @@
 # TractoSphere
 
-TractoSphere is a diffusion MRI research workstation with a Python processing core, command-line interface and PySide6/VTK desktop application. This **development branch** contains the scientific modules developed after the public v0.1.1-alpha release. The published release and its tags remain separate. The software is for research use, not clinical decisions; successful processing does not establish anatomical or biological validity.
+**A desktop research toolbox for diffusion MRI, tractography and connectomics.**
 
-**New to the GUI or diffusion MRI?** Start with the [publishable user guide](docs/index.md), its [beginner primer](docs/user-guide/dmri-basics.md), [required-files checklist](docs/user-guide/files.md), and [one-participant walkthrough](docs/user-guide/walkthrough.md). The guide uses screenshots from the current native GUI to show the main workspaces and explains exact plan approval, saved outputs and review steps. It describes the current development branch and labels incomplete scientific validation.
+![TractoSphere 3D Viewer showing real public brain anatomy and two colored tractography bundles](docs/screenshots/tractography-hero.png)
+
+*Native TractoSphere development GUI with a public TractoInferno T1 image and tractography bundles. This is a visualization example, not an anatomical or biological validation result.*
+
+**Start with the [illustrated Read the Docs guide](https://tractosphere.readthedocs.io/en/latest/).** If diffusion MRI is new to you, read [Diffusion MRI basics](https://tractosphere.readthedocs.io/en/latest/user-guide/dmri-basics/), check [which files you need](https://tractosphere.readthedocs.io/en/latest/user-guide/files/), then follow [one participant from import to connectome](https://tractosphere.readthedocs.io/en/latest/user-guide/walkthrough/). The site also explains [ROI tract filtering](https://tractosphere.readthedocs.io/en/latest/user-guide/tract-filtering/), [connectome generation](https://tractosphere.readthedocs.io/en/latest/user-guide/connectivity/) and [QC review](https://tractosphere.readthedocs.io/en/latest/user-guide/qc-runs/) with native GUI screenshots.
+
+This **development branch** contains scientific workflows added after the public v0.1.1-alpha release. The release and its tags remain separate. TractoSphere has a Python processing core, command-line interface and PySide6/VTK desktop application. It is for research use, not clinical decisions; successful processing does not establish anatomical or biological validity.
 
 ## Scientific capabilities
 
@@ -10,10 +16,10 @@ TractoSphere is a diffusion MRI research workstation with a Python processing co
 | --- | --- |
 | Data and preprocessing | BIDS and custom input discovery; gradient and acquisition checks; MRtrix conversion, denoising, Gibbs correction and masking; metadata-gated FSL TOPUP/EDDY; bias correction and preprocessing QC. |
 | Reconstruction | MRtrix tensor fitting and FA/MD/AD/RD; response estimation; single- and multi-tissue CSD; FOD normalization, QC and glyph visualization. |
-| Tractography | MRtrix deterministic and probabilistic tracking, masks and ROI constraints, tract editing, density maps, statistics, 5TT generation, ACT and GMWMI seeding. |
+| Tractography | MRtrix deterministic and probabilistic tracking, masks and ROI constraints, tract editing, density maps and statistics. ACT and GMWMI seeding require accepted exact-5TT tissue review. |
 | Connectomics | Registered atlas import and review, streamline assignment, count/length/FA matrices, SIFT2 weights, weighted matrices, edge extraction and matrix inspection. |
 | Registration | FSL/MRtrix image and atlas transforms, compatible nonlinear workflows, three-plane atlas-on-b0 QC, human review, and batch registration QC. Rejected or changed evidence blocks scientific reuse. |
-| Studies | Multi-subject discovery, manifests, dry-run plans, bounded execution, pause/cancel/retry/recovery, per-subject and study QC. |
+| Studies | Multi-subject discovery, manifests, previewed plans, bounded batch execution and per-subject QC. Check the [batch guide](https://tractosphere.readthedocs.io/en/latest/user-guide/batch/) for recovery limits. |
 | Visualization | Linked MRI views, FOD glyphs, tractograms, atlas/ROI surfaces, label selection, ROI filtering and connectivity heatmaps. |
 
 The GUI, CLI and Python APIs share the scientific processing engine. Commands are previewed before execution, results use new derivative directories, and provenance stores parameters, tool versions, hashes and QC. Scientific review is separate from command success.
@@ -30,7 +36,7 @@ its selected atlas and reference into that Registration goal.
 
 ## Installation and launch
 
-Python **3.12 or newer** is required. Install the external scientific tools separately for the operations that use them: **MRtrix3**, **FSL** and **ANTs/N4**. FSL has separate licensing terms. The software setup checker reports detected executables and operation-specific version requirements. Earlier macOS validation used MRtrix3 3.0.5 and FSL 6.0.7.18; these version observations are not a guarantee for other installations.
+Python **3.12 or newer** is required. Install the external scientific tools separately for the operations that use them: **MRtrix3**, **FSL** and **ANTs/N4**. FSL has separate licensing terms. The software setup checker reports detected executables and operation-specific version requirements. For this development branch, use the source installation steps below and the [first-run walkthrough](https://tractosphere.readthedocs.io/en/latest/user-guide/first-run/). The [release installation guide](https://tractosphere.readthedocs.io/en/latest/installation/) covers the separate v0.1.1-alpha package.
 
 In Settings, open **Software Dependencies** to locate an existing installation and choose **Verify and Save**. TractoSphere remembers compatible MRtrix3, FSL and ANTs folders across launches and supplies them to new applicable workflows; every scientific command still validates its exact inputs and binaries. See [dependency setup](docs/dependency_setup.md).
 
@@ -58,10 +64,10 @@ The development Batch Processing workspace now has a [guided workflow](docs/batc
 
 The toolbox records technical validation, numerical checks, native image/atlas review, tracking and connectome QC, and batch findings. A registration decision applies only to its exact evidence. Missing or changed registration evidence requires review or an explicitly identified diagnostic operation. QC warnings remain visible after a command succeeds.
 
-Small tractograms, a limited atlas, successful FSL/MRtrix execution or a visually plausible overlay do not establish research-grade connectomes. SIFT2 depends on adequate tractogram and FOD coverage; weights are not axon counts. Tensor and FOD outputs may contain nonphysical or uncertain estimates, and anatomical registration still needs expert inspection. See [scientific limitations](docs/limitations.md) and the stage reports retained in the private development workspace for detailed validation histories.
+Small tractograms, a limited atlas, successful FSL/MRtrix execution or a visually plausible overlay do not establish research-grade connectomes. SIFT2 depends on adequate tractogram and FOD coverage; weights are not axon counts. Tensor and FOD outputs may contain nonphysical or uncertain estimates, and anatomical registration still needs expert inspection. See [how to check each result](https://tractosphere.readthedocs.io/en/latest/validation/), [testing phase and coverage](https://tractosphere.readthedocs.io/en/latest/user-guide/status/) and [known limitations](https://tractosphere.readthedocs.io/en/latest/limitations/).
 
 macOS Apple Silicon is the primary scientific development and native GUI test environment. The public alpha has bounded Linux/Windows viewer and installation tests, but **the expanded scientific workflows on this branch have not been fully validated on Linux, Intel macOS or Windows/WSL2**. FSL is not claimed to run natively on Windows. Cross-platform work follows a separate scientific audit roadmap.
 
 ## Development, license and data safety
 
-Run `python -m pytest tests` for the included tests; native scientific integration cases need their external tools and GUI cases need a display/Qt/VTK. The branch carries product source and tests without participant MRI files, tractograms, SIFT2 weights or research-validation screenshots. Do not include private data in issues or logs. See [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), [LICENSE](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md). The MIT license covers TractoSphere's own code; external scientific programs are installed and licensed separately.
+Run `python -m pytest tests` for the included tests; native scientific integration cases need their external tools and GUI cases need a display/Qt/VTK. The branch carries product source and tests without participant MRI arrays, tractograms, SIFT2 weights or private study records. Public GUI screenshots are documented in [third-party notices](THIRD_PARTY_NOTICES.md). Do not include private data in issues or logs. See [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md) and [LICENSE](LICENSE). The MIT license covers TractoSphere's own code; external scientific programs are installed and licensed separately.
