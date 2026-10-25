@@ -546,6 +546,11 @@
       "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
       "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
     },
+    "docs/screenshots/user-guide/28-qc-dataset-document-action-public.png": {
+      "sha256": "57cd16e40e466f812b25411778edea8d2b2558c418e11c4b85fcda135c9f2b98",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere native Cocoa GUI capture with public ds000221 participant evidence from https://openneuro.org/datasets/ds000221/versions/1.0.0"
+    },
     "docs/screenshots/user-guide/28-filtered-42-on-brain.png": {
       "sha256": "b85b1620e9f9bf3060359ddd1b98b639c452eeead496fe6eeeb91f3b2e8704e2",
       "license": "CC0-1.0 dataset rendering / MIT original application artwork",

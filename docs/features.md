@@ -18,7 +18,7 @@
 | Bias correction | MRtrix dwibiascorrect ants, explicit fitting mask and saved field | Applied once to verified pre-N4 input; division/gradient checks |
 | Anatomy alignment | Supported extraction/segmentation and rigid/BBR adapters | Structural assumptions must be evidenced; registration separate from native DWI |
 | AP/PA combination | Optional separate matched derivative | Full measured pairing, pinned helper and producer gates; PA b0 is not a full series |
-| QC | Saved catalogs, figures, numerical results, logs, image comparison, reports/reviews | Producer-specific formats; no automatic scientific acceptance |
+| QC | Saved catalogs, figures, numerical results, logs, image comparison, reports/reviews; one dataset QC document assembled from the attempts actually run | Representative figures in the combined document; full producer reports remain canonical; no automatic scientific acceptance |
 | Projects | BIDS discovery, inherited metadata, acquisition identity/history | No automatic joint-acquisition assembly |
 | Recovery | Bounded verified native-stage handoff | No automatic interrupted EDDY recovery |
 | AI | Absent | No authentication, API keys or inference services |

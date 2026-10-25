@@ -83,8 +83,8 @@ Do not assume the newest Python major/minor release has matching GUI wheels.
 ### 3. Download the release bundle
 
 The easiest route is to download
-[TractoSphere-v0.2.0-alpha-macos-source-install.zip](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/download/v0.2.0-alpha/TractoSphere-v0.2.0-alpha-macos-source-install.zip)
-from the [v0.2.0-alpha release page](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/tag/v0.2.0-alpha).
+[TractoSphere-v0.2.1-alpha-macos-source-install.zip](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/download/v0.2.1-alpha/TractoSphere-v0.2.1-alpha-macos-source-install.zip)
+from the [v0.2.1-alpha release page](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/tag/v0.2.1-alpha).
 In Finder, extract it in **Downloads**, then open the extracted folder. It contains
 the wheel, helper and checksum file needed below. The ZIP is a Python installer
 bundle; it is not a standalone Mac application.
@@ -92,17 +92,17 @@ bundle; it is not a standalone Mac application.
 If you prefer individual files, use the alternative below and keep all three in
 one folder.
 
-In Finder, create a folder named **TractoSphere-0.2.0-alpha** inside **Downloads**.
+In Finder, create a folder named **TractoSphere-0.2.1-alpha** inside **Downloads**.
 Download all three files from the same official prerelease into that folder:
 
 | File | What it is |
 | --- | --- |
-| [Install-TractoSphere.command](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/download/v0.2.0-alpha/Install-TractoSphere.command) | Installation helper |
-| [dmri_studio-0.2.0a0-py3-none-any.whl](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/download/v0.2.0-alpha/dmri_studio-0.2.0a0-py3-none-any.whl) | Application package; keep this file unextracted |
-| [SHA256SUMS](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/download/v0.2.0-alpha/SHA256SUMS) | Expected release checksums |
+| [Install-TractoSphere.command](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/download/v0.2.1-alpha/Install-TractoSphere.command) | Installation helper |
+| [dmri_studio-0.2.1a0-py3-none-any.whl](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/download/v0.2.1-alpha/dmri_studio-0.2.1a0-py3-none-any.whl) | Application package; keep this file unextracted |
+| [SHA256SUMS](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/download/v0.2.1-alpha/SHA256SUMS) | Expected release checksums |
 
 You can also find these under **Assets** on the
-[release page](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/tag/v0.2.0-alpha).
+[release page](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/tag/v0.2.1-alpha).
 Keep the exact filenames; do not add `.txt` or use a duplicate ending in `(1)`.
 You do not need the source-code downloads for this route.
 
@@ -111,13 +111,13 @@ You do not need the source-code downloads for this route.
 Open Terminal. If you extracted the ZIP in Downloads, enter its folder:
 
 ```sh
-cd "$HOME/Downloads/TractoSphere-v0.2.0-alpha-macos-source-install"
+cd "$HOME/Downloads/TractoSphere-v0.2.1-alpha-macos-source-install"
 ```
 
 If you instead downloaded the three individual files, enter their folder:
 
 ```sh
-cd "$HOME/Downloads/TractoSphere-0.2.0-alpha"
+cd "$HOME/Downloads/TractoSphere-0.2.1-alpha"
 ```
 
 Use only the command matching the folder you actually have. Finder may rename a
@@ -137,7 +137,7 @@ stop and use [troubleshooting](#understand-setup-results).
 Its default environment is:
 
 ```text
-~/Library/Application Support/TractoSphere/alpha-0.2.0
+~/Library/Application Support/TractoSphere/alpha-0.2.1
 ```
 
 If it says **Destination exists**, it deliberately did not overwrite anything.
@@ -145,7 +145,7 @@ Try the reopening command below for an existing completed installation. For a
 separate installation, choose a new environment folder:
 
 ```sh
-bash Install-TractoSphere.command "$HOME/Library/Application Support/TractoSphere/alpha-0.2.0-second"
+bash Install-TractoSphere.command "$HOME/Library/Application Support/TractoSphere/alpha-0.2.1-second"
 ```
 
 For a custom environment, keep the exact launch command printed by the helper.
@@ -162,7 +162,7 @@ Add the packages below when you are ready to preprocess data.
 For the helper's default installation, run:
 
 ```sh
-"$HOME/Library/Application Support/TractoSphere/alpha-0.2.0/bin/dmri-studio" gui
+"$HOME/Library/Application Support/TractoSphere/alpha-0.2.1/bin/dmri-studio" gui
 ```
 
 This works without activating an environment or adding anything to your shell
@@ -448,7 +448,7 @@ approves every shared library.
 For the default helper installation, a read-only CLI inventory is:
 
 ```sh
-"$HOME/Library/Application Support/TractoSphere/alpha-0.2.0/bin/dmri-studio" doctor
+"$HOME/Library/Application Support/TractoSphere/alpha-0.2.1/bin/dmri-studio" doctor
 ```
 
 Use **Export setup report** in the app when requesting help. Review personal paths
@@ -484,7 +484,7 @@ xcode-select --install
 
 ```sh
 cd "$HOME"
-git clone --branch v0.2.0-alpha https://github.com/kkartikeya-kulkarni/TractoSphere.git
+git clone --branch v0.2.1-alpha https://github.com/kkartikeya-kulkarni/TractoSphere.git
 ```
 
 4. From the cloned folder, create the environment with your installed Python.
@@ -527,7 +527,7 @@ use another supported interpreter:
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install './dmri_studio-0.2.0a0-py3-none-any.whl[gui]'
+python -m pip install './dmri_studio-0.2.1a0-py3-none-any.whl[gui]'
 python -m pip check
 dmri-studio gui
 ```

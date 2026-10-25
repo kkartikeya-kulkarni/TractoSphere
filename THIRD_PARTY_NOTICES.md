@@ -73,8 +73,9 @@ license the entire HCP pipeline.
 
 ## Dataset and screenshot provenance
 
-Public screenshots use TractoInferno/OpenNeuro ds003900 sub-1006, licensed CC0:
-https://openneuro.org/datasets/ds003900. Tissue regions shown are derived from
+Public screenshots use TractoInferno/OpenNeuro ds003900 sub-1006 and OpenNeuro
+ds000221 public participant data, licensed CC0: https://openneuro.org/datasets/ds003900
+and https://openneuro.org/datasets/ds000221. Tissue regions shown are derived from
 that subject's supplied nonoverlapping masks and labeled as such, not a cortical
 parcellation or registered MNI atlas. Real AF_L/other bundle files come from the
 same subject. No MRI or tractogram arrays are distributed with the application.

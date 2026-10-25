@@ -2,6 +2,24 @@
 
 Every processing attempt produces a **new output directory** containing an exact plan, execution manifest, logs, products and usually a QC catalog/report. A status such as `validated_pending_qc` means execution and technical checks reached a validated state while scientific assessment remains separate.
 
+## Create one QC document for the steps you ran
+
+![Current Quality Control workspace with the Create dataset QC document control and real public-data DTI findings](../screenshots/user-guide/28-qc-dataset-document-action-public.png)
+
+*The document control is at the top of the current GUI. This example shows a public DTI attempt whose automated QC failed; that finding is retained in the dataset document.*
+
+Use this after any combination of supported processing steps. The document is assembled from **the QC catalogs actually saved by those attempts**. It does not insert an unrun step or turn a warning into a pass. You may create a new document after additional steps; the earlier document remains unchanged.
+
+1. Save each operation into a new attempt folder under **one dataset's processing folder**. For example, `my-study/sub-01/processing/` might contain `denoise-attempt/`, `eddy-attempt/`, `dti-attempt/` and `tracking-attempt/`. Each attempt must retain its original `qc-catalog.json`, reports, metrics, logs and figures. Keep subjects separate.
+2. Open **Quality Control** and choose **Create dataset QC document…**. This control works even when no individual QC catalog is open. Choose the folder containing the attempt folders for **one dataset**, such as `my-study/sub-01/processing/`. The dialog starts at the parent of the opened catalog when one is open.
+3. Choose an existing destination folder and a new `.html` filename, such as `sub-01-dataset-QC.html`. The toolbox checks the saved catalogs and evidence hashes before writing. It refuses a changed artifact, more than 64 catalogs, conflicting explicit subject identities, or an existing destination file. Fix the source association or choose a narrower folder; do not edit QC statuses to force an export.
+4. Wait for **Dataset QC document saved**. The toolbox opens the new document in your browser. It is one offline HTML file with a status table for performed steps, a separate list of plan stages recorded as pending/skipped/unknown, recorded findings, representative saved figures and graphs, native before/after previews where a verified comparison is available, measurements, processing history, short logs, and source hashes/locations. Exact-bound `review-<id>.json` declarations saved under the same dataset folder are shown separately; the producer's scientific review state is not silently rewritten. The original producer reports remain available for complete slice coverage and any evidence too large to embed. The document states how many saved figures were omitted from its bounded overview.
+5. Review the document from top to bottom. Check that the listed attempts are the ones you intended. A catalog with only a file-derived or unspecified subject name is labeled as such; verify its exact input in the original run manifest before interpreting the collection. A combined document is a review aid, **not** scientific approval. Record human decisions in the relevant task's QC review controls.
+
+If the steps were saved in unrelated folders, place **copies of their complete attempt folders** beneath one dataset processing folder and create the document there. Keep the original attempts unchanged. A single report should contain one participant and acquisition context, not a mixture of subjects.
+
+For scripted use, the same exporter is available with `dmri-studio combined-qc --folder /path/to/sub-01/processing --output /path/to/sub-01-dataset-QC.html`. The output file must be new. This command only reads saved evidence; it does not rerun processing.
+
 ## Open a QC catalog
 
 ![Current Quality Control screen with a saved public-data DTI QC catalog open and its measurements selected](../screenshots/user-guide/23-qc-open-public.png)

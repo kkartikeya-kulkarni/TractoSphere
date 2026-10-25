@@ -5,4 +5,4 @@ Install the repository in the Python 3.12 conda environment with
 and Python API both use the source-preserving loader in ``core``.
 """
 
-__version__ = "0.2.0a0"
+__version__ = "0.2.1a0"
