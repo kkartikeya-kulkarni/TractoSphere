@@ -6,7 +6,7 @@ PUBLIC ALPHA · RESEARCH USE ONLY · NOT FOR CLINICAL USE · SCIENTIFIC VALIDATI
   CI results, when available, are software checks rather than scientific validation.
 - The published v0.1.1-alpha did not claim reconstruction/model fitting, new
   tractography generation, connectome analysis or tensor/FOD glyphs. This
-  development branch implements bounded versions of those workflows, with the
+  current source on `main` implements bounded versions of those workflows, with the
   scientific validation gaps listed below and in the 38-item backlog. Complete
   DSI Studio feature parity is not claimed.
 - No automatic multi-run/joint multi-shell assembly or interrupted EDDY recovery.

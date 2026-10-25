@@ -4,7 +4,7 @@
 
 **Start with the [illustrated Read the Docs guide](https://tractosphere.readthedocs.io/en/latest/).** If diffusion MRI is new to you, read [Diffusion MRI basics](https://tractosphere.readthedocs.io/en/latest/user-guide/dmri-basics/), check [which files you need](https://tractosphere.readthedocs.io/en/latest/user-guide/files/), then follow [one participant from import to connectome](https://tractosphere.readthedocs.io/en/latest/user-guide/walkthrough/). The site also explains [ROI tract filtering](https://tractosphere.readthedocs.io/en/latest/user-guide/tract-filtering/), [connectome generation](https://tractosphere.readthedocs.io/en/latest/user-guide/connectivity/) and [QC review](https://tractosphere.readthedocs.io/en/latest/user-guide/qc-runs/) with native GUI screenshots.
 
-This **development branch** contains scientific workflows added after the public v0.1.1-alpha release. The release and its tags remain separate. TractoSphere has a Python processing core, command-line interface and PySide6/VTK desktop application. It is for research use, not clinical decisions; successful processing does not establish anatomical or biological validity.
+The **current source on `main`** contains scientific workflows added after the public v0.1.1-alpha package. That downloadable release and its tag remain separate. TractoSphere has a Python processing core, command-line interface and PySide6/VTK desktop application. It is for research use, not clinical decisions; successful processing does not establish anatomical or biological validity.
 
 ## Scientific capabilities
 
@@ -32,7 +32,7 @@ its selected atlas and reference into that Registration goal.
 
 ## Installation and launch
 
-Python **3.12 or newer** is required. Install the external scientific tools separately for the operations that use them: **MRtrix3**, **FSL** and **ANTs/N4**. FSL has separate licensing terms. The software setup checker reports detected executables and operation-specific version requirements. For this development branch, use the source installation steps below and the [first-run walkthrough](https://tractosphere.readthedocs.io/en/latest/user-guide/first-run/). The [release installation guide](https://tractosphere.readthedocs.io/en/latest/installation/) covers the separate v0.1.1-alpha package.
+Python **3.12 or newer** is required. Install the external scientific tools separately for the operations that use them: **MRtrix3**, **FSL** and **ANTs/N4**. FSL has separate licensing terms. The software setup checker reports detected executables and operation-specific version requirements. For the current source, use the steps below and the [first-run walkthrough](https://tractosphere.readthedocs.io/en/latest/user-guide/first-run/). The [release installation guide](https://tractosphere.readthedocs.io/en/latest/installation/) covers the separate v0.1.1-alpha package.
 
 In Settings, open **Software Dependencies** to locate an existing installation and choose **Verify and Save**. TractoSphere remembers compatible MRtrix3, FSL and ANTs folders across launches and supplies them to new applicable workflows; every scientific command still validates its exact inputs and binaries. See [dependency setup](docs/dependency_setup.md).
 
@@ -41,7 +41,6 @@ For macOS or Linux shells:
 ```sh
 git clone https://github.com/kkartikeya-kulkarni/TractoSphere.git
 cd TractoSphere
-git switch audit/end-to-end-usability-2026-10-24
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -52,9 +51,9 @@ dmri-studio gui
 
 On Windows PowerShell, create the environment with `py -3.12 -m venv .venv`, activate it with `.\.venv\Scripts\Activate.ps1`, and inspect [platform limits](docs/platforms.md) before scientific processing. `dmri-studio --help`, `dmri-studio scientific --help` and `dmri-studio batch --help` show the installed CLI. A first use can load existing NIfTI images, TCK/TRK tractograms or registered atlases without starting a reconstruction job. Review a selected input and the proposed command before approving new processing. Source data is never intentionally overwritten.
 
-The existing [installation guide](docs/installation.md) describes the released alpha and tool setup. Its release-specific screenshots and package version are historical; this branch is the newer development snapshot.
+The existing [installation guide](docs/installation.md) describes the released alpha and tool setup. Its release-specific screenshots and package version are historical; the source on `main` contains the newer toolbox.
 
-The development Batch Processing workspace now has a [guided workflow](docs/batch_processing.md) for data discovery, acquisition selection, supported scientific presets, exact plan approval, monitoring and QC. Advanced Settings retains saved workflow definitions and technical execution controls.
+The Batch Processing workspace has a [guided workflow](docs/batch_processing.md) for data discovery, acquisition selection, supported scientific presets, exact plan approval, monitoring and QC. Advanced Settings retains saved workflow definitions and technical execution controls.
 
 ## Quality control and scientific limits
 

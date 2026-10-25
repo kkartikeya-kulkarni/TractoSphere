@@ -4,14 +4,13 @@ New to diffusion MRI? Read [Diffusion MRI basics](dmri-basics.md) before choosin
 
 ## 1. Install the app
 
-Follow the [installation guide](../installation.md) for your platform. The scientific development branch requires Python 3.12 or newer. The primary native scientific GUI evidence is on Apple Silicon macOS; see [platform limits](../platforms.md) before relying on another platform. The release package and this development checkout are different versions.
+Follow the [installation guide](../installation.md) for your platform. The current scientific toolbox source requires Python 3.12 or newer. The primary native scientific GUI evidence is on Apple Silicon macOS; see [platform limits](../platforms.md) before relying on another platform. The v0.1.1-alpha release package and the current source checkout contain different functionality.
 
-For a source checkout of the development toolbox on macOS or Linux, run one command at a time in Terminal:
+For a source checkout of the current toolbox on macOS or Linux, run one command at a time in Terminal:
 
 ```sh
 git clone https://github.com/kkartikeya-kulkarni/TractoSphere.git
 cd TractoSphere
-git switch audit/end-to-end-usability-2026-10-24
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -20,7 +19,7 @@ dmri-studio doctor
 dmri-studio gui
 ```
 
-This branch contains the GUI and guide shown here. After the guide is merged elsewhere, use the branch or release named on that published version's home page. The [installation guide](../installation.md) gives release and platform alternatives. If an already installed TractoSphere opens, you do not need to reinstall it for Viewer-only steps.
+The default `main` branch contains the GUI and guide shown here. The [installation guide](../installation.md) gives release and platform alternatives. If an already installed TractoSphere opens, you do not need to reinstall it for Viewer-only steps.
 
 ## 2. Make an output location
 

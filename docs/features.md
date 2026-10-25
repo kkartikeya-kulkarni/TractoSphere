@@ -27,7 +27,7 @@ FSL/MRtrix/ANTs are separate local CLI dependencies. NumPy/NiBabel/SciPy/VTK/Qt
 are imported local libraries. No remote inference API or container is needed for
 the released workflows. Additional processing engines are future work.
 
-In the Phase 6 development branch, open **Preprocessing** even before loading
+In the current toolbox, open **Preprocessing** even before loading
 data to reach its input action and staged history/operation review. **Diffusion
 models** offers direct tensor and FOD tasks. The scientific input inventory is
 shared with Anatomy, SIFT2, Connectivity and the other scientific workspaces;

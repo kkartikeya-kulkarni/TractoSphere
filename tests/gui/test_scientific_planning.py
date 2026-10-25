@@ -2,7 +2,7 @@
 
 import nibabel as nib
 import numpy as np
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox
 
 from dmri_studio.core.execution import hash_file
