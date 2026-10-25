@@ -425,6 +425,141 @@
       "sha256": "332d0b6480e16f326470f9804797ab4bb9745fb37c8b34393a7c3047c273ef61",
       "license": "MIT",
       "source": "Project-authored vector brain logo and raster/icon conversions; no MRI data"
+    },
+    "docs/screenshots/user-guide/01-start.png": {
+      "sha256": "a3451f0cb96b37baa1a840ee069886f0896a28c470f2632428f2c3315cd6fbfd",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/02-import-choices.png": {
+      "sha256": "b5ddc57fbde111ed46f6e940d66c9f2c73a20be6755b596ae6b9ac3b35fcc5e7",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/03-dwi-files.png": {
+      "sha256": "cad4116f7f0fe54b7567806d7e1173cdcc2929c5dd493604e51de6edc98671e3",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/04-projects.png": {
+      "sha256": "615032974fdb7a3134d8f6dff0d86a0b44efa63765ccf4a52aabce37588e1c60",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/05-preprocessing.png": {
+      "sha256": "fdad622480e07fa0833c635babbb850b0f7e5c2ddf40a8f30fe0a2f189e85d9a",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/06-dti.png": {
+      "sha256": "6cdadbdad023d6a66485d20fd5230eefca1560db47f84730ca135880bc79dd44",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/07-csd.png": {
+      "sha256": "5765c809d91a7f35d92aef0858d39bbc830ece17b267cfa2db06050a2eb8265a",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/08-registration.png": {
+      "sha256": "028ad18a2e9b0cba1b2f559b307cf86a5a9ce7de5c9440a33ee4286679feb025",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/09-five-tissue.png": {
+      "sha256": "e86307ca26e0192f7d49f34eeceacd95419e1c67ba36f71a27331f7bddc00de5",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/10-tractography-tasks.png": {
+      "sha256": "c28e81bbdd2b2e193bb03d1ae47ee9a73d3adc795209ccab93bd6af58d8d73ae",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/11-sift2.png": {
+      "sha256": "da708c2723946ab5595bef1b6442624322bc94b33b1f1fcf1a2ded2aada3ae44",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/12-connectivity.png": {
+      "sha256": "83a79b2d2dda5081027f5a3fb620125ebb1e52771a8e344cde36a77d04d7c1ea",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/13-batch.png": {
+      "sha256": "ccc5215729672ab94a10d9a2f86df10b071930e14dcffbe5092cc7a598332ea5",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/16-software-setup.png": {
+      "sha256": "92e1709fb1c36133cbf6c94f53eff298b47cb578cf1d3f94829c03511e61acb4",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/17-preferences.png": {
+      "sha256": "461b1f6678935e3bc1b7ebca7d0716a7395374333aea3fcaf35fcc76a76c4faa",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/18-image-viewer.png": {
+      "sha256": "7b47807f1f1a074546999e2e9a20195cd938dc859b9ef7b160e37c90016fc0a1",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/19-viewer-public-t1.png": {
+      "sha256": "38166ad7a8ed2da743edb732909046f3eed683691d6b735c70b13e70934936fb",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/21-tractography-filter.png": {
+      "sha256": "50c41b998e6380403211cc1e4af2908ab090c18f5c7805634f6e55c9e1378db0",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/22-tractography-density.png": {
+      "sha256": "5455d951d2a48e19ef0fcc5f42a670d91d0cfd05c3fad7f9384ba280fddeedc1",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/23-qc-open-public.png": {
+      "sha256": "0ef4602ae1f18cbdcf8624a7d424e1fff7ab0f45ffd8f001f125dd6ac716a5bd",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/24-qc-review-controls.png": {
+      "sha256": "d68d445413159098c8b3525eda7ba9d560030dde62e91d81ef6dcb226de2f29b",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/25-filter-regions.png": {
+      "sha256": "7c9ad10ef4d5df6c2d8d1458480710ff9007e5fd8cfb9bb68af2320e92e542d7",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds000221/versions/1.0.0; actual TractoSphere native Cocoa GUI capture using public participant data and reviewed filter derivatives"
+    },
+    "docs/screenshots/user-guide/26-data-validation-public.png": {
+      "sha256": "02a7667133a99547745ac26070c9906aff379b8f2c16860ff4b95dc3faf7ac13",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/27-runs-open-public.png": {
+      "sha256": "feb665b1ab761913b8131c6eeac9d6961fc924a147f9a5a694f966f78b1e04b0",
+      "license": "MIT original application UI; CC0-1.0 public dataset rendering where shown",
+      "source": "Actual TractoSphere GUI capture; public image examples from https://openneuro.org/datasets/ds000221/versions/1.0.0 and https://openneuro.org/datasets/ds003900/versions/1.1.1"
+    },
+    "docs/screenshots/user-guide/28-filtered-42-on-brain.png": {
+      "sha256": "b85b1620e9f9bf3060359ddd1b98b639c452eeead496fe6eeeb91f3b2e8704e2",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds000221/versions/1.0.0; actual TractoSphere native Cocoa GUI capture using public participant data and reviewed filter derivatives"
+    },
+    "docs/screenshots/user-guide/29-filtered-42-3d.png": {
+      "sha256": "607ba924058a0fd8dfa9efdcaf228bfd0eefe08ad4f411ae4f3d0c562a9cfa7e",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds000221/versions/1.0.0; actual TractoSphere native Cocoa GUI capture using public participant data and reviewed filter derivatives"
+    },
+    "docs/screenshots/user-guide/30-native-three-parcel-filter.png": {
+      "sha256": "05ddc04e50060efc7dc45aaa31f2b2394e3cb6c794ce943f169f0dbf1b923698",
+      "license": "CC0-1.0 dataset rendering / MIT original application artwork",
+      "source": "https://openneuro.org/datasets/ds000221/versions/1.0.0; actual TractoSphere native Cocoa GUI capture using public participant data and reviewed filter derivatives"
     }
   }
 }

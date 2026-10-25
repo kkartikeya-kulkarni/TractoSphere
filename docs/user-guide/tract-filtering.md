@@ -23,7 +23,9 @@ For an atlas, a label image contains many integer parcels. Do not import the ent
 4. Decide whether to check **Limit the number of retained streamlines**. The **Maximum retained streamlines** number applies only when that checkbox is checked; a value visible in the field is not an active limit by itself.
 5. Open **Choose pathway regions**. Select an imported mask from the searchable list. If none appears, choose **Import ROI mask…**, **Choose regions in Viewer…**, or **Use selected Viewer ROIs…**. Viewer selections become reviewed snapshots for the processing task; display color or visibility does not define a processing rule.
 
-![Current pathway-region controls with pass-through, avoid and ordered-waypoint lists](../screenshots/user-guide/25-filter-regions.png)
+![Guided filter with three real public-data ROI masks assigned to Must pass through](../screenshots/user-guide/25-filter-regions.png)
+
+*The populated **Must pass through (all)** list contains three separate masks derived from Schaefer parcels 52, 53 and 54. Their red, cyan and yellow swatches are display colors; the saved mask voxels define the filter.*
 
 6. With a mask selected, click **Must pass through**, **Must avoid**, or **Add waypoint**. Repeat for each ROI. Read the three lists below the buttons to verify each mask landed in the intended role. **Remove selected** removes one assignment. For waypoints, **Move up/Move down** changes their required order.
 7. Click **Inspect selected region in Viewer** when uncertain about location. Confirm it is the correct side, parcel and anatomical space. Then return to the filter task.
@@ -46,6 +48,11 @@ The guided **Must pass through** list uses **ALL**, not “any one of these.” 
 Use this route when your starting regions are labels in one original registered atlas, such as three named parcels. First open the exact reference image and tractogram in **Tractography Viewer**, then load the original discrete-label atlas with its known label table. Select the relevant atlas regions and use **Filter using original Viewer atlas (Include ANY / ALL)…** from the guided filter task, or the Viewer's corresponding filter action. The dialog displays the **full source count** and original atlas path/IDs; it does not filter only the 10,000 tracks currently drawn.
 
 1. Search the original atlas region list by **name or ID**. Assign selected regions to **Must pass through** or **Must avoid**. Check the included and excluded lists; an ID is only meaningful for this exact atlas version.
+
+![Native original-atlas filter dialog with parcels 52, 53 and 54 assigned as required regions](../screenshots/user-guide/30-native-three-parcel-filter.png)
+
+*The native atlas dialog shows the exact three original parcel IDs in **Must pass through**. The screenshot is scrolled to the region controls; the source, atlas and command evidence are above and below this position in the same dialog.*
+
 2. Choose **Inclusion rule**: **OR** means any included parcel, **AND** means all included parcels, and **ORDERED** means the listed parcels in saved vertex order. Use **Move up/Move down** to arrange ORDERED IDs. Optionally choose **Test endpoints only** for a different endpoint question; the app blocks its combination with ORDERED.
 3. Provide the required subject/space and registration evidence if the dialog asks for it. A historical spatial declaration or equal image grids cannot substitute for native review of atlas-to-reference correspondence.
 4. Choose an unused local output parent and **Preview command**. The plan creates exact binary mask snapshots from the original atlas labels and shows the full-source `tckedit` command. Inspect the rule, source, IDs, masks and free-space check; then mark the approval checkbox and **Run filter**.
@@ -55,14 +62,18 @@ The native MRtrix filtering checks saved streamline vertices against ROI voxels.
 
 ## Inspect the result over the brain
 
-Open the same verified reference NIfTI first, then the filtered TCK. Choose **Four views** so axial, coronal, sagittal and 3D views are visible together. Select the filtered tract group in the Inspector; check the retained count and compare it with the full source. If the 3D panel shows tracks without a brain outline, open the intended NIfTI again and adjust **Volume rendering** or a suitable anatomical surface. Those display changes do not alter the filter. The **Display limit** may show only a subset in 3D; the processing plan and QC use the complete source file.
+Open an image from the same verified participant and coordinate space, then the filtered TCK. For this public-data example, the image shown below is the **original DWI NIfTI**, with **volume 1 of 67** selected (its supplied b-value is 5 s/mm², effectively a low-b image). The processing reference was the verified mean low-b image derived from this series. The original DWI and that reference have the same voxel grid and affine. Matching geometry alone does not establish the scientific association; review the run's source and registration evidence.
 
-![Current GUI showing the public-data 42-track result over its mean low-b reference in four views](../screenshots/user-guide/28-filtered-42-on-brain.png)
+Choose **Four views** so axial, coronal, sagittal and 3D views are visible together. Import the filter's three saved binary ROI masks as display ROIs, turn their visibility on in **Atlas & ROIs**, and move the linked crosshair through the regions. The example captures place each crosshair at the center of its slice panel; panning the display does not move the data or masks. The masks are displayed as independent ROIs, which is why the Inspector groups them under **Manual ROIs**. The actual native filter used the original registered discrete atlas.
 
-*A saved public-data filter result is open over the matching mean low-b image. The tract group reports 42 source fibers and 42 drawn; this is the already filtered TCK, so open the original full source separately when comparing retention. The screenshot shows viewing, not a biological pathway approval.*
+Select the filtered tract group in **Tract groups** to inspect its retained count and compare it with the full source. The **Display limit** may show only a subset in 3D; the processing plan and QC use the complete source file.
 
-![The same filtered tracks and anatomical volume in the current 3D Viewer](../screenshots/user-guide/29-filtered-42-3d.png)
+![Four centered views of the original public DWI volume with three colored ROI masks and filtered tracks](../screenshots/user-guide/28-filtered-42-on-brain.png)
 
-*Switch the layout to **3D scene** to enlarge the context. Here the base image is ray cast at low opacity and tract line width is increased to make the relationship visible; neither setting changes the image or tracks on disk.*
+*The original public DWI image is visible in the anatomical panels. Red, cyan and yellow show the exact saved masks for parcels 52–54; the 42 colored paths come from the filtered TCK. The centered axes are display crosshairs. Reopen the original 10,000-track source separately to compare retention.*
+
+![Original public DWI data volume visible in the 3D Viewer beneath three ROIs and 42 filtered streamlines](../screenshots/user-guide/29-filtered-42-3d.png)
+
+*Switch the layout to **3D scene**, enable the **axial anatomical plane**, choose the low-b volume and set a **Superior** camera view. This shows the actual DWI slice inside the 3D Viewer, with all three ROI surfaces and the retained streamlines. Adjust slice opacity, camera zoom and tract width for readability; these are display settings and do not change the image, ROI masks or tracks on disk.*
 
 If zero tracks remain, check ROI location and source/reference identity, whether you accidentally chose ALL instead of ANY, whether endpoints-only or order was intended, and the QC's ROI observations. Do not enlarge or move a mask only to make a nonzero result without documenting a new scientific ROI decision.

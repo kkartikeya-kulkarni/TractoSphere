@@ -2,6 +2,9 @@
 
 The app is driven through its own controls. Public source files stay outside the
 repository, and this test records technical outcomes without scientific approval.
+Set ROOT to the public dataset folder, DWI_STEM and REVERSE_EPI to paths relative
+to ROOT, and OUTPUT to an isolated writable folder using the prefixed environment
+variable names below. Participant paths remain outside the repository.
 """
 
 import json
@@ -16,6 +19,7 @@ from dmri_studio.core.execution import hash_file
 
 @pytest.mark.skipif(
     not os.environ.get("TRACTOSPHERE_DS000221_ROOT")
+    or not os.environ.get("TRACTOSPHERE_DS000221_DWI_STEM")
     or not os.environ.get("TRACTOSPHERE_DS000221_OUTPUT")
     or os.environ.get("QT_QPA_PLATFORM") != "cocoa",
     reason="Requires selected public data, an isolated output folder and native Cocoa GUI",
@@ -24,10 +28,10 @@ def test_ds000221_raw_denoise_gibbs_native_gui(window, qtbot):
     root = Path(os.environ["TRACTOSPHERE_DS000221_ROOT"])
     output_root = Path(os.environ["TRACTOSPHERE_DS000221_OUTPUT"])
     output_root.mkdir(parents=True, exist_ok=True)
-    stem = root / "sub-010002/ses-01/dwi/sub-010002_ses-01_dwi"
+    stem = root / os.environ["TRACTOSPHERE_DS000221_DWI_STEM"]
     source = Path(str(stem) + ".nii.gz")
     source_hash = hash_file(source)
-    evidence = {"dataset": "OpenNeuro ds000221 v1.0.0 sub-010002 ses-01"}
+    evidence = {"dataset": "OpenNeuro ds000221 v1.0.0 selected public acquisition"}
 
     page = window.page
     page.show_form()
@@ -50,7 +54,7 @@ def test_ds000221_raw_denoise_gibbs_native_gui(window, qtbot):
     window.focus_workflow()
     workflow = window.workflow
     workflow.template.setCurrentIndex(2)
-    workflow.source.setText("OpenNeuro ds000221 v1.0.0 raw BIDS acquisition, sub-010002 ses-01")
+    workflow.source.setText("OpenNeuro ds000221 v1.0.0 raw BIDS acquisition")
     workflow.confirm.click()
     workflow.selections["denoise"].setChecked(True)
     workflow.selections["gibbs"].setChecked(True)
@@ -87,6 +91,8 @@ def test_ds000221_raw_denoise_gibbs_native_gui(window, qtbot):
 
 @pytest.mark.skipif(
     not os.environ.get("TRACTOSPHERE_DS000221_ROOT")
+    or not os.environ.get("TRACTOSPHERE_DS000221_DWI_STEM")
+    or not os.environ.get("TRACTOSPHERE_DS000221_REVERSE_EPI")
     or not os.environ.get("TRACTOSPHERE_DS000221_OUTPUT")
     or not os.environ.get("TRACTOSPHERE_FSL_BIN")
     or os.environ.get("QT_QPA_PLATFORM") != "cocoa",
@@ -99,13 +105,9 @@ def test_ds000221_gibbs_to_topup_eddy_native_gui(window, qtbot):
     assert (parent / "native-manifest.json").exists(), "Run raw GUI preprocessing first"
     source = parent / "gibbs.nii"
     source_hash = hash_file(source)
-    original_json = (
-        root / "sub-010002/ses-01/dwi/sub-010002_ses-01_dwi.json"
-    )
-    reverse = (
-        root
-        / "sub-010002/ses-01/fmap/sub-010002_ses-01_acq-SEfmapDWI_dir-PA_epi.nii.gz"
-    )
+    stem = root / os.environ["TRACTOSPHERE_DS000221_DWI_STEM"]
+    original_json = Path(str(stem) + ".json")
+    reverse = root / os.environ["TRACTOSPHERE_DS000221_REVERSE_EPI"]
     evidence = {"source": str(source), "source_sha256": source_hash}
 
     page = window.page
