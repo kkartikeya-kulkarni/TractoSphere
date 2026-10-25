@@ -1,0 +1,49 @@
+site_name: TractoSphere User Guide
+site_description: Step-by-step GUI guide for the TractoSphere research toolbox
+repo_url: https://github.com/kkartikeya-kulkarni/TractoSphere
+docs_dir: docs
+exclude_docs: |
+  /requirements.txt
+  /validation-summary.json
+  /END_TO_END_USABILITY_AUDIT_*.md
+  /PHASE*_HANDOFF.md
+  /PHASE*_IMPLEMENTATION_AND_HANDOFF.md
+  /PHASE*_SCIENTIFIC_VALIDATION.md
+  /PROGRESS.md
+  /REAL_DATA_FUNCTIONAL_AUDIT_*.md
+  /REGISTRATION_WORKFLOW_REPAIR_*.md
+  /SCIENTIFIC_VALIDATION_BACKLOG.md
+  /TRACTOGRAPHY_FILTER_VIEWER_REPAIR_*.md
+  /USABILITY_AUDIT_FIXES_*.md
+validation:
+  links:
+    anchors: warn
+theme:
+  name: readthedocs
+nav:
+  - Start here: index.md
+  - Before you begin:
+      - Install TractoSphere: installation.md
+      - Diffusion MRI basics: user-guide/dmri-basics.md
+      - Set up and open the app: user-guide/first-run.md
+      - Files and evidence checklist: user-guide/files.md
+      - Screen-by-screen map: user-guide/workspaces.md
+  - Follow a study:
+      - One participant, start to finish: user-guide/walkthrough.md
+      - Import data and projects: user-guide/import-projects.md
+      - Preprocess DWI: user-guide/preprocessing.md
+      - Fit DTI and CSD models: user-guide/models.md
+      - Prepare anatomy and register images: user-guide/anatomy-registration.md
+      - Generate and filter streamlines: user-guide/tractography.md
+      - Run SIFT2 and connectivity: user-guide/connectivity.md
+      - View images, tracts, atlases and ROIs: user-guide/viewer.md
+      - Process a batch: user-guide/batch.md
+      - Review QC and saved runs: user-guide/qc-runs.md
+  - Solve a problem: user-guide/troubleshooting.md
+  - Testing phase and coverage: user-guide/status.md
+  - Scientific and technical reference:
+      - Feature inventory: features.md
+      - Atlas and ROI details: atlas.md
+      - Dependencies: dependency_setup.md
+      - Known limitations: limitations.md
+      - Validation scope: validation.md

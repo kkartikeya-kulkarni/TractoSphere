@@ -2,6 +2,8 @@
 
 TractoSphere is a diffusion MRI research workstation with a Python processing core, command-line interface and PySide6/VTK desktop application. This **development branch** contains the scientific modules developed after the public v0.1.1-alpha release. The published release and its tags remain separate. The software is for research use, not clinical decisions; successful processing does not establish anatomical or biological validity.
 
+**New to the GUI or diffusion MRI?** Start with the [publishable user guide](docs/index.md), its [beginner primer](docs/user-guide/dmri-basics.md), [required-files checklist](docs/user-guide/files.md), and [one-participant walkthrough](docs/user-guide/walkthrough.md). The guide uses screenshots from the current native GUI to show the main workspaces and explains exact plan approval, saved outputs and review steps. It describes the current development branch and labels incomplete scientific validation.
+
 ## Scientific capabilities
 
 | Area | Available workflows |
