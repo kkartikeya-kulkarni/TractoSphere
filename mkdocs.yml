@@ -1,6 +1,7 @@
 site_name: TractoSphere User Guide
 site_description: Step-by-step GUI guide for the TractoSphere research toolbox
 repo_url: https://github.com/kkartikeya-kulkarni/TractoSphere
+edit_uri: edit/audit/end-to-end-usability-2026-10-24/docs/
 docs_dir: docs
 exclude_docs: |
   /requirements.txt

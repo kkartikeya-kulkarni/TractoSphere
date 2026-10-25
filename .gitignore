@@ -100,4 +100,5 @@ HCD*_MR/
 *.tar.gz
 *.tgz
 *.bundle
+/site/
 # The ignore file does not sanitize tracked files/history or prove a backup.

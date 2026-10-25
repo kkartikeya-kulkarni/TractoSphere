@@ -39,7 +39,7 @@ For macOS or Linux shells:
 ```sh
 git clone https://github.com/kkartikeya-kulkarni/TractoSphere.git
 cd TractoSphere
-git switch development/scientific-toolbox-2026-10
+git switch audit/end-to-end-usability-2026-10-24
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip

@@ -11,7 +11,7 @@ For a source checkout of the development toolbox on macOS or Linux, run one comm
 ```sh
 git clone https://github.com/kkartikeya-kulkarni/TractoSphere.git
 cd TractoSphere
-git switch development/scientific-toolbox-2026-10
+git switch audit/end-to-end-usability-2026-10-24
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -20,7 +20,7 @@ dmri-studio doctor
 dmri-studio gui
 ```
 
-The checkout/branch must actually contain the toolbox documented by this site; branch names and installation instructions may change after publication. The [`README.md` in the same checkout](https://github.com/kkartikeya-kulkarni/TractoSphere) and [installation guide](../installation.md) give release and platform alternatives. If an already installed TractoSphere opens, you do not need to reinstall it for Viewer-only steps.
+This branch contains the GUI and guide shown here. After the guide is merged elsewhere, use the branch or release named on that published version's home page. The [installation guide](../installation.md) gives release and platform alternatives. If an already installed TractoSphere opens, you do not need to reinstall it for Viewer-only steps.
 
 ## 2. Make an output location
 
@@ -57,7 +57,7 @@ The Viewer opens images without running a processing step. Importing a file into
 
 ### Use every Preferences control
 
-Open **Preferences** from the sidebar or **Edit → Preferences**. Under **Appearance → Color scheme**, choose **Follow system appearance**, **Light** or **Dark**; the choice changes application chrome, not image values or scientific color maps. **Accessibility → Suppress nonessential interface motion** is checked and currently disabled because this interface has no decorative animation. **Scientific software → Open Software Dependencies…** opens the same setup screen described above. Expand **About** for the app's version and research-use notice. None of these choices edits source MRI files, registration transforms, tractograms or saved QC decisions.
+Open **Preferences** from the sidebar or **Edit → Preferences**. Under **Appearance → Color scheme**, choose **Follow system appearance**, **Light** or **Dark**; the choice changes application chrome, not image values or scientific color maps. **Accessibility → Suppress nonessential interface motion** is checked and currently disabled because this interface has no decorative animation. **Scientific software → Open Software Dependencies…** opens the same setup screen described above. Expand **About** for the product name and research-use notice. None of these choices edits source MRI files, registration transforms, tractograms or saved QC decisions.
 
 ## 5. Keep a reproducible study notebook
 
