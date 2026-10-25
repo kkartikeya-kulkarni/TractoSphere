@@ -17,6 +17,8 @@ Open **Tractography → Tractography tasks**. The task-first choices are **Gener
 
 ## Filter existing tracks using ROIs
 
+For a first-time, click-by-click explanation of **two or three ROI filtering**, including the difference between guided binary-mask filtering and original-atlas filtering, use [Filter tracks with ROIs](tract-filtering.md).
+
 ![Current Select or Filter Existing Streamlines task showing source, reference and pathway controls](../screenshots/user-guide/21-tractography-filter.png)
 
 *Choose the source tractogram and compatible reference first. Use the endpoint checkbox only when the intended rule tests endpoints; otherwise use full-path ROI constraints under Choose pathway regions or the original Viewer atlas action. The maximum-retained field matters only when its checkbox is selected.*

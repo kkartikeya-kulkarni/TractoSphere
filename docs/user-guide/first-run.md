@@ -1,6 +1,6 @@
 # Set up and open TractoSphere
 
-New to diffusion MRI? Read [Diffusion MRI basics](dmri-basics.md) before choosing files. The screenshots on this site were captured from the current native GUI in this repository on 24 October 2026 (code revision `f559e40`). Form screenshots have no participant loaded; the Viewer example uses a public CC0 dataset. They show where controls are, not a completed scientific review. If a packaged version has a different layout, check its version before following a control name.
+New to diffusion MRI? Read [Diffusion MRI basics](dmri-basics.md) before choosing files. The screenshots on this site were captured from the native GUI in this local development checkout on 24 October 2026. Form screenshots without a selected participant show control placement; populated Data Validation, Viewer, QC and Runs examples use public data. They show how to inspect evidence, not a completed scientific review. If a packaged version has a different layout, check its version before following a control name.
 
 ## 1. Install the app
 
@@ -54,6 +54,10 @@ The Viewer opens images without running a processing step. Importing a file into
 ![Current TractoSphere Preferences screen](../screenshots/user-guide/17-preferences.png)
 
 *Preferences changes appearance and offers a route back to software dependencies. It does not repair a missing DWI companion or approve an output.*
+
+### Use every Preferences control
+
+Open **Preferences** from the sidebar or **Edit → Preferences**. Under **Appearance → Color scheme**, choose **Follow system appearance**, **Light** or **Dark**; the choice changes application chrome, not image values or scientific color maps. **Accessibility → Suppress nonessential interface motion** is checked and currently disabled because this interface has no decorative animation. **Scientific software → Open Software Dependencies…** opens the same setup screen described above. Expand **About** for the app's version and research-use notice. None of these choices edits source MRI files, registration transforms, tractograms or saved QC decisions.
 
 ## 5. Keep a reproducible study notebook
 
