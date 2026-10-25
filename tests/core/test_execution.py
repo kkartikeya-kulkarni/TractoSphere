@@ -18,7 +18,7 @@ import pytest
 
 from dmri_studio.core import execution
 from dmri_studio.core._mif_checks import rearrange, voxel_mapping
-from dmri_studio.core.dataset import DatasetPaths, SourceFingerprint
+from dmri_studio.core.dataset import DatasetPaths, SourceChangedError, SourceFingerprint
 from dmri_studio.core.execution import (
     ExecutionPlan,
     detect_mrtrix,
@@ -164,13 +164,13 @@ def test_approval_and_command_tampering_refused(phantom, history, fake_tools, tm
 def test_content_change_with_restored_mtime_invalidates_approval(
     phantom, history, fake_tools, tmp_path
 ):
-    """Hash revalidation catches changes a stat-only preview cannot observe."""
+    """A same-size companion edit is blocked before native execution."""
     plan = prepare_execution(phantom, history, ("convert",), tmp_path / "run")
     path = phantom.paths.bval
     before = path.stat()
     path.write_text(path.read_text().replace("1000", "1001", 1))
     os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
-    with pytest.raises(ValueError, match="changed"):
+    with pytest.raises(SourceChangedError, match="changed"):
         execute_plan(phantom, plan, approval=plan.digest)
     assert not (tmp_path / "run").exists()
 

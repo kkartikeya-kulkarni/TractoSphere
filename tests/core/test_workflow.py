@@ -161,7 +161,10 @@ def test_confirmation_and_selection_are_both_required(dataset):
 
 def test_changed_and_closed_inputs_require_reload(dataset):
     """Reject stale decisions even if the original load passed."""
+    original = dataset.fingerprints["bval"]
+    atime_ns = dataset.paths.bval.stat().st_atime_ns
     dataset.paths.bval.write_text("0 1000 1000 3000")
+    os.utime(dataset.paths.bval, ns=(atime_ns, original.mtime_ns))
     with pytest.raises(SourceChangedError):
         build_plan(dataset, raw_history(), ("mask",))
     dataset.close()

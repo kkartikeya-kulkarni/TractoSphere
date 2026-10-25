@@ -542,12 +542,14 @@ def test_qform_conflict_unknown_units_and_changed_label_table(tmp_path):
     path = image(tmp_path)
     loaded = nib.load(path)
     loaded.set_qform(np.diag([3.0, 3.0, 3.0, 1.0]), 1)
+    path = tmp_path / "conflicting-qform.nii"
     nib.save(loaded, path)
     with pytest.raises(ValueError, match="Conflicting qform"):
         import_artifact(ImportRequest("anatomy", path))
     path = image(tmp_path)
     loaded = nib.load(path)
     loaded.header.set_xyzt_units("unknown")
+    path = tmp_path / "unknown-units.nii"
     nib.save(loaded, path)
     with pytest.raises(ValueError, match="documented spatial units"):
         import_artifact(ImportRequest("anatomy", path))

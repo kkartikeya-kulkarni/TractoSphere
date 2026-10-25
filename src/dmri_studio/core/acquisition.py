@@ -101,7 +101,8 @@ def validate_epi_reference(dwi: Path, reference: Path, dwi_metadata: dict, metad
         "bids::" + dwi.relative_to(target.parent).as_posix(),
     }
     if not isinstance(intended, list) or not any(
-        isinstance(item, str) and item in accepted_targets for item in intended
+        isinstance(item, str) and item.replace("\\", "/") in accepted_targets
+        for item in intended
     ):
         raise ValueError("Reference IntendedFor does not identify this DWI.")
     source, calibration = nib.load(dwi), nib.load(reference)

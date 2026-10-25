@@ -8,6 +8,7 @@ most of it, which matters for multi-gigabyte HCP data and the later preview.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from collections.abc import Mapping
 from dataclasses import InitVar, asdict, dataclass, field
@@ -81,7 +82,7 @@ class DatasetPaths:
 
 @dataclass(frozen=True, slots=True)
 class SourceFingerprint:
-    """Cheap source identity, not a content checksum or immutable file guarantee."""
+    """Source identity with a bounded checksum for small companion files."""
 
     path: str
     resolved_path: str
@@ -89,6 +90,7 @@ class SourceFingerprint:
     mtime_ns: int
     device: int
     inode: int
+    content_sha256: str | None = None
 
     @classmethod
     def capture(cls, path: Path | str) -> SourceFingerprint:
@@ -96,14 +98,28 @@ class SourceFingerprint:
         requested = Path(path).expanduser().absolute()
         resolved = requested.resolve(strict=True)
         stat = resolved.stat()
+        content_sha256 = None
+        if stat.st_size <= 8 * 1024 * 1024:
+            with resolved.open("rb") as source:
+                content_sha256 = hashlib.file_digest(source, "sha256").hexdigest()
         return cls(
-            str(requested), str(resolved), stat.st_size, stat.st_mtime_ns, stat.st_dev, stat.st_ino
+            str(requested), str(resolved), stat.st_size, stat.st_mtime_ns, stat.st_dev, stat.st_ino,
+            content_sha256,
         )
 
     def unchanged(self, path: Path | str) -> bool:
-        """Check identity, size, and mtime; inaccessible/removed sources are changed."""
+        """Check identity and bounded content; inaccessible sources are changed."""
         try:
-            return self == type(self).capture(path)
+            current = type(self).capture(path)
+            return (
+                self.path == current.path
+                and self.resolved_path == current.resolved_path
+                and self.size == current.size
+                and self.mtime_ns == current.mtime_ns
+                and self.device == current.device
+                and self.inode == current.inode
+                and (self.content_sha256 is None or self.content_sha256 == current.content_sha256)
+            )
         except (OSError, ValueError, RuntimeError):
             return False
 
@@ -236,7 +252,7 @@ class DwiDataset:
         """Check that this open snapshot still refers to the loaded source files.
 
         Workflow planning uses this metadata-only check without reading voxels.
-        Fingerprints detect common changes; they are not content checksums.
+        Large images use identity/size/mtime; small files also use a checksum.
         """
         # No image-reader lock: a planning screen must not wait for a blocking
         # preview read. This is a snapshot check, not an execution-time lease.
