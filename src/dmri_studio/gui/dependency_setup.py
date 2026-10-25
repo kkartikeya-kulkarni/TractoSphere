@@ -433,9 +433,16 @@ class DependencyWidget(QWidget):
     def busy(self, value):
         """Keep viewer-only continuation usable even while queries are running."""
         self.check.setEnabled(not value)
+        compatible = bool(
+            self.controller.report
+            and any(
+                family_state(self.controller.report, family)["state"] == "ready"
+                for family in INSTALL_LINKS
+            )
+        )
         self.save.setEnabled(
             not value
-            and self.controller.report is not None
+            and compatible
             and self.choices_current()
             and not self.controller.report["cancelled"]
         )

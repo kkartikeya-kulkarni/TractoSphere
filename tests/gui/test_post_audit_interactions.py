@@ -391,15 +391,20 @@ def test_mapping_dialog_keyboard_and_small_window_layout(qapp, qtbot, tmp_path, 
     qtbot.addWidget(dialog)
     dialog.resize(620, 560)
     dialog.show()
+    dialog.raise_()
+    dialog.activateWindow()
+    qtbot.waitExposed(dialog)
+    qtbot.waitUntil(dialog.isActiveWindow, timeout=10000)
     qapp.processEvents()
     save = dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Save)
     assert save.isVisible() and save.isEnabled()
     assert dialog.findChild(QDialogButtonBox).geometry().bottom() <= dialog.height()
     assert dialog.subject_pattern.isVisible()
     dialog.subject_pattern.setFocus()
+    assert dialog.subject_pattern.hasFocus()
     qtbot.keyClicks(dialog.subject_pattern, "person-*")
     qtbot.keyClick(dialog.subject_pattern, Qt.Key.Key_Tab)
-    assert dialog.session_pattern.hasFocus()
+    assert dialog.session_pattern.hasFocus(), repr(QApplication.focusWidget())
     assert dialog.subject_pattern.text() == "person-*"
 
 

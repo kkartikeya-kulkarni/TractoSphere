@@ -18,7 +18,7 @@ import numpy as np
 import vtk
 from PySide6.QtCore import QSettings
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QPushButton
 from vtk.util.numpy_support import vtk_to_numpy
 
 from dmri_studio.gui.capture import capture_widget
@@ -120,9 +120,23 @@ def main():
         viewer.load_atlas(atlas, same_space=True)
         wait()
         assert len(viewer.rois) == 2
+        build_surface = next(
+            button
+            for button in viewer.findChildren(QPushButton)
+            if button.text() == "Build / update ROI in 3D"
+        )
+        for index in range(2):
+            viewer.roi_list.setCurrentRow(index)
+            build_surface.click()
         viewer.roi_list.entries[1].setSelected(True)
         wait()
-        assert all(("roi", i) in viewer.scene.actors for i in range(2))
+        assert all(("roi", i) in viewer.scene.actors for i in range(2)), (
+            viewer.status.text(),
+            list(viewer.scene.actors),
+            [roi.get("surface_built") for roi in viewer.rois],
+            viewer.roi_surface_queue,
+            viewer.roi_surface_busy,
+        )
         viewer.roi_list.setCurrentRow(1)
         viewer.roi_opacity.setValue(0.25)
         assert viewer.scene.actors[("roi", 1)].GetProperty().GetOpacity() == 0.25
