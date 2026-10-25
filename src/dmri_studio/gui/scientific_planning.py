@@ -273,6 +273,12 @@ class ImportDialog(QDialog):
                 {"atlas_labels"},
             ),
             (
+                "registration_manifest",
+                "Verified atlas registration run manifest JSON",
+                None,
+                {"atlas_labels"},
+            ),
+            (
                 "registration_qc",
                 "Native atlas QC bundle JSON",
                 None,
@@ -430,6 +436,11 @@ class ImportDialog(QDialog):
         self.purpose.setText(
             input_description(kind)
             + " Technical inspection does not establish scientific acceptance. Open scientific declarations when the selected type requires identity or convention evidence."
+            + (
+                " For an atlas already registered by TractoSphere, select its saved registration manifest; the QC preview verifies the exact output and diffusion reference without repeating registration."
+                if kind == "atlas_labels"
+                else ""
+            )
             if kind
             else "Choose a scientific input type to see what evidence it needs."
         )
