@@ -367,6 +367,30 @@ class BiasStep(MRtrixStep):
         return verify_bias_outputs(dataset, folder, cancelled, progress)
 
 
+def _grid_deviation_mm(reference: np.ndarray, candidate: np.ndarray, shape: tuple[int, ...]) -> float:
+    """Largest physical displacement across voxel-centre corners of one grid."""
+    if not np.isfinite(reference).all() or not np.isfinite(candidate).all():
+        return float("inf")
+    corners = np.array(
+        [
+            [x, y, z]
+            for x in (0, shape[0] - 1)
+            for y in (0, shape[1] - 1)
+            for z in (0, shape[2] - 1)
+        ],
+        dtype=float,
+    )
+    return float(
+        np.max(
+            np.linalg.norm(
+                nib.affines.apply_affine(reference, corners)
+                - nib.affines.apply_affine(candidate, corners),
+                axis=1,
+            )
+        )
+    )
+
+
 def verify_bias_outputs(
     dataset: DwiDataset,
     folder: Path,
@@ -379,11 +403,15 @@ def verify_bias_outputs(
         produced_mif(folder / "bias-corrected.mif") as (rf, ra, result),
         produced_mif(folder / "bias-field.mif") as (_, fa, field),
     ):
+        field_grid_deviation = _grid_deviation_mm(sa, fa, source.shape[:3])
         if (
             source.shape != result.shape
             or field.shape != source.shape[:3]
             or not np.allclose(sa, ra, atol=1e-7, rtol=0)
-            or not np.allclose(sa, fa, atol=1e-7, rtol=0)
+            # ANTs/MRtrix may round the scalar field's transform through
+            # float32 headers. Permit only sub-micron corner displacement;
+            # a changed voxel grid or interpolation still fails.
+            or field_grid_deviation > 1e-4
         ):
             raise ValueError("N4 changed geometry or volume order/shape")
         expected = np.array([[float(v) for v in row.split(",")] for row in sf.get("dw_scheme", [])])
@@ -446,6 +474,8 @@ def verify_bias_outputs(
         "division_max_absolute_error": maximum,
         "division_tolerance": {"atol": 1e-6, "rtol": 2e-7},
         "field_range": field_range,
+        "field_grid_max_corner_displacement_mm": field_grid_deviation,
+        "field_grid_tolerance_mm": 1e-4,
         "wrapper_global_field_multiplier": float(multipliers[0]),
         "normalization": normalization,
         "image": image_check,

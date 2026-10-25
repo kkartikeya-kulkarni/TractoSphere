@@ -12,7 +12,7 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-from dmri_studio.core.bias_correction import verify_correction_handoff
+from dmri_studio.core.bias_correction import _grid_deviation_mm, verify_correction_handoff
 from dmri_studio.core.dataset import DatasetPaths
 from dmri_studio.core.execution import execute_plan, hash_file, prepare_execution
 from dmri_studio.core.loading import DatasetLoader
@@ -20,6 +20,21 @@ from dmri_studio.core.qc import load_catalog
 from dmri_studio.core.workflow import HistoryClaim, ProcessingHistory, assess_operations
 
 ANTS = Path(__file__).resolve().parents[3] / "workflow-research/lemon-resolution-001/tools-env/bin"
+
+
+def test_n4_scalar_field_header_rounding_is_distinct_from_resampling():
+    reference = np.array(
+        [[1.71875, 0.0123, 0.0578, -110.3443],
+         [0.0156, 1.6562, -0.4540, -117.6203],
+         [-0.0564, 0.4593, 1.6372, -80.8116],
+         [0, 0, 0, 1]],
+        dtype=float,
+    )
+    rounded = reference.astype(np.float32).astype(float)
+    assert _grid_deviation_mm(reference, rounded, (128, 128, 88)) < 1e-4
+    shifted = rounded.copy()
+    shifted[0, 3] += 0.01
+    assert _grid_deviation_mm(reference, shifted, (128, 128, 88)) > 1e-4
 
 
 def make_fixture(root):
