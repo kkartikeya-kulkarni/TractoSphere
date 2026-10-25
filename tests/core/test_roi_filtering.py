@@ -11,6 +11,10 @@ from dmri_studio.core.roi_filtering import prepare_roi_filter
 from dmri_studio.core.tract_index import IndexedStreamlines
 
 BIN = Path("/usr/local/mrtrix3/bin")
+pytestmark = pytest.mark.skipif(
+    not all((BIN / name).is_file() for name in ("mrconvert", "tckedit")),
+    reason="Native MRtrix3 is required for ROI-filter integration tests",
+)
 
 
 @pytest.fixture

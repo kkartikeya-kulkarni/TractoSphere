@@ -201,6 +201,17 @@ def prepare_tracking(
     if any(folder.is_relative_to(Path(s).resolve().parent) for s in sources):
         raise ValueError("Output must be outside original scientific input directories")
     require_local_processing([folder, *sources])
+    # Report missing human tissue review before probing optional native tools.
+    # The full, hash-bound evidence is checked again when the task is compiled.
+    inventory = {a.id: a.to_dict() for a in artifacts}
+    if any(t.algorithm.startswith("tckgen.act_") for t in tasks):
+        from .anatomy import accepted_tissue_review
+
+        for task in tasks:
+            if task.algorithm.startswith("tckgen.act_"):
+                five_tt = task.inputs.get("five_tt")
+                if isinstance(five_tt, str) and five_tt in inventory:
+                    accepted_tissue_review(inventory[five_tt], cancelled)
     names = {"tckinfo", "tckstats", *(t.algorithm.split(".")[0] for t in tasks)}
     names.add("mrconvert")  # verified reference/density exports for existing viewer
     if any(t.algorithm.startswith("tckgen.act_") for t in tasks):
@@ -218,7 +229,6 @@ def prepare_tracking(
         + os.pathsep
         + os.environ.get("PATH", "")
     )
-    inventory = {a.id: a.to_dict() for a in artifacts}
     products = {}
     commands = []
     bindings = []

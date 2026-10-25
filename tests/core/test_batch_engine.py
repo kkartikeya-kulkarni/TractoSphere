@@ -19,6 +19,10 @@ from dmri_studio.core.batch.planning import GIB, build_batch_plan
 from dmri_studio.core.scientific.dti import TENSOR_DECLARATIONS
 
 BIN = Path("/usr/local/mrtrix3/bin")
+pytestmark = pytest.mark.skipif(
+    not all((BIN / name).is_file() for name in ("mrconvert", "tensor2metric")),
+    reason="Native MRtrix3 is required for batch integration tests",
+)
 
 
 def fixture(tmp_path, count=2):

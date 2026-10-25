@@ -5,11 +5,18 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
+import pytest
 
 from dmri_studio.core.batch.discovery import Acquisition, Study
 from dmri_studio.core.batch.engine import BatchRunner, control, create_batch
 from dmri_studio.core.batch.planning import build_batch_plan
 from dmri_studio.core.registration_qc import batch_qc_rows, export_batch_qc, record_decision
+
+pytestmark = pytest.mark.skipif(
+    not all((Path("/usr/local/mrtrix3/bin") / name).is_file() for name in ("mrconvert", "mrmath"))
+    or not all((Path.home() / "fsl/share/fsl/bin" / name).is_file() for name in ("flirt", "fast")),
+    reason="Native MRtrix3 and FSL are required for registration batch integration tests",
+)
 
 
 def fixture(tmp_path):
