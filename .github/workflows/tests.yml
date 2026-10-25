@@ -19,22 +19,24 @@ concurrency:
   cancel-in-progress: true
 jobs:
   verify:
+    name: verify (${{ matrix.platform.os }}, py${{ matrix.platform.python }}, gui-${{ matrix.gui_shard }})
     # Private repository remains private; do not consume paid private CI minutes.
     if: github.event.repository.private == false
-    timeout-minutes: 25
+    timeout-minutes: 45
     env:
       # UTF-8 reporting/child streams; does not change Windows file-encoding defaults.
       PYTHONIOENCODING: utf-8
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.platform == 'windows' && '[{"os":"windows-2022","python":"3.12"}]' || inputs.platform == 'macos-arm64' && '[{"os":"macos-15","python":"3.12"}]' || '[{"os":"macos-15","python":"3.12"},{"os":"macos-15-intel","python":"3.12"},{"os":"ubuntu-24.04","python":"3.12"},{"os":"ubuntu-24.04","python":"3.13"},{"os":"windows-2022","python":"3.12"}]') }}
-    runs-on: ${{ matrix.os }}
+        platform: ${{ fromJSON(inputs.platform == 'windows' && '[{"os":"windows-2022","python":"3.12"}]' || inputs.platform == 'macos-arm64' && '[{"os":"macos-15","python":"3.12"}]' || '[{"os":"macos-15","python":"3.12"},{"os":"macos-15-intel","python":"3.12"},{"os":"ubuntu-24.04","python":"3.12"},{"os":"ubuntu-24.04","python":"3.13"},{"os":"windows-2022","python":"3.12"}]') }}
+        gui_shard: [0, 1, 2, 3, 4, 5]
+    runs-on: ${{ matrix.platform.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
+          python-version: ${{ matrix.platform.python }}
       - name: Ubuntu Qt/X11/software-GL dependencies
         if: runner.os == 'Linux'
         run: |
@@ -57,6 +59,7 @@ jobs:
         if: runner.os == 'Windows'
         run: python scripts/diagnose_windows_io.py
       - name: Core, geometry, tractography, atlas, QC, setup and filesystem tests
+        if: matrix.gui_shard == 0
         run: python -m pytest tests/core tests/cli tests/unit tests/test_atlas.py tests/test_scene.py tests/test_scene_operations.py --junitxml=core-tests.xml
       - name: Windows CI software OpenGL (pinned Mesa, ephemeral runner only)
         if: runner.os == 'Windows'
@@ -85,24 +88,24 @@ jobs:
           python scripts/diagnose_windows_rendering.py
       - name: Native macOS/Windows Qt behavior tests
         if: runner.os != 'Linux'
-        run: python -m pytest tests/gui --junitxml=gui-tests.xml
+        run: python scripts/run_gui_shard.py --index ${{ matrix.gui_shard }} --count 6 --junitxml gui-tests.xml
       - name: Ubuntu Xvfb Qt behavior tests
         if: runner.os == 'Linux'
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
-        run: xvfb-run -a -s '-screen 0 1440x960x24' python -m pytest tests/gui --junitxml=gui-tests.xml
+        run: xvfb-run -a -s '-screen 0 1440x960x24' python scripts/run_gui_shard.py --index ${{ matrix.gui_shard }} --count 6 --junitxml gui-tests.xml
       - name: Native macOS/Windows viewer smoke
-        if: runner.os != 'Linux'
+        if: runner.os != 'Linux' && matrix.gui_shard == 0
         run: python scripts/validate_platform_smoke.py --output platform-smoke
       - name: Ubuntu software-rendered viewer smoke
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && matrix.gui_shard == 0
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: xvfb-run -a -s '-screen 0 1440x960x24' python scripts/validate_platform_smoke.py --output platform-smoke
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: platform-${{ matrix.os }}-python-${{ matrix.python }}
+          name: platform-${{ matrix.platform.os }}-python-${{ matrix.platform.python }}-gui-${{ matrix.gui_shard }}
           path: |
             *-tests.xml
             platform-smoke/*.png

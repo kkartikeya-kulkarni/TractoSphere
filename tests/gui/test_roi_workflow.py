@@ -7,6 +7,12 @@ import pytest
 
 from dmri_studio.core.execution import hash_file
 
+MR = Path("/usr/local/mrtrix3/bin")
+native_filter = pytest.mark.skipif(
+    not all((MR / name).is_file() for name in ("mrconvert", "tckedit")),
+    reason="Native MRtrix3 is required for ROI-filter integration",
+)
+
 
 def fixture(window, qtbot, tmp_path):
     spec = importlib.util.spec_from_file_location(
@@ -73,6 +79,7 @@ def test_bulk_visibility_display_and_persistence(window, qtbot, tmp_path, theme)
     assert all(hash_file(p) == h for p, h in hashes.items())
 
 
+@native_filter
 def test_native_dialog_filter_full_source_and_return(window, qtbot, tmp_path):
     v, source, decl = fixture(window, qtbot, tmp_path)
     v.bulk_selection("all")
@@ -179,6 +186,7 @@ def test_filter_dialog_cancels_actual_process_and_reports_failure(window, qtbot,
     assert not d.open_button.isEnabled()
 
 
+@native_filter
 def test_smoothing_and_opacity_do_not_change_native_filter(window, qtbot, tmp_path):
     import nibabel as nib
     import numpy as np

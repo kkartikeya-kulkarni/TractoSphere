@@ -1,6 +1,7 @@
 """The guided registration route must produce the existing typed scientific tasks."""
 
 import importlib.util
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -8,6 +9,16 @@ import pytest
 from PySide6.QtCore import QPoint
 
 from dmri_studio.core.scientific import Task
+
+MR = Path("/usr/local/mrtrix3/bin")
+FSL = Path(os.environ.get("FSLDIR", "/usr/local/fsl")) / "bin"
+native_mr = pytest.mark.skipif(
+    not (MR / "mrconvert").is_file(), reason="Native MRtrix3 is required for guided preview"
+)
+native_fsl = pytest.mark.skipif(
+    not all((FSL / name).is_file() for name in ("flirt", "epi_reg")),
+    reason="Native FSL is required for guided registration preview",
+)
 
 
 def _artifact(kind, name):
@@ -214,6 +225,8 @@ def test_guided_missing_input_does_not_start_a_worker(window):
     assert "Choose the moving image" in guided.summary.text()
 
 
+@native_mr
+@native_fsl
 def test_guided_real_rigid_preview_uses_exact_approved_plan(window, qtbot, tmp_path, monkeypatch):
     spec = importlib.util.spec_from_file_location(
         "reg_fixture", Path(__file__).parents[1] / "test_registration.py"
@@ -247,6 +260,7 @@ def test_guided_real_rigid_preview_uses_exact_approved_plan(window, qtbot, tmp_p
     assert panel.plan is None and not guided.run_button.isEnabled()
 
 
+@native_mr
 def test_guided_low_b_preview_survives_verified_product_refresh(
     window, qtbot, tmp_path, monkeypatch
 ):
@@ -333,6 +347,8 @@ def test_guided_low_b_preview_survives_verified_product_refresh(
     assert not guided.run_button.isEnabled()
 
 
+@native_mr
+@native_fsl
 def test_guided_epi_t1_preview_binds_structural_evidence(window, qtbot, tmp_path, monkeypatch):
     import nibabel as nib
 
