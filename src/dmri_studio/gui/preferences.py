@@ -80,7 +80,7 @@ class PreferencesPage(QWidget):
                 widgets=[
                     label("TractoSphere · Diffusion MRI Research Studio"),
                     label(
-                        "Public alpha · Research use only · Not for clinical use. Scientific validation ongoing. Diffusion modelling and connectivity execution are not implemented; imported tractography can be inspected and edited.",
+                        "Public alpha · Research use only · Not for clinical use. Scientific validation ongoing. Diffusion modelling, tractography and connectivity require verified inputs, installed tools and separate QC review.",
                         "caption",
                     ),
                 ],
