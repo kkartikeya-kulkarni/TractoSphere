@@ -4,7 +4,7 @@ PUBLIC ALPHA · RESEARCH USE ONLY · NOT FOR CLINICAL USE · SCIENTIFIC VALIDATI
 
 - Native GUI verification is on macOS Apple Silicon. Linux/Windows are experimental;
   CI results, when available, are software checks rather than scientific validation.
-- The v0.2.0-alpha package implements bounded reconstruction/model fitting, new
+- The v0.2.1-alpha package implements bounded reconstruction/model fitting, new
   tractography generation, connectome analysis and tensor/FOD glyph workflows.
   Their scientific validation gaps are listed below and in the 38-item backlog.
   Complete DSI Studio feature parity is not claimed.
@@ -48,6 +48,11 @@ PUBLIC ALPHA · RESEARCH USE ONLY · NOT FOR CLINICAL USE · SCIENTIFIC VALIDATI
 - Undo histories are bounded and not preserved as full histories across restart.
 - Original files remain unchanged; no automated volume removal, mask union/repair,
   gradient flipping or scientific acceptance is authorized by QC flags alone.
+
+- The dataset QC document is a bounded overview. It embeds representative verified images,
+  graphs, measurements, history and short logs from saved attempt catalogs; complete
+  all-slice producer reports and large logs remain in their original attempt folders.
+  It does not authenticate a reviewer or make a scientific acceptance decision.
 
 - Scientific software installation is guided manual/browser handoff, not a
   one-click installer. FSL can require Terminal/IT assistance. Unsigned macOS

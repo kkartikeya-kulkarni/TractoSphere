@@ -4,7 +4,7 @@ New to diffusion MRI? Read [Diffusion MRI basics](dmri-basics.md) before choosin
 
 ## 1. Install the app
 
-Follow the [installation guide](../installation.md) for your platform. The v0.2.0-alpha package and current source require Python 3.12 or newer. The primary native scientific GUI evidence is on Apple Silicon macOS; see [platform limits](../platforms.md) before relying on another platform.
+Follow the [installation guide](../installation.md) for your platform. The v0.2.1-alpha package and current source require Python 3.12 or newer. The primary native scientific GUI evidence is on Apple Silicon macOS; see [platform limits](../platforms.md) before relying on another platform.
 
 For a source checkout of the current toolbox on macOS or Linux, run one command at a time in Terminal:
 

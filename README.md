@@ -4,7 +4,7 @@
 
 **Start with the [illustrated Read the Docs guide](https://tractosphere.readthedocs.io/en/latest/).** If diffusion MRI is new to you, read [Diffusion MRI basics](https://tractosphere.readthedocs.io/en/latest/user-guide/dmri-basics/), check [which files you need](https://tractosphere.readthedocs.io/en/latest/user-guide/files/), then follow [one participant from import to connectome](https://tractosphere.readthedocs.io/en/latest/user-guide/walkthrough/). The site also explains [ROI tract filtering](https://tractosphere.readthedocs.io/en/latest/user-guide/tract-filtering/), [connectome generation](https://tractosphere.readthedocs.io/en/latest/user-guide/connectivity/) and [QC review](https://tractosphere.readthedocs.io/en/latest/user-guide/qc-runs/) with native GUI screenshots.
 
-**Download the current [v0.2.0-alpha prerelease](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/tag/v0.2.0-alpha)** or follow the [installation guide](https://tractosphere.readthedocs.io/en/latest/installation/). The release package and `main` contain the same scientific toolbox. TractoSphere has a Python processing core, command-line interface and PySide6/VTK desktop application. It is for research use, not clinical decisions; successful processing does not establish anatomical or biological validity. The Mac download is a Python wheel and install helper, not a standalone `.app`.
+**Download the current [v0.2.1-alpha prerelease](https://github.com/kkartikeya-kulkarni/TractoSphere/releases/tag/v0.2.1-alpha)** or follow the [installation guide](https://tractosphere.readthedocs.io/en/latest/installation/). The release package and `main` contain the same scientific toolbox. TractoSphere has a Python processing core, command-line interface and PySide6/VTK desktop application. It is for research use, not clinical decisions; successful processing does not establish anatomical or biological validity. The Mac download is a Python wheel and install helper, not a standalone `.app`.
 
 ## Scientific capabilities
 
@@ -51,13 +51,15 @@ dmri-studio gui
 
 On Windows PowerShell, create the environment with `py -3.12 -m venv .venv`, activate it with `.\.venv\Scripts\Activate.ps1`, and inspect [platform limits](docs/platforms.md) before scientific processing. `dmri-studio --help`, `dmri-studio scientific --help` and `dmri-studio batch --help` show the installed CLI. A first use can load existing NIfTI images, TCK/TRK tractograms or registered atlases without starting a reconstruction job. Review a selected input and the proposed command before approving new processing. Source data is never intentionally overwritten.
 
-The [installation guide](docs/installation.md) covers the current `v0.2.0-alpha` package and scientific tool setup. Earlier alpha tags remain available for reproducibility.
+The [installation guide](docs/installation.md) covers the current `v0.2.1-alpha` package and scientific tool setup. Earlier alpha tags remain available for reproducibility.
 
 The Batch Processing workspace has a [guided workflow](docs/batch_processing.md) for data discovery, acquisition selection, supported scientific presets, exact plan approval, monitoring and QC. Advanced Settings retains saved workflow definitions and technical execution controls.
 
 ## Quality control and scientific limits
 
 The toolbox records technical validation, numerical checks, native image/atlas review, tracking and connectome QC, and batch findings. A registration decision applies only to its exact evidence. Missing or changed registration evidence requires review or an explicitly identified diagnostic operation. QC warnings remain visible after a command succeeds.
+
+The **Quality Control → Create dataset QC document…** action combines the saved evidence for the operations performed on one dataset into a single offline HTML report. It includes recorded statuses and findings, representative before/after images and graphs, measurements, history, exact-bound local review declarations and source hashes. It lists unrun plan stages separately and does not grant scientific approval. Follow the [step-by-step dataset QC guide](https://tractosphere.readthedocs.io/en/latest/user-guide/qc-runs/#create-one-qc-document-for-the-steps-you-ran).
 
 Small tractograms, a limited atlas, successful FSL/MRtrix execution or a visually plausible overlay do not establish research-grade connectomes. SIFT2 depends on adequate tractogram and FOD coverage; weights are not axon counts. Tensor and FOD outputs may contain nonphysical or uncertain estimates, and anatomical registration still needs expert inspection. See [how to check each result](https://tractosphere.readthedocs.io/en/latest/validation/), [testing phase and coverage](https://tractosphere.readthedocs.io/en/latest/user-guide/status/) and [known limitations](https://tractosphere.readthedocs.io/en/latest/limitations/).
 

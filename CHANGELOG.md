@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.2.1-alpha — 2026-10-25
+
+Python package version: 0.2.1a0. Adds an in-toolbox dataset QC document built
+from the processing attempts actually saved for one participant. The previous
+v0.2.0-alpha release remains available for reproducibility.
+
+### Added
+
+- **Quality Control → Create dataset QC document…** combines verified producer
+  catalogs into one offline HTML review document. It preserves execution,
+  technical, automated QC and scientific review as separate states.
+- Include recorded findings, representative figures and graphs, verified native
+  before/after previews where available, measurements, histories, short logs,
+  exact-bound local review declarations and source hashes. Pending or skipped
+  plan stages are listed separately from performed steps. Conflicting explicit
+  subject IDs and changed artifacts block export.
+- Add the matching `dmri-studio combined-qc` command and an illustrated Read the
+  Docs procedure. The exporter is general to saved toolbox attempts, with no
+  study-specific script or bundled participant data.
+
+### Scope
+
+The combined document is a bounded overview. Producer reports remain the source
+for complete slice coverage and large evidence. This feature does not grant
+scientific acceptance or authenticate a reviewer.
+
 ## v0.2.0-alpha — 2026-10-25
 
 Python package version: 0.2.0a0. Packages the scientific toolbox previously
