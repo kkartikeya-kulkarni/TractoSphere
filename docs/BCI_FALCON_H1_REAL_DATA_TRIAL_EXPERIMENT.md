@@ -1,5 +1,7 @@
 # FALCON H1 overlap audit and bounded real-data trial experiment
 
+**Chronology clarification:** The S1 calibration selection below uses later trials 4–5 to normalize predictions for earlier S1 minival trial 1. It is a **retrospective calibration** comparison, not a prospective validation. A separate [within-recording chronological comparison](BCI_FALCON_H1_CHRONOLOGICAL_COMPARISON.md) freezes earlier training/calibration trials before later evaluation trials and preserves this experiment's results unchanged.
+
 This is a **custom, read-only research experiment**, not an unchanged FALCON benchmark run or a scientific acceptance decision. It investigates why the available public calibration/minival pairs cannot be used as independent file-level roles under the [ridge reference contract](BCI_FALCON_H1_RIDGE_REFERENCE.md). The pinned upstream revision is [`770c9b9`](https://github.com/snel-repo/falcon-challenge/tree/770c9b9597b8f58bf67b5a9ec6401ef705a2cb0f). Public assets came from mutable [DANDI 000954](https://dandiarchive.org/dandiset/000954), version `draft` (the only version listed by the API when checked on 2026-11-01; modified 2024-08-27). Their UUIDs and local SHA-256 hashes, rather than the draft label, identify the analyzed bytes. The NWB dates below are **deidentified session labels**.
 
 ## Source and role audit
