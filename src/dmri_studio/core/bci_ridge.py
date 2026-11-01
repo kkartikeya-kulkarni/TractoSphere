@@ -26,6 +26,8 @@ from dmri_studio.core.dataset import SourceFingerprint
 
 SPEC_SCHEMA = "falcon-h1-ridge-reference-spec-v1"
 REPORT_SCHEMA = "falcon-h1-ridge-reference-report-v1"
+CUSTOM_SPEC_SCHEMA = "falcon-h1-ridge-custom-trials-spec-v1"
+CUSTOM_REPORT_SCHEMA = "falcon-h1-ridge-custom-trials-report-v1"
 KERNEL_TAU_MS = 240.0
 KERNEL_LENGTH = 12
 ALPHAS = np.logspace(-5, 5, 20)
@@ -267,6 +269,158 @@ def _validate_separation(rows: dict[str, dict[str, Any]]) -> None:
                 )
 
 
+def _custom_trial_selections(
+    rows: dict[str, dict[str, Any]], declarations: Any
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    """Select whole source-indexed trials with isolated filter state."""
+    import h5py
+
+    if not isinstance(declarations, dict) or set(declarations) != set(ROLE_PARTITIONS):
+        raise ValueError("custom trial selections require training, calibration and evaluation")
+    selected_rows = {}
+    summaries = {}
+    for role, row in rows.items():
+        item = declarations[role]
+        if not isinstance(item, dict) or set(item) != {
+            "start",
+            "stop",
+            "trial_numbers",
+            "evidence",
+        }:
+            raise ValueError(f"{role} requires explicit source indices, trial IDs and evidence")
+        start, stop = item["start"], item["stop"]
+        if (
+            not isinstance(start, int)
+            or isinstance(start, bool)
+            or not isinstance(stop, int)
+            or isinstance(stop, bool)
+            or start < 0
+            or stop <= start
+            or stop >= len(row["counts"])
+            or not isinstance(item["evidence"], str)
+            or not item["evidence"].strip()
+            or not isinstance(item["trial_numbers"], list)
+        ):
+            raise ValueError(f"{role} selection must contain complete in-file trials")
+        with h5py.File(row["source"], "r") as root:
+            trials = np.asarray(root["acquisition/TrialNum/data"][:], dtype=np.int64)
+        boundaries = np.r_[0, np.flatnonzero(np.diff(trials) > 0) + 1]
+        if start not in boundaries or stop not in boundaries:
+            raise ValueError(f"{role} selection is not bounded by complete TrialNum segments")
+        trial_ids = trials[boundaries[(boundaries >= start) & (boundaries < stop)]].tolist()
+        if item["trial_numbers"] != trial_ids:
+            raise ValueError(f"{role} selected trial IDs contradict source TrialNum")
+        selected_rows[role] = {
+            **row,
+            "counts": row["counts"][start:stop].copy(),
+            "targets": row["targets"][start:stop].copy(),
+            "raw_mask": row["raw_mask"][start:stop].copy(),
+        }
+        summaries[role] = {
+            **item,
+            "samples": stop - start,
+            "trial_count": len(trial_ids),
+            "first_bin_window_start_s": round(
+                row["inspection"]["time"]["start_s"] + (start - 1) * PERIOD_S, 9
+            ),
+            "last_bin_window_end_s": round(
+                row["inspection"]["time"]["start_s"] + (stop - 1) * PERIOD_S, 9
+            ),
+            "raw_eval_mask_true": int(np.count_nonzero(row["raw_mask"][start:stop])),
+            "raw_eval_mask_false": int(
+                stop - start - np.count_nonzero(row["raw_mask"][start:stop])
+            ),
+            "analyzed_exposure_s": round((stop - start) * PERIOD_S, 9),
+            "filter_reset_at_selection_start": role != "calibration",
+        }
+
+    training, calibration, evaluation = (rows[name] for name in ROLE_PARTITIONS)
+    if any(
+        calibration["declaration"][key] != evaluation["declaration"][key]
+        for key in ("participant", "session_day", "recording_set")
+    ):
+        raise ValueError(
+            "custom calibration and evaluation must belong to the same documented recording"
+        )
+    if (
+        training["declaration"]["participant"],
+        training["declaration"]["session_day"],
+        training["declaration"]["recording_set"],
+    ) == (
+        evaluation["declaration"]["participant"],
+        evaluation["declaration"]["session_day"],
+        evaluation["declaration"]["recording_set"],
+    ):
+        raise ValueError("custom training must use a different documented session or set")
+    n = len(evaluation["counts"])
+    if len(calibration["counts"]) < n or not all(
+        np.array_equal(calibration[key][:n], evaluation[key], equal_nan=True)
+        for key in ("counts", "targets", "raw_mask")
+    ):
+        raise ValueError(
+            "calibration/evaluation source-index mapping is not established by an exact prefix"
+        )
+    if calibration["unit_ids"] != evaluation["unit_ids"]:
+        raise ValueError("calibration/evaluation unit-ID order differs within the same session")
+    if calibration["inspection"]["time"]["start_s"] != evaluation["inspection"]["time"]["start_s"]:
+        raise ValueError("calibration/evaluation source clocks differ")
+    with (
+        h5py.File(calibration["source"], "r") as left,
+        h5py.File(evaluation["source"], "r") as right,
+    ):
+        if not np.array_equal(
+            left["acquisition/OpenLoopKinematics/data"][:n],
+            right["acquisition/OpenLoopKinematics/data"][:],
+            equal_nan=True,
+        ):
+            raise ValueError("calibration/evaluation kinematic-observation prefix differs")
+        if not np.array_equal(
+            left["acquisition/TrialNum/data"][:n], right["acquisition/TrialNum/data"][:]
+        ):
+            raise ValueError("calibration/evaluation trial-number prefix differs")
+        end_s = evaluation["inspection"]["time"]["last_sample_s"]
+        left_spikes, right_spikes = left["units/spike_times"], right["units/spike_times"]
+        left_stops = np.asarray(left["units/spike_times_index"][:], dtype=int)
+        right_stops = np.asarray(right["units/spike_times_index"][:], dtype=int)
+        a = b = 0
+        for left_stop, right_stop in zip(left_stops, right_stops, strict=True):
+            x = np.asarray(left_spikes[a:left_stop])
+            y = np.asarray(right_spikes[b:right_stop])
+            if np.any(y > end_s):
+                raise ValueError("evaluation source has spikes beyond its final bin end")
+            if not np.array_equal(x[x <= end_s], y[y <= end_s]):
+                raise ValueError("calibration/evaluation spike-time prefix differs")
+            a, b = int(left_stop), int(right_stop)
+    cal = summaries["calibration"]
+    ev = summaries["evaluation"]
+    if cal["start"] >= ev["stop"]:
+        unused_bins = cal["start"] - ev["stop"]
+    elif ev["start"] >= cal["stop"]:
+        unused_bins = ev["start"] - cal["stop"]
+    else:
+        raise ValueError("custom calibration and evaluation selections overlap in source indices")
+    # The minival file includes its last bin's right boundary. An adjacent
+    # calibration selection could therefore reuse a spike on that boundary,
+    # even though the source-index ranges are disjoint. Require at least one
+    # complete unused bin between roles; filtering is reset at evaluation.
+    if unused_bins == 0:
+        raise ValueError("custom calibration and evaluation share a bin boundary")
+    first, second = (ev, cal) if ev["stop"] < cal["start"] else (cal, ev)
+    if second["first_bin_window_start_s"] <= first["last_bin_window_end_s"]:
+        raise ValueError("custom calibration and evaluation analyzed windows overlap")
+    # Every selected role is checked, including against coincident numerical
+    # observations under different declared session identities.
+    for i, left_role in enumerate(ROLE_PARTITIONS):
+        for right_role in tuple(ROLE_PARTITIONS)[i + 1 :]:
+            if _window_digests(selected_rows[left_role]) & _window_digests(
+                selected_rows[right_role]
+            ):
+                raise ValueError(
+                    f"custom {left_role} and {right_role} selections contain repeated observations"
+                )
+    return selected_rows, summaries
+
+
 def _metrics(y: np.ndarray, predictions: np.ndarray) -> dict[str, Any]:
     from sklearn.metrics import r2_score
 
@@ -302,8 +456,8 @@ def _array_identity(array: np.ndarray) -> dict[str, Any]:
     }
 
 
-def run_h1_ridge_experiment(spec_path: str | Path) -> dict[str, Any]:
-    """Run one explicitly bound reference experiment; never write to a source."""
+def _run_h1_ridge_experiment(spec_path: str | Path, *, custom: bool) -> dict[str, Any]:
+    """Shared numerical path for the exact reference and explicit custom trials."""
     try:
         import scipy
         from sklearn import __version__ as sklearn_version
@@ -318,16 +472,20 @@ def run_h1_ridge_experiment(spec_path: str | Path) -> dict[str, Any]:
     spec_fingerprint = SourceFingerprint.capture(path)
     spec_bytes = path.read_bytes()
     spec = json.loads(spec_bytes)
-    if not isinstance(spec, dict) or set(spec) != {
+    required = {
         "schema",
         "upstream_commit",
         "feature_order",
         "preprocessing",
         "model_selection",
         "roles",
-    }:
+    }
+    if custom:
+        required.add("selections")
+    if not isinstance(spec, dict) or set(spec) != required:
         raise ValueError("unsupported or incomplete FALCON H1 ridge experiment specification")
-    if spec["schema"] != SPEC_SCHEMA or spec["upstream_commit"] != UPSTREAM_LOADER_COMMIT:
+    expected_schema = CUSTOM_SPEC_SCHEMA if custom else SPEC_SCHEMA
+    if spec["schema"] != expected_schema or spec["upstream_commit"] != UPSTREAM_LOADER_COMMIT:
         raise ValueError("experiment schema or pinned upstream revision differs")
     if spec["feature_order"] != list(FEATURES):
         raise ValueError("H1 target feature order differs from the pinned reference")
@@ -355,6 +513,8 @@ def run_h1_ridge_experiment(spec_path: str | Path) -> dict[str, Any]:
     history = settings["history_bins"]
     if not isinstance(history, int) or history < 0 or history > 59:
         raise ValueError("history_bins must be an integer from 0 through 59")
+    if custom and history != 0:
+        raise ValueError("custom complete-trial experiment currently requires zero lag history")
     if spec["model_selection"] != {"alpha_logspace": [-5, 5, 20], "cv_folds": 5}:
         raise ValueError("model selection differs from the pinned GridSearchCV reference")
     if not isinstance(spec["roles"], dict) or set(spec["roles"]) != set(ROLE_PARTITIONS):
@@ -374,7 +534,11 @@ def run_h1_ridge_experiment(spec_path: str | Path) -> dict[str, Any]:
         != evaluation_identity["benchmark_partition"].split("_", 1)[0]
     ):
         raise ValueError("calibration and evaluation held-in/held-out partitions conflict")
-    _validate_separation(rows)
+    selections = None
+    if custom:
+        rows, selections = _custom_trial_selections(rows, spec["selections"])
+    else:
+        _validate_separation(rows)
     widths = {len(row["unit_ids"]) for row in rows.values()}
     if len(widths) != 1:
         raise ValueError(
@@ -421,15 +585,20 @@ def run_h1_ridge_experiment(spec_path: str | Path) -> dict[str, Any]:
             "observation_span": row["declaration"]["observation_span"],
             "unit_ids": row["unit_ids"],
             "samples": row["inspection"]["time"]["sample_count"],
+            **({"selected": selections[role]} if selections is not None else {}),
         }
         for role, row in rows.items()
     }
     report = {
-        "schema": REPORT_SCHEMA,
+        "schema": CUSTOM_REPORT_SCHEMA if custom else REPORT_SCHEMA,
         "specification": {"path": str(path), "sha256": hashlib.sha256(spec_bytes).hexdigest()},
         "upstream_commit": UPSTREAM_LOADER_COMMIT,
         "sources": source_reports,
-        "configuration": {"preprocessing": settings, "model_selection": spec["model_selection"]},
+        "configuration": {
+            "preprocessing": settings,
+            "model_selection": spec["model_selection"],
+            **({"selections": selections} if selections is not None else {}),
+        },
         "software": {
             "numpy": np.__version__,
             "scipy": scipy.__version__,
@@ -470,7 +639,11 @@ def run_h1_ridge_experiment(spec_path: str | Path) -> dict[str, Any]:
                 "raw_eval_mask": _array_identity(evaluation["raw_mask"]),
                 "predictions": _array_identity(predictions),
             },
-            "metric_scope": "local single-recording descriptive result; not the official FALCON benchmark score",
+            "metric_scope": (
+                "custom disjoint-trial real-data result; not the FALCON benchmark score"
+                if custom
+                else "local single-recording descriptive result; not the official FALCON benchmark score"
+            ),
         },
         "limitations": [
             "Unit IDs and matching channel counts do not establish cross-session biological identity.",
@@ -483,7 +656,35 @@ def run_h1_ridge_experiment(spec_path: str | Path) -> dict[str, Any]:
         raise ValueError("nonfinite reference prediction")
     if not spec_fingerprint.unchanged(path):
         raise ValueError("experiment specification changed during execution")
+    if custom:
+        assert selections is not None
+        cal, ev = selections["calibration"], selections["evaluation"]
+        gap_bins = (
+            cal["start"] - ev["stop"] if cal["start"] >= ev["stop"] else ev["start"] - cal["stop"]
+        )
+        report["temporal_isolation"] = {
+            "unused_source_bins_between_calibration_and_evaluation": gap_bins,
+            "unanalyzed_gap_s_between_selected_windows": round(gap_bins * PERIOD_S, 9),
+            "causal_filter_support_bins": KERNEL_LENGTH,
+            "history_bins": history,
+            "filter_reset_at_training_and_evaluation_start": True,
+            "calibration_uses_no_filter": True,
+            "calibration_parameters_from_selected_raw_counts_only": True,
+        }
+        report["limitations"].append(
+            "Custom source-indexed complete trials and filter resets differ from the unchanged upstream file-level pipeline."
+        )
     return report
+
+
+def run_h1_ridge_experiment(spec_path: str | Path) -> dict[str, Any]:
+    """Run one hash-bound pinned reference experiment without source writes."""
+    return _run_h1_ridge_experiment(spec_path, custom=False)
+
+
+def run_h1_custom_trial_experiment(spec_path: str | Path) -> dict[str, Any]:
+    """Run a custom nonoverlapping whole-trial experiment on the shared math path."""
+    return _run_h1_ridge_experiment(spec_path, custom=True)
 
 
 def write_h1_ridge_report(report: dict[str, Any], output: str | Path) -> Path:
