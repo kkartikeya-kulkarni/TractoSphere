@@ -309,6 +309,8 @@ def inspect_falcon_h1(path: str | Path) -> dict[str, Any]:
         position, start, period = parsed["OpenLoopKinematics"]
         velocity = parsed["OpenLoopKinematicsVelocity"][0]
         size = position.shape[0] if len(position.shape) == 2 else 0
+        if size == 0:
+            raise ValueError("OpenLoopKinematics must have nonempty time × 7 dimensions")
         for name, (data, other_start, other_period) in parsed.items():
             if len(data.shape) == 0 or data.shape[0] != size:
                 raise ValueError(f"{name} sample count differs from OpenLoopKinematics")
