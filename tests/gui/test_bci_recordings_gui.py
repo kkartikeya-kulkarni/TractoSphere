@@ -77,7 +77,7 @@ def test_inventory_reports_every_failure_and_retains_success(qapp, qtbot, tmp_pa
 def test_path_with_spaces_is_not_partially_disclosed():
     from dmri_studio.gui.bci_recordings import _finding, _text
 
-    private = "/Users/researcher/Private study/participant 01.nwb"
+    private = "/example/Private study/participant 01.nwb"
     assert _text(private) == "[text omitted: local path]"
     assert _text(f"Source: {private}") == "[text omitted: local path]"
     finding = _finding([f"[Errno 2] No such file or directory: '{private}'"])
