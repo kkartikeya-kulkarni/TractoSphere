@@ -1,10 +1,10 @@
 # FALCON H1 overlap audit and bounded real-data trial experiment
 
-This is a **custom, read-only research experiment**, not an unchanged FALCON benchmark run or a scientific acceptance decision. It investigates why the available public calibration/minival pairs cannot be used as independent file-level roles under the [ridge reference contract](BCI_FALCON_H1_RIDGE_REFERENCE.md). The pinned upstream revision is [`770c9b9`](https://github.com/snel-repo/falcon-challenge/tree/770c9b9597b8f58bf67b5a9ec6401ef705a2cb0f). Public assets came from mutable [DANDI 000954](https://dandiarchive.org/dandiset/000954), version `draft`; their UUIDs and local SHA-256 hashes, rather than the draft label, identify the analyzed bytes. The NWB dates below are **deidentified session labels**.
+This is a **custom, read-only research experiment**, not an unchanged FALCON benchmark run or a scientific acceptance decision. It investigates why the available public calibration/minival pairs cannot be used as independent file-level roles under the [ridge reference contract](BCI_FALCON_H1_RIDGE_REFERENCE.md). The pinned upstream revision is [`770c9b9`](https://github.com/snel-repo/falcon-challenge/tree/770c9b9597b8f58bf67b5a9ec6401ef705a2cb0f). Public assets came from mutable [DANDI 000954](https://dandiarchive.org/dandiset/000954), version `draft` (the only version listed by the API when checked on 2026-11-01; modified 2024-08-27). Their UUIDs and local SHA-256 hashes, rather than the draft label, identify the analyzed bytes. The NWB dates below are **deidentified session labels**.
 
 ## Source and role audit
 
-The DANDI API advertised each asset UUID, archive path, byte size, and DANDI ETag. Each listed local byte size matched the archive size; the SHA-256 values below were computed from the complete local files. For the S0/S1 assets, the advertised ETags were respectively `cb30e699c38a1ff393d58b7381779d1e-1`, `289c2734ddd2a3a47efba7df7c154074-1`, `0546ab8b04978f5f04292f225df1aa03-1`, and `d9d8a5b58b8a7875622168b8723bf4fd-1`. ETags are recorded as archive digests, not misrepresented as SHA-256. The private role specification and report retain actual paths. No recording or path-bearing report is committed.
+The DANDI asset API advertised each UUID, archive path, `contentSize`, `dandi:sha2-256`, and DANDI ETag. Each listed local byte size **and SHA-256** matched the corresponding archive values; the SHA-256 values below were recomputed from complete local files. ETags remain a separate digest type. The private role specification and report retain actual local paths. No recording or path-bearing report is committed.
 
 | Role and deidentified session | DANDI asset UUID | Advertised/local bytes | Local SHA-256 | NWB identifier | Samples |
 | --- | --- | ---: | --- | --- | ---: |
@@ -15,7 +15,18 @@ The DANDI API advertised each asset UUID, archive path, byte size, and DANDI ETa
 | S2 held-in calibration, set1, 1925-01-13 | `bd4c010b-bf13-4e4b-8149-964b99b51ba4` | 5,853,252 | `477410e16b8c1ccfcb3caba9403169ec21ab8bee35c4846376bae781003c5f92` | `HumanPitt-held_in-calib_01-13-12:08_set1` | 11,646 |
 | S2 held-in minival, same session/set | `145b08bd-460c-4e35-adfd-393ae4da898b` | 984,848 | `8fcaf8bf0030556ccccd1ff8133b45728409b4972ab8fcf0f554b9ad8befc41e` | `HumanPitt-held_in-minival_01-13-12:08_set1` | 1,530 |
 
-The public archive paths are under `sub-HumanPitt-held-in-calib/` and `sub-HumanPitt-held-in-minival/`, with session-specific NWB filenames. The [DANDI asset API](https://api.dandiarchive.org/api/assets/dd1bdcf3-5430-4037-ad4a-1727004d38d2/) and pinned upstream [dataset loader](https://github.com/snel-repo/falcon-challenge/blob/770c9b9597b8f58bf67b5a9ec6401ef705a2cb0f/falcon_challenge/dataloaders.py) are primary sources for the asset and loading contract. The earlier S6 held-out calibration file had no matching held-out minival in the inspected archive assets; it was not assigned an evaluation role.
+Exact public archive paths, in table order:
+
+1. `sub-HumanPitt-held-in-calib/sub-HumanPitt-held-in-calib_ses-19250101T111740.nwb`
+2. `sub-HumanPitt-held-in-minival/sub-HumanPitt-held-in-minival_ses-19250101T111740.nwb`
+3. `sub-HumanPitt-held-in-calib/sub-HumanPitt-held-in-calib_ses-19250108T110520.nwb`
+4. `sub-HumanPitt-held-in-minival/sub-HumanPitt-held-in-minival_ses-19250108T110520.nwb`
+5. `sub-HumanPitt-held-in-calib/sub-HumanPitt-held-in-calib_ses-19250113T120811.nwb`
+6. `sub-HumanPitt-held-in-minival/sub-HumanPitt-held-in-minival_ses-19250113T120811.nwb`
+
+Advertised `dandi:dandi-etag` values in the same order: `cb30e699c38a1ff393d58b7381779d1e-1`, `289c2734ddd2a3a47efba7df7c154074-1`, `0546ab8b04978f5f04292f225df1aa03-1`, `d9d8a5b58b8a7875622168b8723bf4fd-1`, `ab8df46bfa32f7ca516b11ee5266c81a-1`, `0461025295f67df6ac311488d28799fb-1`.
+
+The [DANDI asset API](https://api.dandiarchive.org/api/assets/dd1bdcf3-5430-4037-ad4a-1727004d38d2/) and pinned upstream [dataset loader](https://github.com/snel-repo/falcon-challenge/blob/770c9b9597b8f58bf67b5a9ec6401ef705a2cb0f/falcon_challenge/dataloaders.py) are primary sources for the asset and loading contract. The earlier S6 held-out calibration file had no matching held-out minival in the inspected archive assets; it was not assigned an evaluation role.
 
 ### What “prefix” means here
 
