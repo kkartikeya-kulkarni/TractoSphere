@@ -26,6 +26,11 @@ scientific review are separate states.
 
 Future features must preserve this separation and the existing design system.
 
+The experimental FALCON H1 inspector lives in `core/bci.py` and is exposed
+only by `cli/bci.py`. It imports optional `h5py` on demand, opens NWB sources
+read-only, and returns hash-bound structural summaries. There is no GUI route,
+decoder, or connection to MRI spatial/artifact contracts.
+
 Dependency setup uses core/dependencies.py and shared tool_versions.py. It records
 versions/provenance without MRI execution. GUI dependency_setup.py owns one shared
 bounded worker for first run and Preferences; cli/dependencies.py exposes doctor.

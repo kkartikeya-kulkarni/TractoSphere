@@ -20,6 +20,13 @@
 
 The GUI, CLI and Python APIs share the scientific processing engine. Commands are previewed before execution, results use new derivative directories, and provenance stores parameters, tool versions, hashes and QC. Scientific review is separate from command success.
 
+An **experimental, headless BCI recording inspector** is available separately
+from the MRI workspaces. After installing `dmri-studio[bci]`, use
+`dmri-studio bci inspect-h1 --nwb RECORDING.nwb` to validate and summarize the
+selected modern FALCON H1 NWB structure without changing the source. It does
+not decode, train, evaluate or infer anatomy; see the [exact supported schema
+and limits](docs/BCI_FALCON_H1_INSPECTOR.md).
+
 If an atlas was **already registered**, use Registration → **Review an Existing
 Registered Atlas**. Import the exact atlas and its verified diffusion reference,
 review the original registration manifest or a hash-bound QC association, then

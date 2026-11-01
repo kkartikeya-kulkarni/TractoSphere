@@ -2,6 +2,12 @@
 
 PUBLIC ALPHA · RESEARCH USE ONLY · NOT FOR CLINICAL USE · SCIENTIFIC VALIDATION ONGOING
 
+- The experimental BCI extension inspects only the selected modern FALCON H1
+  NWB layout with `eval_mask`, 20 ms aligned series, seven documented kinematic
+  features and NWB ragged spike times. Older `Blacklist`-only H1 files and all
+  other BCI tasks are unsupported. It does not decode signals, assess benchmark
+  performance, attach anatomy, or provide a GUI. [Exact contract and example](BCI_FALCON_H1_INSPECTOR.md).
+
 - Native GUI verification is on macOS Apple Silicon. Linux/Windows are experimental;
   CI results, when available, are software checks rather than scientific validation.
 - The v0.2.1-alpha package implements bounded reconstruction/model fitting, new
