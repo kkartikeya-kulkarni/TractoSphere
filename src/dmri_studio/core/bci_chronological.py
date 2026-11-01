@@ -7,14 +7,13 @@ Optional NWB and ML packages load only when the experiment runs.
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-from dmri_studio.core.bci import FEATURES, PERIOD_S, UPSTREAM_LOADER_COMMIT
+from dmri_studio.core.bci import FEATURES, PERIOD_S, UPSTREAM_LOADER_COMMIT, parse_bci_spec_json
 from dmri_studio.core.bci_ridge import KERNEL_LENGTH, KERNEL_TAU_MS, _load_role, reference_filter
 from dmri_studio.core.dataset import SourceFingerprint
 
@@ -200,7 +199,7 @@ def run_h1_chronological_experiment(spec_path: str | Path) -> dict[str, Any]:
     path = Path(spec_path).expanduser().resolve(strict=True)
     spec_fingerprint = SourceFingerprint.capture(path)
     spec_bytes = path.read_bytes()
-    spec = json.loads(spec_bytes)
+    spec = parse_bci_spec_json(spec_bytes)
     if not isinstance(spec, dict) or set(spec) != {
         "schema",
         "upstream_commit",

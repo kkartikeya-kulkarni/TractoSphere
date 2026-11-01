@@ -123,6 +123,17 @@ def test_constant_and_empty_target_metric_definitions():
     assert constant["uniform_average_r2"] is None
 
 
+def test_v2_rejects_finite_inputs_with_unsupported_metric_range(tmp_path):
+    path = tmp_path / "v2.json"
+    report = synthetic_chronological_v2_report(path)
+    report["observations"]["targets"][0][0] = 1e308
+    _save(path, report)
+    with pytest.raises(ValueError, match="numeric range"):
+        read_h1_chronological_report(path)
+    with pytest.raises(ValueError, match="numeric range"):
+        compute_embedded_metrics([[10**400] * 7], [[0.0] * 7])
+
+
 def test_v2_cli_api_agreement_and_import_isolation(tmp_path):
     path = tmp_path / "v2.json"
     synthetic_chronological_v2_report(path)

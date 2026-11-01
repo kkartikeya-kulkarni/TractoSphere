@@ -20,6 +20,7 @@ from dmri_studio.core.bci import (
     UPSTREAM_LOADER_COMMIT,
     bin_h1_spikes,
     inspect_falcon_h1,
+    parse_bci_spec_json,
 )
 from dmri_studio.core.bci_inventory import _nwb_metadata
 from dmri_studio.core.dataset import SourceFingerprint
@@ -471,7 +472,7 @@ def _run_h1_ridge_experiment(spec_path: str | Path, *, custom: bool) -> dict[str
         raise ValueError("experiment specification exceeds the 1 MB read limit")
     spec_fingerprint = SourceFingerprint.capture(path)
     spec_bytes = path.read_bytes()
-    spec = json.loads(spec_bytes)
+    spec = parse_bci_spec_json(spec_bytes)
     required = {
         "schema",
         "upstream_commit",

@@ -6,6 +6,7 @@ The optional h5py dependency is imported only when this API is called.
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,23 @@ SERIES = (
     "TrialNum",
     "eval_mask",
 )
+
+
+def parse_bci_spec_json(data: bytes) -> dict[str, Any]:
+    """Reject ambiguous or nonfinite declarations before scientific work begins."""
+
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate JSON key in BCI declaration")
+            result[key] = value
+        return result
+
+    def reject_constant(_value: str) -> None:
+        raise ValueError("nonfinite JSON constant in BCI declaration")
+
+    return json.loads(data, object_pairs_hook=unique_object, parse_constant=reject_constant)
 
 
 def _text(value: Any) -> str:

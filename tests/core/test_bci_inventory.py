@@ -81,6 +81,15 @@ def _manifest(tmp_path, entries):
     return path
 
 
+def test_manifest_rejects_ambiguous_duplicate_declarations(tmp_path):
+    source = _recording(tmp_path / "source.nwb")
+    manifest = _manifest(tmp_path, [_entry(source, "one")])
+    original = manifest.read_text()
+    manifest.write_text('{"schema":"unsupported",' + original[1:])
+    with pytest.raises(ValueError, match="duplicate JSON key"):
+        inspect_h1_inventory(manifest)
+
+
 def test_same_session_different_recordings_are_distinct_and_match_single_api(tmp_path, capsys):
     first = _recording(tmp_path / "first.nwb", recording="set-a")
     second = _recording(tmp_path / "second.nwb", recording="set-b", samples=4)

@@ -40,15 +40,29 @@ def test_report_is_read_only_path_free_and_separates_evidence_states(tmp_path):
 def test_embedded_paths_in_freeform_fields_are_redacted(tmp_path):
     path = tmp_path / "report.json"
     report = synthetic_chronological_report(path)
-    report["limitations"].append("Review /private/participant/analysis/report.json before use")
+    report["limitations"].append("Review /private/participant name/analysis/report.json before use")
     report["selections"]["unused_gap"]["reason"] = "Separate /Users/person/private/file.nwb"
     report["evaluation"]["metric_scope"] = "see /Volumes/research/hidden.json"
     _write(path, report)
     view = read_h1_chronological_report(path)
     assert "/private/participant" not in json.dumps(view)
+    assert "participant name/analysis" not in json.dumps(view)
     assert "/Users/person" not in json.dumps(view)
     assert "/Volumes/research" not in json.dumps(view)
-    assert "[local path]" in json.dumps(view)
+    assert "[text omitted: local path]" in json.dumps(view)
+
+
+def test_external_citation_remains_visible_but_file_uri_is_omitted(tmp_path):
+    path = tmp_path / "report.json"
+    report = synthetic_chronological_report(path)
+    report["limitations"] += [
+        "Method: https://example.org/research/paper",
+        "Private source: file:///Users/Private Participant/recording.nwb",
+    ]
+    _write(path, report)
+    view = read_h1_chronological_report(path)
+    assert "Method: https://example.org/research/paper" in view["limitations"]
+    assert "Participant/recording.nwb" not in json.dumps(view)
 
 
 @pytest.mark.parametrize(

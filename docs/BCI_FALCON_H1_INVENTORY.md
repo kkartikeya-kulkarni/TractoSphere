@@ -67,6 +67,10 @@ size and current inspector/upstream-loader versions. There is no filename-based
 identity inference. `dataset` is optional documented context, not a validation
 substitute; its version and asset identifier should be recorded for public
 comparisons.
+
+Ambiguous duplicate JSON keys and nonfinite JSON constants in the manifest are
+rejected before any recording is inspected.
+
 The binning and measurement declarations are validated exactly against the
 implemented 20 ms, all-window descriptive contract. An unsupported per-entry
 override is reported as that entry's failure; it is never silently applied.

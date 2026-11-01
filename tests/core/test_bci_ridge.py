@@ -180,6 +180,14 @@ def test_experiment_cli_api_determinism_source_integrity_and_exclusive_output(tm
         assert (tmp_path / spec["roles"][role]["path"]).read_bytes() == source_bytes[role]
 
 
+def test_reference_spec_rejects_ambiguous_duplicate_roles(tmp_path):
+    path, _ = _spec(tmp_path)
+    original = path.read_text()
+    path.write_text('{"roles":{},' + original[1:])
+    with pytest.raises(ValueError, match="duplicate JSON key"):
+        run_h1_ridge_experiment(path)
+
+
 def test_pinned_reference_fixture_numerical_conformance(tmp_path):
     """Expected values were generated independently by the pinned upstream modules."""
     spec_path, _ = _spec(tmp_path)

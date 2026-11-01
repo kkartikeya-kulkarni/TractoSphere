@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import re
 from pathlib import Path
@@ -11,7 +10,7 @@ from typing import Any
 
 import numpy as np
 
-from dmri_studio.core.bci import FEATURES, PERIOD_S, inspect_falcon_h1
+from dmri_studio.core.bci import FEATURES, PERIOD_S, inspect_falcon_h1, parse_bci_spec_json
 from dmri_studio.core.dataset import SourceFingerprint
 
 MANIFEST_SCHEMA = "falcon-h1-inventory-manifest-v1"
@@ -202,7 +201,7 @@ def inspect_h1_inventory(manifest_path: str | Path) -> dict[str, Any]:
     if before.size > 4_000_000:
         raise ValueError("inventory manifest exceeds the 4 MB read limit")
     raw = path.read_bytes()
-    manifest = json.loads(raw)
+    manifest = parse_bci_spec_json(raw)
     if not isinstance(manifest, dict) or manifest.get("schema") != MANIFEST_SCHEMA:
         raise ValueError(f"Expected {MANIFEST_SCHEMA}")
     config = _binning(manifest.get("binning"))

@@ -1,5 +1,8 @@
 # Chronological H1 constant, fixed-ridge, and normalization comparison
 
+The versioned chronological specification rejects duplicate JSON keys and
+nonfinite JSON constants before source inspection or fitting.
+
 This is a **custom within-recording research comparison**, not a FALCON benchmark result, prospective clinical validation, or statistical significance test. It follows the [public-asset overlap audit](BCI_FALCON_H1_REAL_DATA_TRIAL_EXPERIMENT.md) and preserves the [pinned file-level reference](BCI_FALCON_H1_RIDGE_REFERENCE.md). The previous custom experiment calibrated on **later S1 trials 4–5** (`[2353, 3771)`) before predicting **earlier S1 minival trial 1** (`[0, 909)`). That was retrospective calibration, not a prospective validation. Its original results remain unchanged: alpha `29763.51441631313`, evaluation uniform-average R² `-0.17011`, variance-weighted R² `0.02175`, with per-output and independent-reference comparisons in the earlier audit.
 
 ## Frozen source and chronology

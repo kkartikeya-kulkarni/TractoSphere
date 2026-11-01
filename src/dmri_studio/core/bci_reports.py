@@ -50,9 +50,15 @@ def _object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def _finite(value: Any, name: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         _fail(f"{name} must be finite")
-    return float(value)
+    try:
+        number = float(value)
+    except OverflowError:
+        _fail(f"{name} exceeds the supported numeric range")
+    if not math.isfinite(number):
+        _fail(f"{name} must be finite")
+    return number
 
 
 def _count(value: Any, name: str) -> int:
@@ -79,7 +85,11 @@ def _mapping(value: Any, name: str, keys: set[str]) -> dict[str, Any]:
 
 def _display_text(value: str) -> str:
     """Keep incidental absolute local paths out of passive summaries."""
-    return re.sub(r"(?<![\w])(?:/[^\s]+|[A-Za-z]:\\[^\s]+)", "[local path]", value)
+    # A path can contain spaces. Token replacement would leave later path
+    # components (including participant names) visible in the summary.
+    if re.search(r"file://|(?<![\w:/])(?:/[^\s]+|[A-Za-z]:\\[^\s]+)", value):
+        return "[text omitted: local path]"
+    return value
 
 
 def _sanitize_tree(value: Any) -> Any:
@@ -217,33 +227,52 @@ def compute_embedded_metrics(
             variances.append(0.0)
             continue
         errors = [a - b for a, b in zip(y, p, strict=True)]
-        mean = math.fsum(y) / n
-        sse = math.fsum(error * error for error in errors)
-        sst = math.fsum((value - mean) ** 2 for value in y)
+        if not all(math.isfinite(error) for error in errors):
+            _fail("embedded metric arithmetic exceeds the supported numeric range")
+        try:
+            mean = math.fsum(y) / n
+            sse = math.fsum(error * error for error in errors)
+            sst = math.fsum((value - mean) ** 2 for value in y)
+            mae = math.fsum(abs(error) for error in errors) / n
+        except OverflowError:
+            _fail("embedded metric arithmetic exceeds the supported numeric range")
+        if not all(math.isfinite(value) for value in (mean, sse, sst, mae)):
+            _fail("embedded metric arithmetic exceeds the supported numeric range")
         variances.append(sst / n)
         defined = n >= 2 and sst > 0
         outputs[feature] = {
             "r2": 1 - sse / sst if defined else None,
             "r2_reason": None if defined else "fewer than two observations or constant target",
-            "mae": math.fsum(abs(error) for error in errors) / n,
+            "mae": mae,
             "rmse": math.sqrt(sse / n),
         }
+        for field in ("r2", "mae", "rmse"):
+            value = outputs[feature][field]
+            if value is not None and not math.isfinite(value):
+                _fail("embedded metric arithmetic exceeds the supported numeric range")
     scores = [outputs[feature]["r2"] for feature in FEATURES]
     defined = all(score is not None for score in scores)
     if not n:
         reason = "no included observations"
     else:
         reason = None if defined else "at least one output has undefined R²"
-    return {
-        "included_samples": n,
-        "per_output": outputs,
-        "uniform_average_r2": math.fsum(scores) / len(scores) if defined else None,
-        "variance_weighted_r2": (
+    try:
+        uniform = math.fsum(scores) / len(scores) if defined else None
+        weighted = (
             math.fsum(score * weight for score, weight in zip(scores, variances, strict=True))
             / math.fsum(variances)
             if defined
             else None
-        ),
+        )
+    except OverflowError:
+        _fail("embedded metric arithmetic exceeds the supported numeric range")
+    if any(value is not None and not math.isfinite(value) for value in (uniform, weighted)):
+        _fail("embedded metric arithmetic exceeds the supported numeric range")
+    return {
+        "included_samples": n,
+        "per_output": outputs,
+        "uniform_average_r2": uniform,
+        "variance_weighted_r2": weighted,
         "aggregate_reason": reason,
     }
 

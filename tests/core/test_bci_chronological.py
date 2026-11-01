@@ -121,6 +121,14 @@ def _save(path, spec):
     path.write_text(json.dumps(spec))
 
 
+def test_chronological_spec_rejects_ambiguous_duplicate_selections(tmp_path):
+    path, _ = _fixture(tmp_path)
+    original = path.read_text()
+    path.write_text('{"selections":{},' + original[1:])
+    with pytest.raises(ValueError, match="duplicate JSON key"):
+        run_h1_chronological_experiment(path)
+
+
 def test_chronological_cli_same_evaluation_samples_metrics_and_source_integrity(tmp_path):
     path, spec = _fixture(tmp_path)
     original = Path(spec["source"]["path"]).read_bytes()
