@@ -223,7 +223,7 @@ def _load_role(entry: dict[str, Any], role: str, spec_dir: Path) -> dict[str, An
 
 
 def _window_digests(row: dict[str, Any], width: int = 32) -> set[bytes]:
-    """Detect exact repeated contiguous observations even across distinct files."""
+    """Flag identical numeric windows; identity alone cannot prove shared acquisition."""
     counts = row["counts"]
     targets = row["targets"]
     if len(counts) < width:
@@ -253,19 +253,19 @@ def _validate_separation(rows: dict[str, dict[str, Any]]) -> None:
                 for key in ("participant", "session_day", "recording_set")
             )
             if same_identity:
-                if _window_digests(left) & _window_digests(right):
-                    raise ValueError(
-                        f"{left_role} and {right_role} contain overlapping observations"
-                    )
                 a = left["declaration"]["observation_span"]
                 b = right["declaration"]["observation_span"]
                 if max(a["start"], b["start"]) < min(a["stop"], b["stop"]):
                     raise ValueError(
                         f"{left_role} and {right_role} declare overlapping observation spans"
                     )
+                if _window_digests(left) & _window_digests(right):
+                    raise ValueError(
+                        f"{left_role} and {right_role} have identical numeric windows; independence is unresolved"
+                    )
             if _window_digests(left) & _window_digests(right):
                 raise ValueError(
-                    f"{left_role} and {right_role} contain overlapping observations despite different declared identities"
+                    f"{left_role} and {right_role} have identical numeric windows despite different declared identities; independence is unresolved"
                 )
 
 
@@ -416,7 +416,7 @@ def _custom_trial_selections(
                 selected_rows[right_role]
             ):
                 raise ValueError(
-                    f"custom {left_role} and {right_role} selections contain repeated observations"
+                    f"custom {left_role} and {right_role} selections have identical numeric windows; independence is unresolved"
                 )
     return selected_rows, summaries
 
