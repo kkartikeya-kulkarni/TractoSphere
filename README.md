@@ -29,6 +29,10 @@ and limits](docs/BCI_FALCON_H1_INSPECTOR.md).
 An [experimental multi-recording inventory](docs/BCI_FALCON_H1_INVENTORY.md)
 compares explicitly listed, hash-pinned H1 recordings descriptively through
 the same headless API/CLI; it does not match units or train a decoder.
+The experimental [BCI Results workspace](docs/BCI_FALCON_H1_RESULTS_WORKSPACE.md)
+can inspect an existing chronological comparison report without reopening its
+recording or running a decoder. Report structure checks do not verify source
+files or assign scientific acceptance.
 
 If an atlas was **already registered**, use Registration → **Review an Existing
 Registered Atlas**. Import the exact atlas and its verified diffusion reference,

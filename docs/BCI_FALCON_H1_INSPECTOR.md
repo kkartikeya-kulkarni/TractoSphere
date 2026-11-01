@@ -1,9 +1,11 @@
 # Experimental FALCON H1 recording inspection
 
-This is a **read-only, headless** research extension. It describes one modern
+This original milestone is a **read-only, headless** research extension. It describes one modern
 FALCON H1 NWB recording structure. It does not train a decoder, score the
 benchmark, infer electrode anatomy, or connect these recordings to diffusion
-MRI. No BCI GUI or live acquisition path is implemented.
+MRI. A later [read-only BCI Results workspace](BCI_FALCON_H1_RESULTS_WORKSPACE.md)
+opens saved chronological research reports; this inspector remains headless.
+No live acquisition path is implemented.
 
 ## Source contract inspected before implementation
 

@@ -5,8 +5,11 @@ PUBLIC ALPHA · RESEARCH USE ONLY · NOT FOR CLINICAL USE · SCIENTIFIC VALIDATI
 - The experimental BCI extension inspects only the selected modern FALCON H1
   NWB layout with `eval_mask`, 20 ms aligned series, seven documented kinematic
   features and NWB ragged spike times. Older `Blacklist`-only H1 files and all
-  other BCI tasks are unsupported. It does not decode signals, assess benchmark
-  performance, attach anatomy, or provide a GUI. [Exact contract and example](BCI_FALCON_H1_INSPECTOR.md).
+  other BCI tasks are unsupported. The separate chronological research
+  comparison can fit a bounded ridge model, and the read-only BCI Results GUI
+  opens its saved report. Neither establishes official benchmark performance,
+  source verification on passive reopen, anatomy, or scientific acceptance.
+  [Inspector contract](BCI_FALCON_H1_INSPECTOR.md) · [Results workspace](BCI_FALCON_H1_RESULTS_WORKSPACE.md).
 - H1 counts, rates, nonfinite covariate counts and raw mask/trial summaries are
   descriptive only. The selected NWB clock uses a constant step, so missing
   acquisitions or unrepresented timing gaps cannot be inferred. Zero observed

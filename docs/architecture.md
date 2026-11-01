@@ -27,13 +27,18 @@ scientific review are separate states.
 Future features must preserve this separation and the existing design system.
 
 The experimental FALCON H1 inspector lives in `core/bci.py` and is exposed
-only by `cli/bci.py`. It imports optional `h5py` on demand, opens NWB sources
-read-only, and returns hash-bound structural summaries. There is no GUI route,
-decoder, or connection to MRI spatial/artifact contracts.
+by `cli/bci.py`. It imports optional `h5py` on demand, opens NWB sources
+read-only, and returns hash-bound structural summaries. Separate bounded,
+headless reference/chronological ridge experiments live in `core/bci_ridge.py`
+and `core/bci_chronological.py`; none connects to MRI spatial/artifact contracts.
 `core/bci_inventory.py` reuses that inspector sequentially from a versioned,
 hash-pinned manifest. `cli/bci.py` exposes the same API with explicit partial
 failure status and exclusive report creation. No cross-recording spike matrix
 or decoder state is constructed.
+`core/bci_reports.py` passively validates an explicitly selected chronological
+JSON report and prepares bounded prediction traces. `gui/bci_results.py` is a
+lazy, read-only presentation of that Qt-free API. It does not follow report
+source paths, rerun experiments, or treat report structure as source verification.
 
 Dependency setup uses core/dependencies.py and shared tool_versions.py. It records
 versions/provenance without MRI execution. GUI dependency_setup.py owns one shared
