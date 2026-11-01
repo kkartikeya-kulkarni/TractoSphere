@@ -12,7 +12,9 @@ from dmri_studio.core.bci_inventory import inspect_h1_inventory
 
 
 def add_command(commands: argparse._SubParsersAction) -> None:
-    bci = commands.add_parser("bci", help="inspect supported BCI research recordings")
+    bci = commands.add_parser(
+        "bci", help="inspect BCI recordings or run bounded reference experiments"
+    )
     tasks = bci.add_subparsers(dest="bci_command", required=True)
     inspect = tasks.add_parser("inspect-h1", help="read-only FALCON H1 NWB structure summary")
     inspect.add_argument("--nwb", type=Path, required=True, help="selected modern H1 .nwb file")
@@ -21,12 +23,24 @@ def add_command(commands: argparse._SubParsersAction) -> None:
     inventory.add_argument(
         "--output", type=Path, help="create a new JSON report outside source data"
     )
+    ridge = tasks.add_parser(
+        "ridge-h1", help="run a pinned, headless H1 ridge reference experiment"
+    )
+    ridge.add_argument("--spec", type=Path, required=True, help="versioned experiment JSON")
+    ridge.add_argument("--output", type=Path, required=True, help="new private JSON report path")
 
 
 def run(args: argparse.Namespace) -> int:
     try:
         if args.bci_command == "inspect-h1":
             report = inspect_falcon_h1(args.nwb)
+        elif args.bci_command == "ridge-h1":
+            from dmri_studio.core.bci_ridge import run_h1_ridge_experiment, write_h1_ridge_report
+
+            report = run_h1_ridge_experiment(args.spec)
+            write_h1_ridge_report(report, args.output)
+            print(json.dumps({"report": str(args.output.expanduser().resolve())}, sort_keys=True))
+            return 0
         else:
             report = inspect_h1_inventory(args.manifest)
             if args.output is not None:

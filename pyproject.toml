@@ -15,6 +15,7 @@ dependencies = ["numpy>=2.1,<3", "nibabel>=5.3,<6", "psutil>=7.2,<8", "Pillow>=1
 
 [project.optional-dependencies]
 bci = ["h5py>=3.11,<4"]
+bci-reference = ["dmri-studio[bci]", "scipy>=1.14,<2", "scikit-learn>=1.6,<2"]
 gui = ["PySide6==6.12.0", "indexed_gzip>=1.10,<2", "vtk>=9.4,<10", "scipy>=1.14,<2", "matplotlib>=3.9,<4"]
 gui-dev = ["dmri-studio[gui,dev]", "pytest-qt==4.5.0"]
 dev = ["pytest>=8,<10", "pytest-cov>=6,<8", "ruff>=0.11,<1", "h5py>=3.11,<4"]
