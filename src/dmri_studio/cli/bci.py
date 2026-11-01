@@ -41,6 +41,10 @@ def add_command(commands: argparse._SubParsersAction) -> None:
     chronology.add_argument(
         "--output", type=Path, required=True, help="new private JSON report path"
     )
+    saved = tasks.add_parser(
+        "inspect-h1-chronological-report", help="validate and summarize one saved H1 comparison"
+    )
+    saved.add_argument("--report", type=Path, required=True, help="existing local JSON report")
 
 
 def run(args: argparse.Namespace) -> int:
@@ -71,6 +75,15 @@ def run(args: argparse.Namespace) -> int:
             report = run_h1_chronological_experiment(args.spec)
             write_h1_ridge_report(report, args.output)
             print(json.dumps({"report": str(args.output.expanduser().resolve())}, sort_keys=True))
+            return 0
+        elif args.bci_command == "inspect-h1-chronological-report":
+            from dmri_studio.core.bci_reports import (
+                read_h1_chronological_report,
+                summarize_h1_chronological_report,
+            )
+
+            view = read_h1_chronological_report(args.report)
+            print(json.dumps(summarize_h1_chronological_report(view), indent=2, sort_keys=True))
             return 0
         else:
             report = inspect_h1_inventory(args.manifest)

@@ -127,6 +127,7 @@ class MainWindow(QMainWindow):
             ("Connectivity", "network"),
             ("QC", "list-checks"),
             ("Results", "files"),
+            ("BCI Results", "files"),
             ("Software Dependencies", "sliders-horizontal"),
             ("Settings", "settings"),
         ]
@@ -174,6 +175,8 @@ class MainWindow(QMainWindow):
                 if name == "QC"
                 else self.focus_results
                 if name == "Results"
+                else self.focus_bci_results
+                if name == "BCI Results"
                 else None,
                 quiet=True,
             )
@@ -194,6 +197,7 @@ class MainWindow(QMainWindow):
                     "Data Check": "Validate loaded inputs",
                     "QC": "Inspect existing quality-control results",
                     "Results": "View processing outputs and reports",
+                    "BCI Results": "Inspect a saved chronological H1 comparison without opening recordings",
                     "Settings": "Application preferences",
                     "Software Dependencies": "Detect, locate and set up scientific software",
                 }.get(name, "Available in a later phase")
@@ -206,6 +210,7 @@ class MainWindow(QMainWindow):
                     "Acquisitions",
                     "QC",
                     "Results",
+                    "BCI Results",
                     "Settings",
                     "Tractography",
                     "Viewer",
@@ -331,6 +336,7 @@ class MainWindow(QMainWindow):
         # their public attributes as cached properties, creating each on first use.
         self._scientific = None
         self._batch = None
+        self._bci_results = None
         self._dependency_defaults = self.dependencies.saved_directories()
         self.results = ResultsPage(self.settings)
         self.results.scientific_requested.connect(self.open_scientific_selection)
@@ -819,6 +825,7 @@ class MainWindow(QMainWindow):
             "Viewer": "Image Viewer",
             "QC": "Quality Control",
             "Results": "Runs & Reports",
+            "BCI Results": "BCI Results",
             "Settings": "Preferences",
             "Software Dependencies": "Software setup",
         }
@@ -1572,6 +1579,17 @@ class MainWindow(QMainWindow):
         self.workspace.setCurrentWidget(self.results)
         self.select_navigation("Results")
 
+    def focus_bci_results(self) -> None:
+        """Create the passive report workspace only when requested."""
+        if self._bci_results is None:
+            from .bci_results import BciResultsPage
+
+            self._bci_results = BciResultsPage(self.theme)
+            self.workspace.addWidget(self._bci_results)
+        self.page.preview.set_expanded(None)
+        self.workspace.setCurrentWidget(self._bci_results)
+        self.select_navigation("BCI Results")
+
     def open_saved_run(self, path: Path) -> None:
         """Read an existing attempt without changing or restarting processing."""
         self.focus_results()
@@ -1793,6 +1811,7 @@ class MainWindow(QMainWindow):
         dependencies_idle = self.dependencies.shutdown()
         qc_idle = self.qc.shutdown()
         results_idle = self.results.shutdown()
+        bci_results_idle = self._bci_results is None or self._bci_results.shutdown()
         projects_idle = self.projects.shutdown()
         scientific_idle = self._scientific is None or self._scientific.shutdown()
         batch_idle = self._batch is None or self._batch.shutdown()
@@ -1804,6 +1823,7 @@ class MainWindow(QMainWindow):
             or not qc_idle
             or not dependencies_idle
             or not results_idle
+            or not bci_results_idle
             or not projects_idle
             or not scientific_idle
             or not batch_idle
