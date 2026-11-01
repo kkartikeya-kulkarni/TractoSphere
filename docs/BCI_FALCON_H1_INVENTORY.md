@@ -129,6 +129,10 @@ assessed`; matching dimensions or unit IDs do not establish cross-session
 neuron identity. This workflow does not calculate an aggregate score or infer
 causes of differences.
 
+The separate [ridge reference experiment](BCI_FALCON_H1_RIDGE_REFERENCE.md)
+requires additional role and observation-separation evidence. Descriptive
+inventory comparability does not imply decoder experiment eligibility.
+
 ## Two permitted public recordings
 
 Two open-access CC-BY-4.0 **held-in minival** assets from [DANDI

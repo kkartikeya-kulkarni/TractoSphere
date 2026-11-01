@@ -149,3 +149,6 @@ The single public recording demonstrates structural inspection only; it does
 not validate decoding or generalize this schema to every H1 asset.
 The separate [multi-recording inventory](BCI_FALCON_H1_INVENTORY.md) reuses
 this exact inspector for sequential descriptive comparison.
+The bounded [ridge reference experiment](BCI_FALCON_H1_RIDGE_REFERENCE.md)
+is separate and requires explicit, nonoverlapping training, calibration and
+evaluation roles. Inspection alone does not establish those roles.
