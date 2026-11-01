@@ -24,6 +24,16 @@ CONDITIONS = (
 )
 MAX_REPORT_BYTES = 32 * 1024 * 1024
 MAX_PLOT_SEGMENTS = 128
+REPORT_SCHEMA_V2 = "falcon-h1-ridge-chronological-report-v2"
+METRIC_DEFINITIONS = {
+    "per_output_r2": "1-SSE/SST; undefined if fewer than two included bins or SST<=0",
+    "mae": "mean absolute error; undefined with zero included bins",
+    "rmse": "root mean square error; undefined with zero included bins",
+    "uniform_average_r2": "mean of seven R2 values; undefined if any output R2 is undefined",
+    "variance_weighted_r2": "population-target-variance-weighted mean of seven R2 values; undefined if any output R2 is undefined",
+}
+METRIC_REL_TOL = 1e-9
+METRIC_ABS_TOL = 1e-10
 
 
 def _fail(message: str) -> None:
@@ -185,6 +195,206 @@ def _metric(value: Any, name: str) -> dict[str, Any]:
     return row
 
 
+def compute_embedded_metrics(
+    targets: list[list[float]], predictions: list[list[float]]
+) -> dict[str, Any]:
+    """Recompute the writer's float64 metric definitions, without source reads."""
+    if len(targets) != len(predictions):
+        _fail("embedded target/prediction sample dimensions differ")
+    n = len(targets)
+    outputs: dict[str, dict[str, Any]] = {}
+    variances = []
+    for col, feature in enumerate(FEATURES):
+        y = [_finite(row[col], f"observed {feature}") for row in targets]
+        p = [_finite(row[col], f"predicted {feature}") for row in predictions]
+        if not n:
+            outputs[feature] = {
+                "r2": None,
+                "r2_reason": "no included observations",
+                "mae": None,
+                "rmse": None,
+            }
+            variances.append(0.0)
+            continue
+        errors = [a - b for a, b in zip(y, p, strict=True)]
+        mean = math.fsum(y) / n
+        sse = math.fsum(error * error for error in errors)
+        sst = math.fsum((value - mean) ** 2 for value in y)
+        variances.append(sst / n)
+        defined = n >= 2 and sst > 0
+        outputs[feature] = {
+            "r2": 1 - sse / sst if defined else None,
+            "r2_reason": None if defined else "fewer than two observations or constant target",
+            "mae": math.fsum(abs(error) for error in errors) / n,
+            "rmse": math.sqrt(sse / n),
+        }
+    scores = [outputs[feature]["r2"] for feature in FEATURES]
+    defined = all(score is not None for score in scores)
+    if not n:
+        reason = "no included observations"
+    else:
+        reason = None if defined else "at least one output has undefined R²"
+    return {
+        "included_samples": n,
+        "per_output": outputs,
+        "uniform_average_r2": math.fsum(scores) / len(scores) if defined else None,
+        "variance_weighted_r2": (
+            math.fsum(score * weight for score, weight in zip(scores, variances, strict=True))
+            / math.fsum(variances)
+            if defined
+            else None
+        ),
+        "aggregate_reason": reason,
+    }
+
+
+def _compare_embedded_metrics(
+    recorded: dict[str, Any], recalculated: dict[str, Any], name: str
+) -> None:
+    if recorded["included_samples"] != recalculated["included_samples"]:
+        _fail(f"{name} included denominator disagrees with embedded observations")
+    for feature in FEATURES:
+        for field in ("r2", "mae", "rmse"):
+            old = recorded["per_output"][feature][field]
+            new = recalculated["per_output"][feature][field]
+            if (old is None) != (new is None) or (
+                old is not None
+                and not math.isclose(old, new, rel_tol=METRIC_REL_TOL, abs_tol=METRIC_ABS_TOL)
+            ):
+                _fail(f"{name}.{feature}.{field} disagrees with embedded observations")
+        if (
+            recorded["per_output"][feature]["r2_reason"]
+            != recalculated["per_output"][feature]["r2_reason"]
+        ):
+            _fail(f"{name}.{feature} undefined-metric reason disagrees")
+    for field in ("uniform_average_r2", "variance_weighted_r2"):
+        old, new = recorded[field], recalculated[field]
+        if (old is None) != (new is None) or (
+            old is not None
+            and not math.isclose(old, new, rel_tol=METRIC_REL_TOL, abs_tol=METRIC_ABS_TOL)
+        ):
+            _fail(f"{name}.{field} disagrees with embedded observations")
+    if recorded["aggregate_reason"] != recalculated["aggregate_reason"]:
+        _fail(f"{name} aggregate undefined-metric reason disagrees")
+
+
+def _validate_v2(view: dict[str, Any], value: Any) -> dict[str, Any]:
+    """Validate self-contained evidence against unchanged v1 result arrays."""
+    item = _mapping(
+        value,
+        "observations",
+        {
+            "storage",
+            "prediction_storage",
+            "original_indices",
+            "trial_numbers",
+            "targets",
+            "candidate_raw_eval_mask",
+            "candidate_target_finite",
+            "output_labels",
+            "output_units",
+            "metric_definitions",
+        },
+    )
+    if (
+        item["storage"] != "included_only_in_original_index_order"
+        or item["prediction_storage"] != "all_evaluation_candidates_in_source_index_order"
+    ):
+        _fail("v2 observation or prediction alignment declaration differs")
+    if item["output_labels"] != list(FEATURES) or item["metric_definitions"] != METRIC_DEFINITIONS:
+        _fail("v2 feature order or metric definitions differ")
+    eval_row = view["evaluation"]
+    ev = view["selections"]["evaluation"]
+    n = eval_row["samples"]
+    mask, finite = item["candidate_raw_eval_mask"], item["candidate_target_finite"]
+    if (
+        not isinstance(mask, list)
+        or not isinstance(finite, list)
+        or len(mask) != n
+        or len(finite) != n
+        or any(type(value) is not bool for value in mask + finite)
+    ):
+        _fail("v2 candidate mask/finiteness dimensions or values differ")
+    selected = [ev["start"] + index for index in range(n) if mask[index] and finite[index]]
+    if (
+        selected != eval_row["selected_original_indices"]
+        or item["original_indices"] != selected
+        or mask.count(False) != eval_row["raw_mask_false"]
+        or sum(a and not b for a, b in zip(mask, finite, strict=True))
+        != eval_row["additional_nonfinite_target_exclusions"]
+    ):
+        _fail("v2 selected indices or exclusion counts disagree with candidate evidence")
+    membership = []
+    per_trial = eval_row["conditions"][CONDITIONS[0]]["per_trial"]
+    for trial in per_trial:
+        start, stop = trial["original_start"], trial["original_stop"]
+        local = slice(start - ev["start"], stop - ev["start"])
+        if (
+            sum(mask[local]) != trial["raw_mask_true"]
+            or sum(a and not b for a, b in zip(mask[local], finite[local], strict=True))
+            != trial["additional_nonfinite_exclusions"]
+        ):
+            _fail("v2 per-trial exclusion counts disagree with candidate evidence")
+        membership.extend(
+            [trial["trial_number"]]
+            * sum(a and b for a, b in zip(mask[local], finite[local], strict=True))
+        )
+    if (
+        not isinstance(item["trial_numbers"], list)
+        or any(type(value) is not int for value in item["trial_numbers"])
+        or item["trial_numbers"] != membership
+    ):
+        _fail("v2 trial membership differs from original-index selection")
+    targets = item["targets"]
+    if not isinstance(targets, list) or len(targets) != len(selected):
+        _fail("v2 observed target sample dimension differs")
+    for row in targets:
+        if not isinstance(row, list) or len(row) != len(FEATURES):
+            _fail("v2 observed target feature dimension differs")
+        for value in row:
+            _finite(value, "v2 included target")
+    units = item["output_units"]
+    if not isinstance(units, list) or len(units) != len(FEATURES):
+        _fail("v2 output unit dimension differs")
+    for feature, unit in zip(FEATURES, units, strict=True):
+        _mapping(unit, f"v2 {feature} unit", {"label", "unit", "provenance"})
+        if (
+            unit["label"] != feature
+            or (unit["unit"] is None and unit["provenance"] != "unknown")
+            or (
+                unit["unit"] is not None
+                and (
+                    not isinstance(unit["unit"], str)
+                    or not unit["unit"].strip()
+                    or unit["provenance"] != "source_nwb_velocity_storage_unit"
+                )
+            )
+        ):
+            _fail(f"v2 {feature} unit or provenance differs")
+    for condition in CONDITIONS:
+        row = eval_row["conditions"][condition]
+        selected_predictions = [row["predictions"][index - ev["start"]] for index in selected]
+        _compare_embedded_metrics(
+            row["pooled"],
+            compute_embedded_metrics(targets, selected_predictions),
+            f"{condition}.pooled",
+        )
+        for trial in row["per_trial"]:
+            positions = [
+                j
+                for j, original in enumerate(selected)
+                if trial["original_start"] <= original < trial["original_stop"]
+            ]
+            sub_targets = [targets[j] for j in positions]
+            sub_predictions = [selected_predictions[j] for j in positions]
+            _compare_embedded_metrics(
+                trial["metrics"],
+                compute_embedded_metrics(sub_targets, sub_predictions),
+                f"{condition}.trial{trial['trial_number']}",
+            )
+    return item
+
+
 def read_h1_chronological_report(path: str | Path) -> dict[str, Any]:
     """Read one explicit report, validate available claims, return a path-free view."""
     source = Path(path).expanduser().resolve(strict=True)
@@ -208,8 +418,48 @@ def read_h1_chronological_report(path: str | Path) -> dict[str, Any]:
         _fail("file changed during inspection")
     if not isinstance(report, dict):
         _fail("top level must be a JSON object")
-    if report.get("schema") != REPORT_SCHEMA:
-        _fail(f"unsupported schema version {report.get('schema')!r}; expected {REPORT_SCHEMA}")
+    schema = report.get("schema")
+    if schema not in (REPORT_SCHEMA, REPORT_SCHEMA_V2):
+        _fail(
+            f"unsupported schema version {schema!r}; expected {REPORT_SCHEMA} or {REPORT_SCHEMA_V2}"
+        )
+    observations = None
+    if schema == REPORT_SCHEMA_V2:
+        if set(report) != {
+            "schema",
+            "specification",
+            "sources",
+            "upstream_commit",
+            "chronology_evidence",
+            "selection_rule",
+            "selections",
+            "configuration",
+            "training",
+            "calibration",
+            "evaluation",
+            "temporal_isolation",
+            "software",
+            "limitations",
+            "observations",
+            "original_v1_report_sha256",
+            "enrichment",
+        }:
+            _fail("v2 top-level fields differ from the supported schema")
+        original_v1_report_sha256 = _sha(
+            report.pop("original_v1_report_sha256"), "original_v1_report_sha256"
+        )
+        enrichment = _mapping(
+            report.pop("enrichment"),
+            "enrichment",
+            {"method", "explicit_source_path", "source_sha256"},
+        )
+        if enrichment["method"] != "read_only_exact_selected_nwb_targets" or not isinstance(
+            enrichment["explicit_source_path"], str
+        ):
+            _fail("v2 explicit source extraction provenance differs")
+        _sha(enrichment["source_sha256"], "enrichment.source_sha256")
+        observations = report.pop("observations")
+        report["schema"] = REPORT_SCHEMA
     _mapping(
         report,
         "report",
@@ -529,7 +779,7 @@ def read_h1_chronological_report(path: str | Path) -> dict[str, Any]:
         for name, item in selections.items()
     }
     view = {
-        "schema": REPORT_SCHEMA,
+        "schema": schema,
         "report_sha256": hashlib.sha256(data).hexdigest(),
         "structure": "valid_supported_schema",
         "reported_consistency": "checked_available_fields",
@@ -556,6 +806,23 @@ def read_h1_chronological_report(path: str | Path) -> dict[str, Any]:
         "limitations": [_display_text(value) for value in limitations],
         "error_units": "unavailable: output units are not embedded in the v1 report",
     }
+    if observations is not None:
+        if enrichment["source_sha256"] != view["source"]["sha256"]:
+            _fail("v2 explicit source extraction provenance differs")
+        validated = _validate_v2(view, observations)
+        view["observations"] = validated
+        view["original_v1_report_sha256"] = original_v1_report_sha256
+        view["enrichment"] = {
+            "method": enrichment["method"],
+            "source_sha256": enrichment["source_sha256"],
+        }
+        view["metric_recomputation"] = (
+            "all_pooled_and_per_trial_metrics_agree_with_embedded_targets"
+        )
+        view["reported_consistency"] = "embedded_metrics_recomputed_and_agree"
+        view["observed_trace"] = "available_from_embedded_included_targets"
+        view["feature_order_evidence"] = "explicit_v2_order_matches_schema"
+        view["error_units"] = "per_output_v2_unit_declarations"
     return _sanitize_tree(view)
 
 
@@ -589,11 +856,24 @@ def prepare_h1_prediction_traces(
     step = max(1, math.ceil(4 * len(indices) / max_points))
     series = {}
     offset = view["selections"]["evaluation"]["start"]
-    for condition in CONDITIONS:
-        predictions = evaluation["conditions"][condition]["predictions"]
+    rows = {
+        condition: evaluation["conditions"][condition]["predictions"] for condition in CONDITIONS
+    }
+    if "observations" in view:
+        rows["observed"] = view["observations"]["targets"]
+    positions = {index: position for position, index in enumerate(indices)}
+    for condition, predictions in rows.items():
         segments = []
         for run in runs:
-            points = [(index, predictions[index - offset][column]) for index in run]
+            points = [
+                (
+                    index,
+                    predictions[positions[index] if condition == "observed" else index - offset][
+                        column
+                    ],
+                )
+                for index in run
+            ]
             chosen = {0, len(points) - 1}
             if step > 1:
                 for begin in range(0, len(points), step):
@@ -614,7 +894,11 @@ def prepare_h1_prediction_traces(
     return {
         "available": True,
         "x_label": "Original source bin index (nominal 20 ms)",
-        "observed": "unavailable: observed targets are not embedded in the v1 report",
+        "observed": (
+            "available from embedded included targets"
+            if "observations" in view
+            else "unavailable: observed targets are not embedded in the v1 report"
+        ),
         "trial_boundaries": sorted(starts),
         "downsampled": step > 1,
         "series": series,
@@ -623,7 +907,7 @@ def prepare_h1_prediction_traces(
 
 def summarize_h1_chronological_report(view: dict[str, Any]) -> dict[str, Any]:
     """Return a small path-free summary without predictions or model weights."""
-    return {
+    summary = {
         "schema": view["schema"],
         "report_sha256": view["report_sha256"],
         "structure": view["structure"],
@@ -647,3 +931,8 @@ def summarize_h1_chronological_report(view: dict[str, Any]) -> dict[str, Any]:
         },
         "limitations": view["limitations"],
     }
+    if "observations" in view:
+        summary["original_v1_report_sha256"] = view["original_v1_report_sha256"]
+        summary["output_units"] = view["observations"]["output_units"]
+        summary["observed_included_samples"] = len(view["observations"]["targets"])
+    return summary

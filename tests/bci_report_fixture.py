@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
 from dmri_studio.core.bci import FEATURES, UPSTREAM_LOADER_COMMIT
 from dmri_studio.core.bci_chronological import REPORT_SCHEMA
+from dmri_studio.core.bci_reports import (
+    METRIC_DEFINITIONS,
+    REPORT_SCHEMA_V2,
+    compute_embedded_metrics,
+)
 
 
 def synthetic_chronological_report(path: Path) -> dict:
@@ -138,6 +144,58 @@ def synthetic_chronological_report(path: Path) -> dict:
         },
         "software": {"numpy": "synthetic", "scipy": "synthetic", "scikit_learn": "synthetic"},
         "limitations": ["Synthetic fixture; no scientific acceptance."],
+    }
+    path.write_text(json.dumps(report, sort_keys=True))
+    return report
+
+
+def synthetic_chronological_v2_report(path: Path) -> dict:
+    """Self-contained, numerically consistent six-candidate/two-trial fixture."""
+    report = synthetic_chronological_report(path)
+    original_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+    indices = report["evaluation"]["selected_original_indices"]
+    targets = [
+        [float((position + 1) * (feature + 1)) for feature in range(len(FEATURES))]
+        for position in range(len(indices))
+    ]
+    for condition in report["evaluation"]["conditions"].values():
+        predictions = [condition["predictions"][index - 8] for index in indices]
+        condition["pooled"] = compute_embedded_metrics(targets, predictions)
+        for trial in condition["per_trial"]:
+            positions = [
+                position
+                for position, index in enumerate(indices)
+                if trial["original_start"] <= index < trial["original_stop"]
+            ]
+            trial["metrics"] = compute_embedded_metrics(
+                [targets[position] for position in positions],
+                [predictions[position] for position in positions],
+            )
+    report["schema"] = REPORT_SCHEMA_V2
+    report["original_v1_report_sha256"] = original_hash
+    report["enrichment"] = {
+        "method": "read_only_exact_selected_nwb_targets",
+        "explicit_source_path": "/private/absent/explicit-source.nwb",
+        "source_sha256": "a" * 64,
+    }
+    report["observations"] = {
+        "storage": "included_only_in_original_index_order",
+        "prediction_storage": "all_evaluation_candidates_in_source_index_order",
+        "original_indices": indices,
+        "trial_numbers": [5, 5, 6, 6],
+        "targets": targets,
+        "candidate_raw_eval_mask": [True, False, True, True, False, True],
+        "candidate_target_finite": [True] * 6,
+        "output_labels": list(FEATURES),
+        "output_units": [
+            {
+                "label": feature,
+                "unit": "arbitrary",
+                "provenance": "source_nwb_velocity_storage_unit",
+            }
+            for feature in FEATURES
+        ],
+        "metric_definitions": dict(METRIC_DEFINITIONS),
     }
     path.write_text(json.dumps(report, sort_keys=True))
     return report

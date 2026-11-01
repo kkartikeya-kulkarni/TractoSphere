@@ -45,6 +45,15 @@ def add_command(commands: argparse._SubParsersAction) -> None:
         "inspect-h1-chronological-report", help="validate and summarize one saved H1 comparison"
     )
     saved.add_argument("--report", type=Path, required=True, help="existing local JSON report")
+    upgrade = tasks.add_parser(
+        "enrich-h1-chronological-report",
+        help="create a new v2 report from v1 and one explicit hash-matched NWB source",
+    )
+    upgrade.add_argument("--report", type=Path, required=True, help="unchanged v1 report")
+    upgrade.add_argument(
+        "--source", type=Path, required=True, help="explicit original NWB recording"
+    )
+    upgrade.add_argument("--output", type=Path, required=True, help="new private v2 report path")
 
 
 def run(args: argparse.Namespace) -> int:
@@ -84,6 +93,12 @@ def run(args: argparse.Namespace) -> int:
 
             view = read_h1_chronological_report(args.report)
             print(json.dumps(summarize_h1_chronological_report(view), indent=2, sort_keys=True))
+            return 0
+        elif args.bci_command == "enrich-h1-chronological-report":
+            from dmri_studio.core.bci_report_upgrade import upgrade_h1_chronological_report
+
+            path = upgrade_h1_chronological_report(args.report, args.source, args.output)
+            print(json.dumps({"report": str(path)}, sort_keys=True))
             return 0
         else:
             report = inspect_h1_inventory(args.manifest)

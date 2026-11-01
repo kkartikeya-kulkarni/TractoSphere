@@ -88,7 +88,7 @@ class PredictionPlot(QWidget):
         trace = self.trace
         if not trace or not trace["available"]:
             return
-        groups = [segment for name in CONDITIONS for segment in trace["series"][name]]
+        groups = [segment for series in trace["series"].values() for segment in series]
         points = [point for segment in groups for point in segment]
         if not points:
             return
@@ -120,8 +120,11 @@ class PredictionPlot(QWidget):
                 pen = QPen(self.theme.color("border.control"), 1, Qt.PenStyle.DashLine)
                 painter.setPen(pen)
                 painter.drawLine(int(x), rect.top(), int(x), rect.bottom())
-        for name, token in zip(CONDITIONS, COLORS, strict=True):
-            painter.setPen(QPen(self.theme.color(token), 1.5))
+        palette = [(name, token) for name, token in zip(CONDITIONS, COLORS, strict=True)]
+        if "observed" in trace["series"]:
+            palette.append(("observed", "text.primary"))
+        for name, token in palette:
+            painter.setPen(QPen(self.theme.color(token), 2.0 if name == "observed" else 1.5))
             for segment in trace["series"][name]:
                 if len(segment) == 1:
                     x, y = xy(segment[0])
@@ -197,6 +200,16 @@ class BciResultsPage(QWidget):
         self.feature.setAccessibleName("Select output feature for saved predictions and metrics")
         self.feature.currentIndexChanged.connect(self.show_feature)
         feature_row.addWidget(self.feature)
+        feature_row.addWidget(label("Prediction condition"))
+        self.condition = QComboBox()
+        self.condition.setAccessibleName(
+            "Select prediction condition to compare with observed targets"
+        )
+        self.condition.addItem("All conditions", None)
+        for name in CONDITIONS:
+            self.condition.addItem(NAMES[name], name)
+        self.condition.currentIndexChanged.connect(self.show_feature)
+        feature_row.addWidget(self.condition)
         feature_row.addStretch()
         traces.body.addLayout(feature_row)
         self.feature_metrics = label("No output selected.", "caption")
@@ -262,8 +275,11 @@ class BciResultsPage(QWidget):
     def _show_report(self, view: dict, traces: dict) -> None:
         self.view, self.traces = view, traces
         source = view["source"]
+        has_targets = "observations" in view
         self.status.setText(
-            "Saved report structure validated; source files not independently verified."
+            "Saved report and embedded metrics agree; source files not independently verified."
+            if has_targets
+            else "Saved report structure validated; source files not independently verified."
         )
         self.provenance.setText(
             f"Custom chronological H1 research comparison · {view['schema']}\n"
@@ -273,7 +289,11 @@ class BciResultsPage(QWidget):
             f"Specification SHA-256: {view['specification_sha256']}\n"
             "Structure: valid supported schema · reported fields: internally checked where possible\n"
             "Source file verification: not performed · scientific acceptance: unassigned\n"
-            "Metric recomputation: unavailable because observed targets are not embedded."
+            + (
+                "Metric recomputation: pooled and per-trial values agree with embedded targets."
+                if has_targets
+                else "Metric recomputation: unavailable because observed targets are not embedded."
+            )
         )
         selected = view["selections"]
         evaluation = view["evaluation"]
@@ -340,14 +360,47 @@ class BciResultsPage(QWidget):
                 f"{NAMES[condition]}: R² {_metric(value['r2'], value['r2_reason'])}; "
                 f"MAE {_metric(value['mae'])}; RMSE {_metric(value['rmse'])}"
             )
-        self.feature_metrics.setText(
-            f"{feature} · MAE/RMSE units unavailable in the v1 report\n" + "\n".join(rows)
-        )
+        units = "MAE/RMSE units unavailable in the v1 report"
+        if "observations" in self.view:
+            item = self.view["observations"]["output_units"][
+                self.view["feature_labels"].index(feature)
+            ]
+            units = (
+                f"MAE/RMSE units: {item['unit']} ({item['provenance']})"
+                if item["unit"]
+                else "MAE/RMSE units unavailable (not established)"
+            )
+        self.feature_metrics.setText(f"{feature} · {units}\n" + "\n".join(rows))
         trace = self.traces[feature]
+        selected = self.condition.currentData()
+        legends = {
+            "constant_training_mean": "blue: constant training mean",
+            "fixed_ridge": "light blue: fixed ridge",
+            "normalization_recalibrated_ridge": "amber: normalization recalibrated ridge",
+        }
+        names = (selected,) if selected in CONDITIONS else CONDITIONS
+        self.legend.setText(
+            ("White/black: observed target · " if "observations" in self.view else "")
+            + " · ".join(legends[name] for name in names)
+        )
+        if trace["available"] and selected in CONDITIONS:
+            trace = {
+                **trace,
+                "series": {
+                    name: segments
+                    for name, segments in trace["series"].items()
+                    if name in {selected, "observed"}
+                },
+            }
         self.plot.set_trace(trace)
         if trace["available"]:
+            observed = (
+                "Observed targets shown from included v2 observations. "
+                if "observations" in self.view
+                else "Observed target trace unavailable: not embedded in the v1 report. "
+            )
             self.plot_note.setText(
-                f"{trace['x_label']}. Observed target trace unavailable: not embedded in the v1 report. "
+                f"{trace['x_label']}. {observed}"
                 + (
                     "Display decimated with endpoints and extrema retained."
                     if trace["downsampled"]

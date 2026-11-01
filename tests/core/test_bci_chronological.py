@@ -18,7 +18,9 @@ from dmri_studio.core.bci_chronological import (
     _metrics,
     run_h1_chronological_experiment,
 )
-from dmri_studio.core.bci_ridge import _load_role, reference_filter
+from dmri_studio.core.bci_report_upgrade import upgrade_h1_chronological_report
+from dmri_studio.core.bci_reports import read_h1_chronological_report
+from dmri_studio.core.bci_ridge import _load_role, reference_filter, write_h1_ridge_report
 
 h5py = pytest.importorskip("h5py")
 pytest.importorskip("sklearn")
@@ -143,6 +145,63 @@ def test_chronological_cli_same_evaluation_samples_metrics_and_source_integrity(
     )
     assert json.loads(output.read_text()) == report
     assert Path(spec["source"]["path"]).read_bytes() == original
+
+
+def test_explicit_v2_enrichment_preserves_frozen_predictions_and_sources(tmp_path):
+    path, spec = _fixture(tmp_path)
+    source = Path(spec["source"]["path"])
+    original_source = source.read_bytes()
+    v1_path = tmp_path / "frozen-v1.json"
+    original = run_h1_chronological_experiment(path)
+    write_h1_ridge_report(original, v1_path)
+    original_v1 = v1_path.read_bytes()
+    v2_path = tmp_path / "new-v2.json"
+    upgrade_h1_chronological_report(v1_path, source, v2_path)
+    cli_v2 = tmp_path / "cli-v2.json"
+    assert (
+        main(
+            [
+                "bci",
+                "enrich-h1-chronological-report",
+                "--report",
+                str(v1_path),
+                "--source",
+                str(source),
+                "--output",
+                str(cli_v2),
+            ]
+        )
+        == 0
+    )
+    assert json.loads(cli_v2.read_text()) == json.loads(v2_path.read_text())
+    view = read_h1_chronological_report(v2_path)
+    assert (
+        view["metric_recomputation"]
+        == "all_pooled_and_per_trial_metrics_agree_with_embedded_targets"
+    )
+    assert (
+        view["evaluation"]["selected_original_indices"]
+        == original["evaluation"]["selected_original_indices"]
+    )
+    for name in original["evaluation"]["conditions"]:
+        assert (
+            view["evaluation"]["conditions"][name]["predictions"]
+            == original["evaluation"]["conditions"][name]["predictions"]
+        )
+    assert view["observations"]["output_units"][0]["unit"] == "arbitrary"
+    assert source.read_bytes() == original_source
+    assert v1_path.read_bytes() == original_v1
+    altered = tmp_path / "altered-source.nwb"
+    altered.write_bytes(original_source)
+    with h5py.File(altered, "r+") as root:
+        root["acquisition/OpenLoopKinematicsVelocity/data"][180, 0] += 0.25
+    with pytest.raises(ValueError, match="source SHA-256 differs"):
+        upgrade_h1_chronological_report(v1_path, altered, tmp_path / "unwritten-v2.json")
+    assert not (tmp_path / "unwritten-v2.json").exists()
+    with pytest.raises(ValueError, match="must not replace"):
+        upgrade_h1_chronological_report(v1_path, source, v1_path)
+    with pytest.raises(FileExistsError):
+        upgrade_h1_chronological_report(v1_path, source, v2_path)
 
 
 def test_chronological_rejects_future_calibration_and_unsupported_ordering(tmp_path):

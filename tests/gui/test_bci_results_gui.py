@@ -1,6 +1,6 @@
 """Read-only H1 report workflow through the actual application navigation."""
 
-from bci_report_fixture import synthetic_chronological_report
+from bci_report_fixture import synthetic_chronological_report, synthetic_chronological_v2_report
 
 
 def test_open_report_from_navigation_with_file_action(window, qtbot, tmp_path, monkeypatch):
@@ -59,3 +59,21 @@ def test_missing_report_does_not_display_local_path(window, qtbot, tmp_path):
     qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
     assert "unavailable or unreadable" in page.status.text()
     assert str(tmp_path) not in page.status.text()
+
+
+def test_v2_observed_prediction_overlay_and_metric_state(window, qtbot, tmp_path):
+    path = tmp_path / "v2.json"
+    synthetic_chronological_v2_report(path)
+    window.focus_bci_results()
+    page = window._bci_results
+    page.load(path)
+    qtbot.waitUntil(lambda: page.thread is None, timeout=10000)
+    assert "embedded metrics agree" in page.status.text()
+    assert "pooled and per-trial values agree" in page.provenance.text()
+    assert "Source file verification: not performed" in page.provenance.text()
+    assert "units: arbitrary" in page.feature_metrics.text()
+    assert "Observed targets shown" in page.plot_note.text()
+    assert page.plot.trace["trial_boundaries"] == [8, 11]
+    assert page.plot.trace["series"]["observed"][0][0][0] == 8
+    page.condition.setCurrentIndex(page.condition.findData("fixed_ridge"))
+    assert set(page.plot.trace["series"]) == {"observed", "fixed_ridge"}
