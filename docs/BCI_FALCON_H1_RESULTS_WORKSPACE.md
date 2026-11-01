@@ -1,6 +1,6 @@
 # Read-only chronological H1 Results workspace
 
-This experimental workspace opens an **existing** `falcon-h1-ridge-chronological-report-v1` JSON report. It does not fit a model, access a recording, load serialized model objects, rerun an experiment, or assign scientific acceptance. It is a custom within-recording research comparison, **not** an official FALCON benchmark result or a general adaptation finding. The frozen experiment and its scores remain documented in [the chronological comparison](BCI_FALCON_H1_CHRONOLOGICAL_COMPARISON.md).
+This experimental workspace opens an **existing** `falcon-h1-ridge-chronological-report-v1` or [self-contained v2](BCI_FALCON_H1_CHRONOLOGICAL_REPORT_V2.md) JSON report. It does not fit a model, access a recording, load serialized model objects, rerun an experiment, or assign scientific acceptance. It is a custom within-recording research comparison, **not** an official FALCON benchmark result or a general adaptation finding. The frozen experiment and its scores remain documented in [the chronological comparison](BCI_FALCON_H1_CHRONOLOGICAL_COMPARISON.md).
 
 ## Reader contract
 
@@ -17,6 +17,8 @@ The **BCI Results** navigation item creates its page only on first use. The user
 Normalization recalibration keeps the fitted ridge coefficients and intercept unchanged. Only feature mean and standard deviation are estimated from earlier calibration neural observations; calibration target labels are not used. The page makes no causal diagnosis or aggregate quality score.
 
 The plot uses recorded predictions at **original source bin indices**, not a fabricated continuous wall-clock axis. Separate segments preserve excluded-bin gaps and trial transitions, and dashed markers identify trial starts. For long segments, display-only decimation retains bucket endpoints and extrema; saved predictions and metrics are unchanged. The observed target trace is explicitly **unavailable** because v1 does not embed observed values. If a report has too many disjoint segments for an honest bounded plot, the plot is marked unavailable.
+
+For a valid v2 report, the same plot adds observed **included** targets in the theme's foreground color. The reader recomputes pooled and per-trial metrics from embedded targets and unchanged candidate prediction arrays before the page displays them. Its metric-consistency message remains distinct from source verification and scientific acceptance. Output units come from explicit v2 declarations; unknown units remain labeled unavailable. See the [v2 alignment and metric contract](BCI_FALCON_H1_CHRONOLOGICAL_REPORT_V2.md).
 
 ## Verification and limits
 

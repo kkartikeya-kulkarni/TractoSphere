@@ -35,8 +35,10 @@ and `core/bci_chronological.py`; none connects to MRI spatial/artifact contracts
 hash-pinned manifest. `cli/bci.py` exposes the same API with explicit partial
 failure status and exclusive report creation. No cross-recording spike matrix
 or decoder state is constructed.
-`core/bci_reports.py` passively validates an explicitly selected chronological
-JSON report and prepares bounded prediction traces. `gui/bci_results.py` is a
+`core/bci_reports.py` passively validates explicitly selected v1/v2 chronological
+JSON reports and prepares bounded prediction traces. `core/bci_report_upgrade.py`
+creates an exclusive v2 file from a frozen v1 report and an explicitly supplied,
+hash-matched NWB recording; this is not model fitting. `gui/bci_results.py` is a
 lazy, read-only presentation of that Qt-free API. It does not follow report
 source paths, rerun experiments, or treat report structure as source verification.
 
