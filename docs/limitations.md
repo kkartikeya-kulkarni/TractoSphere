@@ -7,6 +7,11 @@ PUBLIC ALPHA · RESEARCH USE ONLY · NOT FOR CLINICAL USE · SCIENTIFIC VALIDATI
   features and NWB ragged spike times. Older `Blacklist`-only H1 files and all
   other BCI tasks are unsupported. It does not decode signals, assess benchmark
   performance, attach anatomy, or provide a GUI. [Exact contract and example](BCI_FALCON_H1_INSPECTOR.md).
+- H1 counts, rates, nonfinite covariate counts and raw mask/trial summaries are
+  descriptive only. The selected NWB clock uses a constant step, so missing
+  acquisitions or unrepresented timing gaps cannot be inferred. Zero observed
+  spikes do not diagnose an electrode. No quality score or scientific acceptance
+  is assigned; source mask values are never interpreted as acquisition failure.
 
 - Native GUI verification is on macOS Apple Silicon. Linux/Windows are experimental;
   CI results, when available, are software checks rather than scientific validation.

@@ -1,6 +1,6 @@
 """Read-only inspection of the selected modern FALCON H1 NWB structure.
 
-This module deliberately does not load a decoder, bin spikes, or infer anatomy.
+This module deliberately does not load a decoder or infer anatomy.
 The optional h5py dependency is imported only when this API is called.
 """
 
@@ -16,7 +16,7 @@ from dmri_studio import __version__
 from dmri_studio.core.dataset import SourceFingerprint
 from dmri_studio.core.execution import hash_file
 
-SCHEMA = "falcon-h1-modern-nwb-v1"
+SCHEMA = "falcon-h1-modern-nwb-v2"
 UPSTREAM_LOADER_COMMIT = "770c9b9597b8f58bf67b5a9ec6401ef705a2cb0f"
 PERIOD_S = 0.02
 FEATURES = ("tx", "ty", "tz", "rx", "g1", "g2", "g3")
@@ -67,16 +67,27 @@ def _series(root: Any, name: str, h5py: Any) -> tuple[Any, float, float]:
     return data, start, period
 
 
-def _missing_by_column(data: Any, label: str) -> list[int]:
+def _missing_by_column(data: Any, mask: Any, label: str) -> tuple[list[int], dict[str, list[int]]]:
     if len(data.shape) != 2 or data.shape[1] != len(FEATURES) or data.shape[0] == 0:
         raise ValueError(f"{label} must have nonempty time × 7 dimensions")
     if data.dtype.kind not in "iuf":
         raise ValueError(f"{label} must be numeric")
     missing = np.zeros(len(FEATURES), dtype=np.int64)
+    by_mask = {
+        "true": np.zeros(len(FEATURES), dtype=np.int64),
+        "false": np.zeros(len(FEATURES), dtype=np.int64),
+    }
     for offset in range(0, data.shape[0], 8192):
         block = data[offset : offset + 8192]
-        missing += np.count_nonzero(~np.isfinite(block), axis=0)
-    return [int(value) for value in missing]
+        raw_mask = np.asarray(mask[offset : offset + block.shape[0]], dtype=bool)
+        invalid = ~np.isfinite(block)
+        missing += np.count_nonzero(invalid, axis=0)
+        for status, selected in (("true", raw_mask), ("false", ~raw_mask)):
+            by_mask[status] += np.count_nonzero(invalid[selected], axis=0)
+    return (
+        [int(value) for value in missing],
+        {key: value.tolist() for key, value in by_mask.items()},
+    )
 
 
 def _one_dimensional(data: Any, size: int, label: str) -> None:
@@ -116,7 +127,86 @@ def _mask_counts(data: Any, size: int) -> dict[str, int | str]:
     return dict(source="eval_mask", true_count=true_count, false_count=size - true_count)
 
 
-def _unit_summary(root: Any, h5py: Any) -> dict[str, int]:
+def h1_bin_windows(
+    bin_end_s: np.ndarray, period_s: float = PERIOD_S
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return analyzed [start, end) windows; the final end is inclusive.
+
+    H1 timestamps denote bin ends in seconds. A long interval contributes only
+    its proximal final ``period_s``; a short interval contributes its actual
+    width. No spikes in omitted gaps are assigned to neighboring bins.
+    """
+    ends = np.asarray(bin_end_s, dtype=np.float64)
+    if ends.ndim != 1 or not np.isfinite(ends).all():
+        raise ValueError("H1 bin ends must be a finite one-dimensional vector")
+    if not math.isfinite(period_s) or period_s <= 0:
+        raise ValueError("H1 bin period must be positive and finite")
+    if ends.size and np.any(np.diff(ends) <= 0):
+        raise ValueError("H1 bin ends must increase strictly")
+    starts = ends - period_s
+    if ends.size > 1:
+        starts[1:] = np.maximum(starts[1:], ends[:-1])
+    return starts, ends
+
+
+def describe_h1_timing(bin_end_s: np.ndarray, period_s: float = PERIOD_S) -> dict[str, Any]:
+    """Describe represented gaps and actual analyzed exposure, without spikes."""
+    starts, ends = h1_bin_windows(bin_end_s, period_s)
+    intervals = np.diff(ends)
+    gaps = intervals > period_s + 1e-9
+    short = intervals < period_s - 1e-9
+    return {
+        "sample_count": int(ends.size),
+        "nominal_duration_s": round(ends.size * period_s, 9),
+        "analyzed_exposure_s": round(math.fsum(float(x) for x in ends - starts), 9),
+        "gap_count": int(np.count_nonzero(gaps)),
+        "gap_duration_s": round(math.fsum(float(x) for x in intervals[gaps] - period_s), 9),
+        "short_interval_count": int(np.count_nonzero(short)),
+    }
+
+
+def _spike_bin_indices(
+    spikes: np.ndarray, starts: np.ndarray, ends: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    # np.histogram uses left-inclusive edges, except its final right edge.
+    indices = np.searchsorted(ends, spikes, side="right")
+    if ends.size:
+        indices[spikes == ends[-1]] = ends.size - 1
+    in_range = indices < ends.size
+    valid = np.zeros(spikes.size, dtype=bool)
+    # Tolerate only floating arithmetic at a constructed lower edge (e.g.
+    # 0.05 - 0.02). This does not widen a window at measurement precision.
+    valid[in_range] = spikes[in_range] >= starts[indices[in_range]] - 1e-12
+    return indices, valid
+
+
+def bin_h1_spikes(
+    spike_times_s: np.ndarray, bin_end_s: np.ndarray, period_s: float = PERIOD_S
+) -> np.ndarray:
+    """Bin one sorted H1 unit with uint64 counts; never wrap at 255.
+
+    Duplicate finite spike times are counted independently. Unsorted or
+    nonfinite timestamps are rejected. Empty windows return an empty vector.
+    """
+    starts, ends = h1_bin_windows(bin_end_s, period_s)
+    spikes = np.asarray(spike_times_s, dtype=np.float64)
+    if spikes.ndim != 1 or not np.isfinite(spikes).all():
+        raise ValueError("H1 spike times must be a finite one-dimensional vector")
+    if np.any(np.diff(spikes) < 0):
+        raise ValueError("H1 spike times must be sorted within each unit")
+    if not ends.size:
+        return np.zeros(0, dtype=np.uint64)
+    indices, valid = _spike_bin_indices(spikes, starts, ends)
+    # bincount uses platform integers; cast after asserting representability.
+    counts = np.bincount(indices[valid], minlength=ends.size)
+    if np.any(counts < 0):
+        raise OverflowError("H1 spike-bin count exceeded platform integer range")
+    return counts.astype(np.uint64, copy=False)
+
+
+def _unit_summary(
+    root: Any, h5py: Any, starts: np.ndarray, ends: np.ndarray, trials: list[dict[str, int]]
+) -> tuple[dict[str, Any], list[int]]:
     ids = _dataset(root, "units/id", h5py)
     spikes = _dataset(root, "units/spike_times", h5py)
     indexes = _dataset(root, "units/spike_times_index", h5py)
@@ -129,18 +219,69 @@ def _unit_summary(root: Any, h5py: Any) -> dict[str, int]:
     unit_ids = np.asarray(ids[:])
     if np.unique(unit_ids).size != unit_ids.size:
         raise ValueError("units/id contains duplicate identifiers")
-    ends = np.asarray(indexes[:], dtype=np.int64)
-    if np.any(ends < 0) or np.any(np.diff(ends) < 0) or ends[-1] != spikes.shape[0]:
+    ragged_ends = np.asarray(indexes[:], dtype=np.int64)
+    if (
+        np.any(ragged_ends < 0)
+        or np.any(np.diff(ragged_ends) < 0)
+        or ragged_ends[-1] != spikes.shape[0]
+    ):
         raise ValueError("units/spike_times_index is inconsistent with spike_times")
-    for offset in range(0, spikes.shape[0], 131072):
-        if not np.isfinite(spikes[offset : offset + 131072]).all():
-            raise ValueError("units/spike_times contains nonfinite values")
-    lengths = np.diff(np.r_[0, ends])
+    lengths = np.diff(np.r_[0, ragged_ends])
+    # Ragged units are read in bounded chunks. Only counts and source identifiers
+    # leave this function; a full time x unit matrix is never constructed.
+    per_unit = []
+    per_trial = [0] * len(trials)
+    stops = np.asarray([trial["stop_index_exclusive"] for trial in trials], dtype=np.int64)
+    outside = {"before": 0, "gap": 0, "after": 0}
+    prior = 0
+    exposure_s = round(math.fsum(float(x) for x in ends - starts), 9)
+    for unit_id, stop in zip(unit_ids, ragged_ends, strict=True):
+        observed = 0
+        last_spike = None
+        duplicates = 0
+        for offset in range(int(prior), int(stop), 131072):
+            block = np.asarray(spikes[offset : min(offset + 131072, int(stop))], dtype=np.float64)
+            if not np.isfinite(block).all():
+                raise ValueError("units/spike_times contains nonfinite values")
+            if (last_spike is not None and block.size and block[0] < last_spike) or np.any(
+                np.diff(block) < 0
+            ):
+                raise ValueError("units/spike_times must be sorted within each unit")
+            duplicates += int(np.count_nonzero(np.diff(block) == 0))
+            if last_spike is not None and block.size and block[0] == last_spike:
+                duplicates += 1
+            if block.size:
+                last_spike = float(block[-1])
+            indices, valid = _spike_bin_indices(block, starts, ends)
+            observed += int(np.count_nonzero(valid))
+            if np.any(valid):
+                trial_indices = np.searchsorted(stops, indices[valid], side="right")
+                for trial_index, count in enumerate(
+                    np.bincount(trial_indices, minlength=len(trials))
+                ):
+                    per_trial[trial_index] += int(count)
+            outside["before"] += int(np.count_nonzero(~valid & (block < starts[0])))
+            outside["after"] += int(np.count_nonzero(~valid & (block > ends[-1])))
+            outside["gap"] += int(
+                np.count_nonzero(~valid & (block >= starts[0]) & (block <= ends[-1]))
+            )
+        per_unit.append(
+            {
+                "unit_id": int(unit_id),
+                "observed_spikes": observed,
+                "rate_hz": observed / exposure_s,
+                "duplicate_timestamps": duplicates,
+            }
+        )
+        prior = int(stop)
     return dict(
         count=int(ids.shape[0]),
         spike_count=int(spikes.shape[0]),
         empty_unit_count=int(np.count_nonzero(lengths == 0)),
-    )
+        zero_observed_unit_count=sum(row["observed_spikes"] == 0 for row in per_unit),
+        per_unit=per_unit,
+        spikes_outside_analyzed_windows=outside,
+    ), per_trial
 
 
 def inspect_falcon_h1(path: str | Path) -> dict[str, Any]:
@@ -182,11 +323,37 @@ def inspect_falcon_h1(path: str | Path) -> dict[str, Any]:
             )
             if labels != FEATURES:
                 raise ValueError(f"{name} requires the documented seven H1 feature labels")
-        position_missing = _missing_by_column(position, "OpenLoopKinematics")
-        velocity_missing = _missing_by_column(velocity, "OpenLoopKinematicsVelocity")
         trials = _trial_segments(parsed["TrialNum"][0], size)
-        mask = _mask_counts(parsed["eval_mask"][0], size)
-        units = _unit_summary(root, h5py)
+        raw_mask = parsed["eval_mask"][0]
+        mask = _mask_counts(raw_mask, size)
+        position_missing, position_by_mask = _missing_by_column(
+            position, raw_mask, "OpenLoopKinematics"
+        )
+        velocity_missing, velocity_by_mask = _missing_by_column(
+            velocity, raw_mask, "OpenLoopKinematicsVelocity"
+        )
+        bin_ends = start + np.arange(size, dtype=np.float64) * period
+        bin_starts, bin_ends = h1_bin_windows(bin_ends, period)
+        widths = bin_ends - bin_starts
+        timing = describe_h1_timing(bin_ends, period)
+        units, trial_spikes = _unit_summary(root, h5py, bin_starts, bin_ends, trials)
+        trial_summaries = []
+        for trial, spike_count in zip(trials, trial_spikes, strict=True):
+            first, stop = trial["start_index"], trial["stop_index_exclusive"]
+            selected_count = 0
+            for offset in range(first, stop, 8192):
+                selected_count += int(np.count_nonzero(raw_mask[offset : min(offset + 8192, stop)]))
+            trial_summaries.append(
+                {
+                    **trial,
+                    "analyzed_exposure_s": round(
+                        math.fsum(float(x) for x in widths[first:stop]), 9
+                    ),
+                    "observed_spikes_all_units": spike_count,
+                    "raw_eval_mask_true_count": selected_count,
+                    "raw_eval_mask_false_count": stop - first - selected_count,
+                }
+            )
         storage_units = {
             name: _text(parsed[name][0].attrs.get("unit", "unknown"))
             for name in ("OpenLoopKinematics", "OpenLoopKinematicsVelocity")
@@ -201,18 +368,21 @@ def inspect_falcon_h1(path: str | Path) -> dict[str, Any]:
         "source": {"path": str(source), "sha256": digest, "bytes": before.size},
         "nwb_version": version,
         "time": {
-            "sample_count": size,
             "start_s": start,
             "period_s": period,
             "last_sample_s": start + (size - 1) * period,
+            **timing,
         },
         "features": {"labels": list(FEATURES), "storage_units": storage_units},
         "kinematics": {
             "position_nonfinite_by_feature": position_missing,
             "velocity_nonfinite_by_feature": velocity_missing,
+            "position_nonfinite_by_raw_mask": position_by_mask,
+            "velocity_nonfinite_by_raw_mask": velocity_by_mask,
         },
         "units": units,
-        "trials": {"count": len(trials), "segments": trials},
+        "trials": {"count": len(trials), "segments": trial_summaries},
         "evaluation_mask": mask,
+        "measurement_kind": "descriptive; no quality score or scientific acceptance",
         "scientific_acceptance": "unassigned",
     }
