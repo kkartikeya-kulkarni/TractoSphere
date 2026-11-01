@@ -1,5 +1,7 @@
 # Experimental FALCON H1 ridge reference
 
+The subsequent [public-asset overlap audit and custom whole-trial real-data experiment](BCI_FALCON_H1_REAL_DATA_TRIAL_EXPERIMENT.md) preserve this file-level reference route and its overlap rejection. That experiment is explicitly separate from unchanged FALCON benchmark evaluation.
+
 This is a bounded, headless **research experiment**, not a benchmark submission, decoder recommendation, scientific acceptance decision, or clinical tool. The Qt-free API is `run_h1_ridge_experiment(spec_path)`; the CLI is `dmri-studio bci ridge-h1 --spec PRIVATE_SPEC.json --output PRIVATE_NEW_REPORT.json`. Install the optional `bci-reference` extra in an isolated environment. The ordinary TractoSphere import and GUI do not eagerly load scikit-learn, SciPy, NWB, Qt or VTK for this experiment. The report is created exclusively outside the repository; it contains source paths and predictions. The API does not write a file. This code never loads a model pickle. The independent upstream comparison used a pickle created inside a trusted private test process; passive inspection must never unpickle arbitrary models.
 
 ## Pinned source and data roles
@@ -16,7 +18,7 @@ The reference is pinned to upstream commit `770c9b9597b8f58bf67b5a9ec6401ef705a2
 
 DANDI asset paths establish benchmark partitions; NWB metadata and the [pinned upstream mapping](https://github.com/snel-repo/falcon-challenge/blob/770c9b9597b8f58bf67b5a9ec6401ef705a2cb0f/falcon_challenge/config.py) support deidentified session/set labels. Neither a basename nor the upstream session helper uniquely identifies a file. The two previously inspected short recordings are **minival**, not training assets.
 
-The exact prefix overlap prevents a nonleaking local evaluation using these matching calibration/minival pairs. The experiment validator rejected a private S0-training/S1-calibration/S1-minival specification with `calibration and evaluation contain overlapping observations` **before fitting**. It checks repeated content, declared observation spans and repeated contiguous observations. Different paths or hashes do not prove independence. Lack of a detected repeated window also does not prove independent acquisition; source evidence for observation spans remains necessary. No real-data ridge score or official benchmark score is claimed. Path-bearing specifications and reports stay outside this repository.
+The exact prefix overlap prevents a nonleaking file-level local evaluation using these matching calibration/minival pairs. The reference validator rejected a private S0-training/S1-calibration/S1-minival specification with `calibration and evaluation contain overlapping observations` **before fitting**. It checks repeated content, declared observation spans and repeated contiguous observations. Different paths or hashes do not prove independence. Lack of a detected repeated window also does not prove independent acquisition; source evidence for observation spans remains necessary. No unchanged-reference real-data ridge score or official benchmark score is claimed. A separate, explicitly custom trial-selection result is documented in the linked audit. Path-bearing specifications and reports stay outside this repository.
 
 ## Versioned experiment contract
 
