@@ -100,6 +100,9 @@ def _parser() -> argparse.ArgumentParser:
     from .roi_filter import add_command as add_roi_filter_command
 
     add_roi_filter_command(commands)
+    from .bci import add_command as add_bci_command
+
+    add_bci_command(commands)
     return parser
 
 
@@ -367,6 +370,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return int(exc.code or 0)
     if args.command == "roi-filter":
         from .roi_filter import run
+
+        return run(args)
+    if args.command == "bci":
+        from .bci import run
 
         return run(args)
     if args.command == "batch":
