@@ -33,6 +33,14 @@ def add_command(commands: argparse._SubParsersAction) -> None:
     )
     custom.add_argument("--spec", type=Path, required=True, help="versioned custom trial JSON")
     custom.add_argument("--output", type=Path, required=True, help="new private JSON report path")
+    chronology = tasks.add_parser(
+        "ridge-h1-chronological",
+        help="compare constant and fixed/recalibrated ridge on later H1 trials",
+    )
+    chronology.add_argument("--spec", type=Path, required=True, help="versioned chronological JSON")
+    chronology.add_argument(
+        "--output", type=Path, required=True, help="new private JSON report path"
+    )
 
 
 def run(args: argparse.Namespace) -> int:
@@ -53,6 +61,14 @@ def run(args: argparse.Namespace) -> int:
             )
 
             report = run_h1_custom_trial_experiment(args.spec)
+            write_h1_ridge_report(report, args.output)
+            print(json.dumps({"report": str(args.output.expanduser().resolve())}, sort_keys=True))
+            return 0
+        elif args.bci_command == "ridge-h1-chronological":
+            from dmri_studio.core.bci_chronological import run_h1_chronological_experiment
+            from dmri_studio.core.bci_ridge import write_h1_ridge_report
+
+            report = run_h1_chronological_experiment(args.spec)
             write_h1_ridge_report(report, args.output)
             print(json.dumps({"report": str(args.output.expanduser().resolve())}, sort_keys=True))
             return 0
