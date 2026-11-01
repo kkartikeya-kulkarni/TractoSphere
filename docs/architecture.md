@@ -30,6 +30,10 @@ The experimental FALCON H1 inspector lives in `core/bci.py` and is exposed
 only by `cli/bci.py`. It imports optional `h5py` on demand, opens NWB sources
 read-only, and returns hash-bound structural summaries. There is no GUI route,
 decoder, or connection to MRI spatial/artifact contracts.
+`core/bci_inventory.py` reuses that inspector sequentially from a versioned,
+hash-pinned manifest. `cli/bci.py` exposes the same API with explicit partial
+failure status and exclusive report creation. No cross-recording spike matrix
+or decoder state is constructed.
 
 Dependency setup uses core/dependencies.py and shared tool_versions.py. It records
 versions/provenance without MRI execution. GUI dependency_setup.py owns one shared

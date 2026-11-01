@@ -147,3 +147,5 @@ separation, source changes and CLI/API parity. Ruff lint and format checks
 passed; isolated core/CLI import loaded neither Qt/VTK nor eager `h5py`.
 The single public recording demonstrates structural inspection only; it does
 not validate decoding or generalize this schema to every H1 asset.
+The separate [multi-recording inventory](BCI_FALCON_H1_INVENTORY.md) reuses
+this exact inspector for sequential descriptive comparison.

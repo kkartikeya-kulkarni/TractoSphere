@@ -12,6 +12,12 @@ PUBLIC ALPHA · RESEARCH USE ONLY · NOT FOR CLINICAL USE · SCIENTIFIC VALIDATI
   acquisitions or unrepresented timing gaps cannot be inferred. Zero observed
   spikes do not diagnose an electrode. No quality score or scientific acceptance
   is assigned; source mask values are never interpreted as acquisition failure.
+- The multi-recording H1 inventory compares only validated, explicitly listed
+  sources with hash-pinned identities. Session-day labels in the public example
+  are deidentified, and NWB subject IDs are source pseudonyms. Descriptive
+  comparability is not decoder-training suitability or cross-session neuron
+  matching. Partial/colliding inventories remain incomplete. See the
+  [manifest and collision contract](BCI_FALCON_H1_INVENTORY.md).
 
 - Native GUI verification is on macOS Apple Silicon. Linux/Windows are experimental;
   CI results, when available, are software checks rather than scientific validation.

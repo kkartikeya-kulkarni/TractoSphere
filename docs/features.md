@@ -22,7 +22,7 @@
 | Projects | BIDS discovery, inherited metadata, acquisition identity/history | No automatic joint-acquisition assembly |
 | Recovery | Bounded verified native-stage handoff | No automatic interrupted EDDY recovery |
 | AI | Absent | No authentication, API keys or inference services |
-| Experimental BCI inspection | CLI/API summary of the selected modern FALCON H1 NWB recording structure | Read-only, optional `h5py`; no GUI, decoder, benchmark scoring or anatomical inference; see [scope](BCI_FALCON_H1_INSPECTOR.md) |
+| Experimental BCI inspection | CLI/API summary of the selected modern FALCON H1 NWB structure and sequential, hash-pinned descriptive inventory | Read-only, optional `h5py`; no GUI, decoder, unit matching, benchmark scoring or anatomical inference; see [single-recording scope](BCI_FALCON_H1_INSPECTOR.md) and [inventory contract](BCI_FALCON_H1_INVENTORY.md) |
 
 FSL/MRtrix/ANTs are separate local CLI dependencies. NumPy/NiBabel/SciPy/VTK/Qt
 are imported local libraries. No remote inference API or container is needed for

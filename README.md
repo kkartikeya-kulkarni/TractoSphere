@@ -26,6 +26,9 @@ from the MRI workspaces. After installing `dmri-studio[bci]`, use
 selected modern FALCON H1 NWB structure without changing the source. It does
 not decode, train, evaluate or infer anatomy; see the [exact supported schema
 and limits](docs/BCI_FALCON_H1_INSPECTOR.md).
+An [experimental multi-recording inventory](docs/BCI_FALCON_H1_INVENTORY.md)
+compares explicitly listed, hash-pinned H1 recordings descriptively through
+the same headless API/CLI; it does not match units or train a decoder.
 
 If an atlas was **already registered**, use Registration → **Review an Existing
 Registered Atlas**. Import the exact atlas and its verified diffusion reference,
