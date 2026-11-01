@@ -127,6 +127,8 @@ class MainWindow(QMainWindow):
             ("Connectivity", "network"),
             ("QC", "list-checks"),
             ("Results", "files"),
+            ("Inspect Recording", "file-input"),
+            ("Compare Recordings", "database"),
             ("BCI Results", "files"),
             ("Software Dependencies", "sliders-horizontal"),
             ("Settings", "settings"),
@@ -138,6 +140,7 @@ class MainWindow(QMainWindow):
                 "Preprocessing": "Process",
                 "QC": "Review",
                 "Software Dependencies": "System",
+                "Inspect Recording": "BCI · experimental",
             }.get(name)
             if group:
                 heading = label(group, "caption")
@@ -175,6 +178,10 @@ class MainWindow(QMainWindow):
                 if name == "QC"
                 else self.focus_results
                 if name == "Results"
+                else self.focus_bci_inspection
+                if name == "Inspect Recording"
+                else self.focus_bci_inventory
+                if name == "Compare Recordings"
                 else self.focus_bci_results
                 if name == "BCI Results"
                 else None,
@@ -197,6 +204,8 @@ class MainWindow(QMainWindow):
                     "Data Check": "Validate loaded inputs",
                     "QC": "Inspect existing quality-control results",
                     "Results": "View processing outputs and reports",
+                    "Inspect Recording": "Read-only modern FALCON H1 NWB inspection",
+                    "Compare Recordings": "Inspect a hash-pinned H1 recording inventory manifest",
                     "BCI Results": "Inspect a saved chronological H1 comparison without opening recordings",
                     "Settings": "Application preferences",
                     "Software Dependencies": "Detect, locate and set up scientific software",
@@ -210,6 +219,8 @@ class MainWindow(QMainWindow):
                     "Acquisitions",
                     "QC",
                     "Results",
+                    "Inspect Recording",
+                    "Compare Recordings",
                     "BCI Results",
                     "Settings",
                     "Tractography",
@@ -337,6 +348,8 @@ class MainWindow(QMainWindow):
         self._scientific = None
         self._batch = None
         self._bci_results = None
+        self._bci_inspection = None
+        self._bci_inventory = None
         self._dependency_defaults = self.dependencies.saved_directories()
         self.results = ResultsPage(self.settings)
         self.results.scientific_requested.connect(self.open_scientific_selection)
@@ -1579,6 +1592,25 @@ class MainWindow(QMainWindow):
         self.workspace.setCurrentWidget(self.results)
         self.select_navigation("Results")
 
+    def focus_bci_inspection(self) -> None:
+        self._focus_bci_recordings(False)
+
+    def focus_bci_inventory(self) -> None:
+        self._focus_bci_recordings(True)
+
+    def _focus_bci_recordings(self, inventory: bool) -> None:
+        from .bci_recordings import BciRecordingsPage
+
+        attribute = "_bci_inventory" if inventory else "_bci_inspection"
+        page = getattr(self, attribute)
+        if page is None:
+            page = BciRecordingsPage(self.theme, inventory=inventory)
+            setattr(self, attribute, page)
+            self.workspace.addWidget(page)
+        self.page.preview.set_expanded(None)
+        self.workspace.setCurrentWidget(page)
+        self.select_navigation("Compare Recordings" if inventory else "Inspect Recording")
+
     def focus_bci_results(self) -> None:
         """Create the passive report workspace only when requested."""
         if self._bci_results is None:
@@ -1811,7 +1843,10 @@ class MainWindow(QMainWindow):
         dependencies_idle = self.dependencies.shutdown()
         qc_idle = self.qc.shutdown()
         results_idle = self.results.shutdown()
-        bci_results_idle = self._bci_results is None or self._bci_results.shutdown()
+        bci_results_idle = all(
+            page is None or page.shutdown()
+            for page in (self._bci_results, self._bci_inspection, self._bci_inventory)
+        )
         projects_idle = self.projects.shutdown()
         scientific_idle = self._scientific is None or self._scientific.shutdown()
         batch_idle = self._batch is None or self._batch.shutdown()

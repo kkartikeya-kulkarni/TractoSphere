@@ -59,3 +59,8 @@ measurement semantics; GUI capture.py composites actual native VTK framebuffer
 pixels into workspace exports without changing scene data. Platform-specific
 discovery does not enable unsupported adapters. CI builds/tests installed wheels
 on explicit runner architectures and never substitutes scientific acceptance.
+
+The experimental **Inspect Recording** and **Compare Recordings** GUI pages now
+expose the existing read-only H1 inspector and manifest inventory. Compare reads
+explicitly listed hash-pinned recordings; BCI Results remains a passive report
+viewer. See the [recording workspace scope and validation limits](BCI_RECORDINGS_WORKSPACE.md).

@@ -38,3 +38,8 @@ record actions; neither loads private data automatically at startup. Processing
 completion, technical output checks and human scientific review are distinct.
 See [how to check each result](validation.md), [testing phase and coverage](user-guide/status.md), and [known limitations](limitations.md)
 for test coverage and native verification limits.
+
+The experimental **Inspect Recording** and **Compare Recordings** GUI pages now
+expose the existing read-only H1 inspector and manifest inventory. Compare reads
+explicitly listed hash-pinned recordings; BCI Results remains a passive report
+viewer. See the [recording workspace scope and validation limits](BCI_RECORDINGS_WORKSPACE.md).

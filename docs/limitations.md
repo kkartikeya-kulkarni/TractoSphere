@@ -91,3 +91,8 @@ PUBLIC ALPHA · RESEARCH USE ONLY · NOT FOR CLINICAL USE · SCIENTIFIC VALIDATI
   or restricted network filesystems may reject it. There is no overwrite fallback.
 - Windows generic subprocess cancellation covers the direct executable only, not
   arbitrary child trees or WSL; Windows scientific processing remains unsupported.
+
+The experimental **Inspect Recording** and **Compare Recordings** GUI pages now
+expose the existing read-only H1 inspector and manifest inventory. Compare reads
+explicitly listed hash-pinned recordings; BCI Results remains a passive report
+viewer. See the [recording workspace scope and validation limits](BCI_RECORDINGS_WORKSPACE.md).

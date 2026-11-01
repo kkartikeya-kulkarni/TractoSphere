@@ -84,3 +84,8 @@ macOS Apple Silicon is the primary scientific development and native GUI test en
 ## Development, license and data safety
 
 Run `python -m pytest tests` for the included tests; native scientific integration cases need their external tools and GUI cases need a display/Qt/VTK. The branch carries product source and tests without participant MRI arrays, tractograms, SIFT2 weights or private study records. Public GUI screenshots are documented in [third-party notices](THIRD_PARTY_NOTICES.md). Do not include private data in issues or logs. See [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md) and [LICENSE](LICENSE). The MIT license covers TractoSphere's own code; external scientific programs are installed and licensed separately.
+
+The experimental **Inspect Recording** and **Compare Recordings** GUI pages now
+expose the existing read-only H1 inspector and manifest inventory. Compare reads
+explicitly listed hash-pinned recordings; BCI Results remains a passive report
+viewer. See the [recording workspace scope and validation limits](docs/BCI_RECORDINGS_WORKSPACE.md).
